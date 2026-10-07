@@ -36,6 +36,23 @@
 <link rel="stylesheet" href="assets/site.css">
 <script>
   (function () {
+    // A credential must never sit in the address bar. If one ever arrives
+    // there — a form that navigated, a pasted link, a bookmark — it is taken
+    // out of the URL and out of this history entry before anything else runs.
+    try {
+      var url = new URL(location.href);
+      var removed = false;
+      ['password', 'pass', 'pwd', 'passwd', 'token', 'secret', 'email'].forEach(function (key) {
+        if (url.searchParams.has(key)) { url.searchParams.delete(key); removed = true; }
+      });
+      if (removed) {
+        history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + url.hash);
+      }
+    } catch (e) { /* nothing here is worth breaking a page over */ }
+  })();
+</script>
+<script>
+  (function () {
     var d = document.documentElement;
     try {
       var t = localStorage.getItem('plume-theme');

@@ -13,6 +13,23 @@
 <link rel="stylesheet" href="assets/site.css">
 <script>
   (function () {
+    // A credential must never sit in the address bar. If one ever arrives
+    // there — a form that navigated, a pasted link, a bookmark — it is taken
+    // out of the URL and out of this history entry before anything else runs.
+    try {
+      var url = new URL(location.href);
+      var removed = false;
+      ['password', 'pass', 'pwd', 'passwd', 'token', 'secret', 'email'].forEach(function (key) {
+        if (url.searchParams.has(key)) { url.searchParams.delete(key); removed = true; }
+      });
+      if (removed) {
+        history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + url.hash);
+      }
+    } catch (e) { /* nothing here is worth breaking a page over */ }
+  })();
+</script>
+<script>
+  (function () {
     var d = document.documentElement;
     try {
       var t = localStorage.getItem('plume-theme');
@@ -21,11 +38,17 @@
   })();
 </script>
 <style>
-  .app-wrap { max-width: 1080px; padding-block: clamp(36px, 6vw, 64px); }
+  /* Five tiles across need a little more room than a reading column. */
+  .app-wrap { max-width: 1180px; padding-block: clamp(28px, 5vw, 56px); }
+
+  /* Everything in the dashboard is a block in one stack, so the spacing is
+     stated once rather than per pair — the tiles row used to sit flush against
+     the panel below it. */
+  #dash > * + * { margin-top: 20px; }
 
   .panel {
     border: 1px solid var(--line); border-radius: 16px;
-    background: var(--card); box-shadow: var(--shadow); padding: 30px;
+    background: var(--card); box-shadow: var(--shadow); padding: 26px;
   }
   .panel + .panel { margin-top: 20px; }
   .panel h2 { font-size: 1.3rem; }
@@ -53,7 +76,7 @@
   /* ---------- dashboard header ---------- */
   .admin-head {
     display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
-    justify-content: space-between; margin-bottom: 20px;
+    justify-content: space-between;
   }
   .admin-head .who { color: var(--text-2); font-size: .92rem; }
   .admin-head .who b { color: var(--text); }
@@ -62,15 +85,17 @@
 
   /* ---------- stat tiles ---------- */
   .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  @media (max-width: 1100px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 920px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 460px) { .tiles { grid-template-columns: 1fr; } }
   .tile {
     border: 1px solid var(--line); border-radius: 14px; background: var(--card);
-    box-shadow: var(--shadow); padding: 18px 20px;
+    box-shadow: var(--shadow); padding: 16px 18px;
+    display: flex; flex-direction: column; min-width: 0;
   }
   .tile .label { font-size: .78rem; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); }
-  .tile .value { font-size: 1.65rem; font-weight: 680; color: var(--text); margin-top: 8px; letter-spacing: -.02em; }
-  .tile .sub { font-size: .83rem; color: var(--text-3); margin-top: 6px; }
+  .tile .value { font-size: 1.55rem; font-weight: 680; color: var(--text); margin-top: 8px; letter-spacing: -.02em; }
+  .tile .sub { font-size: .81rem; color: var(--text-3); margin-top: 6px; line-height: 1.45; text-wrap: pretty; }
   .tile .sub b { color: var(--text-2); font-weight: 580; }
 
   /* ---------- histogram ---------- */
