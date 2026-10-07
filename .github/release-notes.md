@@ -1,6 +1,6 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no vault, no project, no editor chrome.
 
-**1.0.1 fixes problems found in 1.0.1 shortly after release. Please update, especially on macOS and Linux.**
+**1.0.1 fixes problems found in 1.0.0 shortly after release. Please update, especially on macOS and Linux.**
 
 ## Fixed in 1.0.1
 
