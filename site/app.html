@@ -226,7 +226,7 @@
 
       <div class="msg" id="gate-msg" role="alert"></div>
 
-      <form id="auth-form" autocomplete="on" novalidate>
+      <form id="auth-form" autocomplete="on" novalidate onsubmit="return false">
         <div class="field">
           <label for="email">Email</label>
           <input type="email" id="email" name="email" autocomplete="email" required placeholder="you@example.com">
@@ -288,7 +288,7 @@
 
       <div class="msg" id="tok-msg" role="alert"></div>
 
-      <form class="tok-new" id="tok-form">
+      <form class="tok-new" id="tok-form" onsubmit="return false">
         <input type="text" id="tok-name" maxlength="60" placeholder="What is it for? e.g. Claude Code on my laptop" aria-label="Token name">
         <button class="btn btn-primary" type="submit">Create token</button>
       </form>
