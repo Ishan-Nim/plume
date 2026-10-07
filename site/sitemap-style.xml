@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A stylesheet for the sitemap, so that opening it in a browser shows a
+  readable table instead of a wall of run-together text. Crawlers ignore it
+  entirely; it changes nothing about what the sitemap says.
+
+  It is named .xml rather than .xsl on purpose: the host serves .xml as
+  text/xml, and a browser will not apply a stylesheet served as a download.
+-->
+<xsl:stylesheet version="1.0"
+                xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+                xmlns:s="http://www.sitemaps.org/schemas/sitemap/0.9"
+                xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <xsl:output method="html" encoding="UTF-8" indent="yes"/>
+
+  <xsl:template match="/">
+    <html lang="en">
+      <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <title>Sitemap — Plume</title>
+        <style>
+          :root {
+            --bg: #fbfbfd; --card: #fff; --line: #e6e6ec;
+            --text: #15151a; --text-2: #44444e; --text-3: #6f6f7b;
+            --accent: #6d4aff;
+          }
+          @media (prefers-color-scheme: dark) {
+            :root {
+              --bg: #121216; --card: #18181d; --line: #2a2a33;
+              --text: #f2f2f5; --text-2: #c7c7d1; --text-3: #8d8d9a;
+              --accent: #9b85ff;
+            }
+          }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0; padding: 40px 20px; background: var(--bg); color: var(--text);
+            font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          }
+          .wrap { max-width: 980px; margin: 0 auto; }
+          header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+          .mark {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: linear-gradient(145deg, #7c5cff, #5b35e8);
+            display: grid; place-items: center;
+          }
+          .mark svg { width: 20px; height: 20px; }
+          h1 { font-size: 1.5rem; margin: 0; letter-spacing: -.02em; }
+          .lede { color: var(--text-3); font-size: .95rem; margin: 0 0 28px 48px; }
+          .lede a { color: var(--accent); }
+          table {
+            width: 100%; border-collapse: collapse; background: var(--card);
+            border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+          }
+          th, td { text-align: left; padding: 13px 18px; border-bottom: 1px solid var(--line); vertical-align: top; }
+          th {
+            font-size: .74rem; text-transform: uppercase; letter-spacing: .07em;
+            color: var(--text-3); font-weight: 600; background: var(--bg);
+          }
+          tr:last-child td { border-bottom: 0; }
+          td a { color: var(--accent); text-decoration: none; font-weight: 500; word-break: break-all; }
+          td a:hover { text-decoration: underline; }
+          .meta { color: var(--text-3); font-size: .88rem; white-space: nowrap; }
+          .langs { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 5px; }
+          .langs a {
+            font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+            color: var(--text-2); background: var(--bg);
+            border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; text-decoration: none;
+          }
+          .langs a:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
+          footer { margin-top: 24px; color: var(--text-3); font-size: .85rem; }
+          footer a { color: var(--text-3); }
+          @media (max-width: 620px) {
+            .meta { white-space: normal; }
+            th:nth-child(3), td:nth-child(3) { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="wrap">
+          <header>
+            <span class="mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 4c0 9-6 14-13 15l-3 1 1-3C6 10 11 4 20 4z"/>
+                <path d="M4 20c4-6 8-9 13-11"/>
+              </svg>
+            </span>
+            <h1>Sitemap</h1>
+          </header>
+          <p class="lede">
+            <xsl:value-of select="count(s:urlset/s:url)"/> pages on
+            <a href="https://plume-md.com/">plume-md.com</a>, each listed with every language it is
+            published in. This file is for search engines; the styling is only so it reads properly here.
+          </p>
+
+          <table>
+            <tr>
+              <th>Page</th>
+              <th>Last changed</th>
+              <th>Priority</th>
+            </tr>
+            <xsl:for-each select="s:urlset/s:url">
+              <tr>
+                <td>
+                  <a href="{s:loc}"><xsl:value-of select="s:loc"/></a>
+                  <xsl:if test="xhtml:link">
+                    <div class="langs">
+                      <xsl:for-each select="xhtml:link">
+                        <a href="{@href}" title="{@hreflang}"><xsl:value-of select="@hreflang"/></a>
+                      </xsl:for-each>
+                    </div>
+                  </xsl:if>
+                </td>
+                <td class="meta"><xsl:value-of select="s:lastmod"/></td>
+                <td class="meta"><xsl:value-of select="s:priority"/></td>
+              </tr>
+            </xsl:for-each>
+          </table>
+
+          <footer>
+            Not listed here: the sign-in page, the admin view and the 404, which are all
+            <code>noindex</code> on purpose. See <a href="/robots.txt">robots.txt</a>.
+          </footer>
+        </div>
+      </body>
+    </html>
+  </xsl:template>
+</xsl:stylesheet>
