@@ -15,10 +15,26 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+// Never let a harness failure pop a modal error dialog on the desktop:
+// print it and exit instead.
+function fail(message, code = 2) {
+  console.error(`capture: ${message}`);
+  app.exit(code);
+  process.exit(code);
+}
+process.on('uncaughtException', err => fail(err && err.stack ? err.stack : String(err), 1));
+process.on('unhandledRejection', err => fail(err && err.stack ? err.stack : String(err), 1));
+
 const out = process.env.PLUME_OUT;
-if (!out) {
-  console.error('PLUME_OUT is required');
-  process.exit(2);
+if (!out) fail('PLUME_OUT is required');
+
+let extraSettings = {};
+if (process.env.PLUME_SETTINGS) {
+  try {
+    extraSettings = JSON.parse(process.env.PLUME_SETTINGS);
+  } catch (err) {
+    fail(`PLUME_SETTINGS is not valid JSON (${err.message}). Escape Windows backslashes as \\\\ or use forward slashes.`);
+  }
 }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-e2e-'));
@@ -27,7 +43,7 @@ const [w, h] = (process.env.PLUME_SIZE || '1280x860').split('x').map(Number);
 const settings = {
   theme: process.env.PLUME_THEME || 'light',
   bounds: { x: 40, y: 40, width: w, height: h },
-  ...(process.env.PLUME_SETTINGS ? JSON.parse(process.env.PLUME_SETTINGS) : {}),
+  ...extraSettings,
 };
 fs.writeFileSync(path.join(tmp, 'settings.json'), JSON.stringify(settings));
 
@@ -35,6 +51,7 @@ fs.writeFileSync(path.join(tmp, 'settings.json'), JSON.stringify(settings));
 // windows do not produce fresh frames) but does not disturb the desktop.
 BrowserWindow.prototype.show = function show() {
   this.setOpacity(0);
+  this.setSkipTaskbar(true);
   this.showInactive();
 };
 BrowserWindow.prototype.maximize = function maximize() {};

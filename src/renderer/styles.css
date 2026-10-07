@@ -395,6 +395,10 @@ kbd {
   outline: none;
   background: var(--bg);
 }
+/* The reading pane takes focus so the keyboard scrolls it; it is not a
+   control, so it never shows a focus ring. */
+.viewer:focus,
+.viewer:focus-visible { outline: none; }
 
 .is-welcome .markdown-body { display: none; }
 body:not(.is-welcome) .welcome { display: none; }

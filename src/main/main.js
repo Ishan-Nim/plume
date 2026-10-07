@@ -605,7 +605,10 @@ handle('app:defaultStatus', async () => {
 
 handle('app:openDefaultApps', async () => {
   if (process.platform !== 'win32') return false;
-  await shell.openExternal('ms-settings:defaultapps?registeredAppUser=Plume');
+  // A per-machine install registers under HKLM, a per-user one under HKCU;
+  // Settings needs to be told which registration to open.
+  const perMachine = /\\Program Files( \(x86\))?\\/i.test(process.execPath);
+  await shell.openExternal(`ms-settings:defaultapps?${perMachine ? 'registeredAppMachine' : 'registeredAppUser'}=Plume`);
   return true;
 });
 
