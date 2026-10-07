@@ -293,3 +293,13 @@ test('path helpers', () => {
   assert.deepEqual(util.relativeSegments('E:\\Vault', 'E:\\Vault\\x\\y'), ['x', 'y']);
   assert.equal(util.relativeSegments('E:\\Vault', 'E:\\Other\\y'), null);
 });
+
+test('path helpers keep the separator of the root path', () => {
+  assert.equal(util.joinPath('E:\\Vault', 'notes'), 'E:\\Vault\\notes');
+  assert.equal(util.joinPath('E:\\', 'notes'), 'E:\\notes');
+  assert.equal(util.joinPath('/home/me/vault', 'notes'), '/home/me/vault/notes');
+  assert.equal(util.joinPath('/', 'notes'), '/notes');
+  assert.equal(util.dirname('/a.md'), '/');
+  assert.equal(util.dirname('/home/me/a.md'), '/home/me');
+  assert.deepEqual(util.relativeSegments('/home/me', '/home/me/x/y'), ['x', 'y']);
+});

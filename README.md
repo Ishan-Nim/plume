@@ -5,12 +5,12 @@
 <h1 align="center">Plume</h1>
 
 <p align="center">
-  <b>A feather-light Markdown viewer for Windows.</b><br>
+  <b>A feather-light Markdown viewer for Windows, macOS and Linux.</b><br>
   Double-click any <code>.md</code> file and it opens instantly — no vault, no project, no editor chrome. Just the document, beautifully set.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Ishan-Nim/plume/releases/latest"><b>Download for Windows</b></a> ·
+  <a href="https://github.com/Ishan-Nim/plume/releases/latest"><b>Download</b></a> ·
   <a href="#features">Features</a> ·
   <a href="#install">Install</a> ·
   <a href="#keyboard">Keyboard</a> ·
@@ -29,7 +29,7 @@
 
 ## Features
 
-- **Opens with one double-click.** The installer registers Plume for `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, `.mdtxt`, `.mdtext`. A second file opens in a new window of the already-running app — no cold start.
+- **Opens with one double-click.** Plume registers itself for `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, `.mdtxt`, `.mdtext`. A second file opens in a new window of the already-running app — no cold start.
 - **Reads Obsidian notes properly.** `[[wiki links]]`, `[[Note#Heading|alias]]`, `![[image.png|300]]`, `![[Note#Section]]` transclusion, callouts (`> [!tip]`, foldable `> [!warning]-`), `==highlights==`, `#tags`, `%%comments%%`, `^block` ids, front-matter Properties, and Obsidian-style line breaks (toggleable).
 - **Full GitHub-flavoured Markdown.** Tables, task lists, footnotes, definition lists, emoji shortcodes, syntax highlighting (incl. PowerShell, Dockerfile, nginx…), KaTeX math, Mermaid diagrams.
 - **Sidebar** with the folder tree around the file (the whole vault when the file is inside one) and an outline of headings with reading time.
@@ -37,17 +37,20 @@
 - **Find in page**, back/forward between linked notes, image lightbox, copy buttons on code blocks.
 - **Light / dark / auto theme**, text size, reading width, sans/serif.
 - **Print** and **Export to PDF** (with a PDF outline from your headings).
-- **Open in editor** (VS Code if installed, otherwise Notepad), **Open in Obsidian** for vault files, **Open with…**, **Show in folder**.
+- **Open in editor** (VS Code or Cursor if installed, otherwise the system text editor), **Open in Obsidian** for vault files, **Open with…** (Windows), **Show in folder**.
 - Safe by default: documents are sanitised, scripts never run, links to programs are never executed.
 
 ## Install
 
-1. Download `Plume-Setup-<version>.exe` from [Releases](https://github.com/Ishan-Nim/plume/releases/latest) (or build it yourself, below).
-2. Run it. Plume installs for all users in `C:\Program Files\Plume` — Windows asks for administrator approval once — and adds Start-menu and desktop shortcuts.
+Download the package for your system from [Releases](https://github.com/Ishan-Nim/plume/releases/latest), or build it yourself (below). The packages are not code-signed yet.
 
-Requires Windows 10 or 11, 64-bit. Uninstall from **Settings → Apps → Installed apps**.
+**Windows 10 / 11 (64-bit):** run `Plume-Setup-<version>.exe`. Plume installs for all users in `C:\Program Files\Plume` — Windows asks for administrator approval once — and adds Start-menu and desktop shortcuts. If SmartScreen warns, choose **More info → Run anyway**. Uninstall from **Settings → Apps → Installed apps**.
 
-### Make Plume the default for .md
+**macOS (Apple silicon or Intel):** open `Plume-<version>-mac-<arch>.dmg` and drag Plume into Applications. Plume is not notarized, so macOS blocks the first launch: right-click Plume → **Open**, or allow it under **System Settings → Privacy & Security**, or run `xattr -cr /Applications/Plume.app`.
+
+**Linux (x64):** `sudo apt install ./Plume-<version>-linux-amd64.deb`, or make `Plume-<version>-linux-x86_64.AppImage` executable and run it.
+
+### Make Plume the default for .md (Windows)
 
 Windows only lets *you* choose default apps, so this is one click on your side. Any of these works:
 
@@ -57,7 +60,11 @@ Windows only lets *you* choose default apps, so this is one click on your side. 
 
 After that, a double-click opens Markdown files straight into Plume. Plume also appears in the right-click **Open with** menu for every Markdown extension.
 
+On macOS, select a `.md` file in Finder → **Get Info** → **Open with: Plume** → **Change All…**. On Linux, choose Plume under **Open With** in your file manager and set it as the default.
+
 ## Keyboard
+
+On macOS, use `⌘` in place of `Ctrl` and `⌥` in place of `Alt`.
 
 | Action | Keys |
 |---|---|
@@ -81,7 +88,9 @@ npm install
 npm start        # run in development
 npm test         # unit tests
 npm run icons    # re-render icons from resources/*.svg
-npm run dist     # build release/Plume-Setup-<version>.exe (per-machine installer)
+npm run dist        # build release/Plume-Setup-<version>.exe (per-machine installer)
+npm run dist:mac    # build the macOS .dmg and .zip (on a Mac)
+npm run dist:linux  # build the Linux AppImage and .deb
 ```
 
 Visual smoke test (renders a document in the real app and saves a screenshot):
@@ -105,4 +114,4 @@ docs/           screenshots and the demo notebook they are taken from
 
 ## Security
 
-Markdown files are untrusted input. Plume renders them in a sandboxed, context-isolated window with a strict Content-Security-Policy; HTML is sanitised with DOMPurify, scripts never run, external links open in your browser, and links to local files only open documents, images and media — programs, scripts and shortcuts are only ever revealed in File Explorer.
+Markdown files are untrusted input. Plume renders them in a sandboxed, context-isolated window with a strict Content-Security-Policy; HTML is sanitised with DOMPurify, scripts never run, external links open in your browser, and links to local files only open documents, images and media — programs, scripts and shortcuts are only ever revealed in the file manager. A document cannot make Plume load files from other computers on your network.
