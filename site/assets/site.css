@@ -321,6 +321,16 @@ section { padding-block: clamp(64px, 9vw, 108px); }
 .cta-band { text-align: center; }
 .cta-band .btn { margin-top: 28px; }
 
+/* The one line that points at the documentation for everything the home page
+   deliberately does not say. */
+.section-more {
+  margin-top: 36px; text-align: center;
+  color: var(--text-3); font-size: .95rem; line-height: 1.7;
+  max-width: 64ch; margin-inline: auto;
+}
+.section-more a { color: var(--accent); font-weight: 550; }
+.section-more a::after { content: " 92"; }
+
 /* ---------- footer ---------- */
 
 .site-footer { border-top: 1px solid var(--line); background: var(--bg-2); padding-block: 56px 32px; }

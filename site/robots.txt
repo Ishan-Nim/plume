@@ -1,6 +1,13 @@
+# plume-md.com
 User-agent: *
 Allow: /
+
+# Not worth indexing: a sign-in form, a private operations view, and the API.
 Disallow: /app.html
+Disallow: /admin.html
 Disallow: /api/
+
+# Crawl what you like, but the pages are small and there is no need to hurry.
+Crawl-delay: 1
 
 Sitemap: https://plume-md.com/sitemap.xml

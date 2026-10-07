@@ -22,6 +22,20 @@
 <link rel="alternate" hreflang="ru" href="https://plume-md.com/app.html?lang=ru">
 <link rel="alternate" hreflang="x-default" href="https://plume-md.com/app.html">
 
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Plume">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="https://plume-md.com/app.html">
+<meta property="og:title" content="Plume Vault — sign in">
+<meta property="og:description" content="Sign in to Plume Vault. 100 MB of free storage for your Markdown notes.">
+<meta property="og:image" content="https://plume-md.com/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Plume — Markdown, beautifully set.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Plume Vault — sign in">
+<meta name="twitter:description" content="Sign in to Plume Vault. 100 MB of free storage for your Markdown notes.">
+<meta name="twitter:image" content="https://plume-md.com/assets/og.png">
 <link rel="stylesheet" href="assets/site.css">
 <script>
   (function () {
@@ -202,6 +216,16 @@
     font-family: var(--mono); font-size: .82rem; line-height: 1.6;
   }
 </style>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-24LZQCCRJH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  // anonymize_ip is on by default in GA4; this says so out loud, and keeps
+  // Google from using these hits to build ad audiences.
+  gtag('config', 'G-24LZQCCRJH', { anonymize_ip: true, allow_google_signals: false });
+</script>
 </head>
 <body>
 
@@ -274,7 +298,7 @@
 
   <!-- ============ signed in ============ -->
   <div id="vault" hidden>
-    <h1 class="sr-only">Your vault</h1>
+    <h2 class="sr-only">Your vault</h2>
     <div class="panel">
       <div class="acct">
         <div class="who">
