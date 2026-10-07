@@ -235,7 +235,7 @@ export class Vault {
     } else {
       const name = el('input', {
         type: 'text', class: 'vault-name',
-        value: this.state.suggested || doc.name || '',
+        value: doc.name || '',
         'aria-label': 'Name in the vault',
       });
       const send = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Sync to vault' });
@@ -301,6 +301,20 @@ export class Vault {
 
   async push(vaultPath, button) {
     if (!vaultPath) return this.toast('Give the document a name first', 'error');
+
+    // Syncing a document for the first time under a name something else
+    // already uses would replace that other document. The server cannot catch
+    // this — there is no revision to compare against — so ask here.
+    const doc = this.getDoc();
+    const alreadyLinked = doc && this.links[doc.path];
+    const taken = this.files.some(f => f.path === vaultPath);
+    if (!alreadyLinked && taken) {
+      const ok = window.confirm(
+        `Your vault already has a document called “${vaultPath}”. `
+        + 'Syncing will replace it. Use a different name to keep both.',
+      );
+      if (!ok) return;
+    }
     button.disabled = true;
     const label = button.textContent;
     button.textContent = 'Syncing…';

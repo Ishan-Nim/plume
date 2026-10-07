@@ -178,6 +178,28 @@ async function main(win) {
     if (refresh) refresh.click();
   `);
 
+  // The panel must offer the name of the document that is open now. Offering
+  // the one that was open when it first drew made syncing a second document
+  // overwrite the first one's copy in the vault.
+  await run(`
+    document.getElementById('graph-view-close').click();
+    document.querySelector('.sidebar-tab[data-tab="files"]').click();
+    await new Promise(r => setTimeout(r, 500));
+    const rows = [...document.querySelectorAll('.tree-row')];
+    const row = rows.find(r => r.textContent.trim() === 'Reading');
+    if (row) row.click();
+  `);
+  await sleep(1600);
+  await run("document.querySelector('.sidebar-tab[data-tab=\"vault\"]').click();");
+  await sleep(800);
+  const offered = await read('(document.querySelector(".vault-name") || {}).value');
+  record('the name offered is the open document, not a stale one', offered === 'Reading.md', offered);
+
+  await run(`
+    const again = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Graph');
+    if (again) again.click();
+  `);
+
   const graphShown = await until('!document.getElementById("graph-view").hidden', { timeout: 20000 });
   record('the graph view opens', graphShown);
 
