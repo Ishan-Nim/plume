@@ -149,6 +149,12 @@
     $('viewer-body').textContent = '';
     viewer.classList.remove('show');
     clearNote(vaultMsg);
+
+    if (graph) graph.setData([], []);
+    $('graph-legend').textContent = '';
+    $('graph-tip').classList.remove('show');
+    $('graph-empty').textContent = 'Loading your graph…';
+    $('graph-empty').hidden = false;
   }
 
   function signOut() {
@@ -231,6 +237,92 @@
     var data = await apiJson('/vault/list');
     paintAccount(data.account);
     paintFiles(data.files);
+    loadGraph();
+  }
+
+  // ---------- the graph ----------
+
+  var graph = null;
+  var graphTip = null;
+
+  function describe(node) {
+    return node.name + ' · ' + (node.links === 1 ? '1 link' : node.links + ' links');
+  }
+
+  function paintLegend(folders) {
+    var legend = $('graph-legend');
+    legend.textContent = '';
+    if (!folders || folders.length < 2) return;
+
+    folders.slice(0, 8).forEach(function (folder, i) {
+      var item = document.createElement('span');
+      var dot = document.createElement('i');
+      dot.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:99px;margin-right:6px;'
+        + 'background:hsl(' + [262, 190, 36, 150, 320, 12, 212, 96][i % 8] + ' 62% 58%)';
+      var label = document.createElement('b');
+      label.textContent = folder === '' ? 'Top level' : folder;
+      item.appendChild(dot);
+      item.appendChild(label);
+      legend.appendChild(item);
+    });
+  }
+
+  async function loadGraph() {
+    var canvas = $('graph-canvas');
+    var empty = $('graph-empty');
+    if (!canvas || !window.PlumeGraph) return;
+
+    var data;
+    try {
+      data = await apiJson('/vault/graph');
+    } catch (err) {
+      empty.textContent = err.message;
+      empty.hidden = false;
+      return;
+    }
+
+    if (!data.nodes.length) {
+      empty.textContent = 'Sync some documents and the links between them appear here.';
+      empty.hidden = false;
+      if (graph) graph.setData([], []);
+      paintLegend([]);
+      return;
+    }
+    empty.hidden = true;
+
+    if (!graph) {
+      graphTip = $('graph-tip');
+      graph = new window.PlumeGraph(canvas, {
+        onHover: function (node) {
+          if (!node) {
+            graphTip.classList.remove('show');
+            return;
+          }
+          graphTip.textContent = '';
+          var name = document.createElement('b');
+          name.textContent = node.path;
+          var meta = document.createElement('span');
+          meta.textContent = describe(node) + ' · ' + bytes(node.size)
+            + (node.updatedAt ? ' · ' + when(node.updatedAt) : '');
+          graphTip.appendChild(name);
+          graphTip.appendChild(meta);
+          graphTip.classList.add('show');
+        },
+        onOpen: function (node) {
+          var file = state.files.filter(function (f) { return f.path === node.path; })[0];
+          if (file) openFile(file);
+        },
+      });
+
+      window.addEventListener('resize', function () { graph.resize(); });
+      $('graph-fit').addEventListener('click', function () { graph.fit(); });
+      $('graph-shake').addEventListener('click', function () { graph.nudge(); });
+    }
+
+    graph.setData(data.nodes, data.edges);
+    graph.resize();
+    paintLegend(graph.folders);
+    setTimeout(function () { if (graph) graph.fit(); }, 900);
   }
 
   async function showVault() {

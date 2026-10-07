@@ -99,6 +99,33 @@
     display: grid; place-items: center; font-size: .78rem; font-weight: 680;
   }
   .how b { color: var(--text); }
+
+  .graph-panel { margin-top: 20px; }
+  .graph-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .graph-head h2 { font-size: 1.35rem; }
+  .graph-acts { display: flex; gap: 8px; }
+  .graph-stage {
+    position: relative; margin-top: 18px;
+    border: 1px solid var(--line); border-radius: 13px; overflow: hidden;
+    background: var(--bg-2);
+  }
+  .graph-stage canvas { display: block; width: 100%; height: 440px; touch-action: none; cursor: grab; }
+  @media (max-width: 620px) { .graph-stage canvas { height: 340px; } }
+  .graph-empty {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    text-align: center; padding: 24px; color: var(--text-3); font-size: .93rem;
+  }
+  .graph-tip {
+    position: absolute; left: 12px; bottom: 12px; max-width: calc(100% - 24px);
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 12px; font-size: .86rem; pointer-events: none;
+    box-shadow: var(--shadow); display: none;
+  }
+  .graph-tip.show { display: block; }
+  .graph-tip b { display: block; font-weight: 600; word-break: break-all; }
+  .graph-tip span { color: var(--text-3); font-size: .8rem; }
+  .graph-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: .82rem; color: var(--text-3); }
+  .graph-legend b { color: var(--text-2); font-weight: 580; }
 </style>
 </head>
 <body>
@@ -192,6 +219,27 @@
       </div>
     </div>
 
+
+    <div class="panel graph-panel">
+      <div class="graph-head">
+        <h2>Graph</h2>
+        <div class="graph-acts">
+          <button class="btn btn-ghost btn-sm" type="button" id="graph-fit">Fit</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="graph-shake">Re-arrange</button>
+        </div>
+      </div>
+      <p class="hint" style="font-size:.88rem;color:var(--text-3);margin-top:6px">
+        How your documents link to each other. Drag a note to move it, scroll to zoom,
+        double-click to open.
+      </p>
+      <div class="graph-stage">
+        <canvas id="graph-canvas" aria-label="A map of the links between your documents"></canvas>
+        <p class="graph-empty" id="graph-empty">Loading your graph…</p>
+        <div class="graph-tip" id="graph-tip" role="status"></div>
+      </div>
+      <div class="graph-legend" id="graph-legend"></div>
+    </div>
+
     <div class="panel">
       <h2>Documents</h2>
       <div class="msg" id="vault-msg" role="alert"></div>
@@ -233,6 +281,7 @@
 </footer>
 
 <script src="assets/site.js"></script>
+<script src="assets/graph.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>
