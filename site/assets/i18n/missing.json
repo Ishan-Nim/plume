@@ -1,1 +1,13 @@
-[]
+[
+  "Double-click any <code class=\"inline-code\">.md</code> file and it opens instantly. Read it, edit it, and if you want, have it waiting on your other computer.",
+  "Every other Markdown app wants to own your notes first and show them second.",
+  "Opens instantly",
+  "No workspace to import, no project to set up. Double-click and read.",
+  "Edits when you ask",
+  "Press the pencil for the raw Markdown. Nothing is written until you save.",
+  "Syncs a folder",
+  "Pick one folder and a free 100&nbsp;MB vault keeps it on your other machines.",
+  "It also reads Obsidian vaults, renders Mermaid and KaTeX, and gives Claude Code a place to keep project memory. <a href=\"docs.html\">All of it is in the documentation</a>",
+  "<b>Editing.</b> Reading and writing are one keystroke apart.",
+  "Linux<span>x86-64</span>"
+]

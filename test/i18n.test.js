@@ -44,10 +44,20 @@ test('no key carries an empty attribute value, which the DOM writes but the sour
 for (const lang of LANGS) {
   const raw = read(`${lang}.json`);
 
-  test(`${lang}: the file is plain UTF-8 with Unix line endings`, () => {
+  test(`${lang}: the file is plain UTF-8 and no key or value hides a line break`, () => {
     assert.notStrictEqual(raw[0], 0xef, 'a byte-order mark breaks the first key');
-    assert.ok(!raw.includes(13), 'a carriage return breaks every key it touches');
     assert.doesNotThrow(() => JSON.parse(raw.toString('utf8')));
+
+    // Not "the file contains no CR": git hands Windows a CRLF checkout, and a
+    // line ending between JSON tokens is harmless. What is not harmless is a
+    // carriage return inside a key, because the key is matched against what
+    // innerHTML returns, which never has one.
+    const parsed = JSON.parse(raw.toString('utf8'));
+    const BREAK = /[\r\n]/;
+    const offenders = Object.entries(parsed)
+      .filter(([k, v]) => BREAK.test(k) || BREAK.test(v))
+      .map(([k]) => k.slice(0, 60));
+    assert.deepStrictEqual(offenders, []);
   });
 
   const dict = JSON.parse(raw.toString('utf8'));
