@@ -828,9 +828,20 @@ handle('shell:openInObsidian', async (_ctx, p) => {
   return true;
 });
 
-handle('doc:print', ctx => new Promise(resolve => {
+// Paper is white in every theme, but Chromium paints the page margins with
+// the window's background colour, which follows the dark theme.
+async function onPaper(ctx, print) {
+  ctx.win.setBackgroundColor('#ffffff');
+  try {
+    return await print();
+  } finally {
+    applyChrome(ctx.win);
+  }
+}
+
+handle('doc:print', ctx => onPaper(ctx, () => new Promise(resolve => {
   ctx.win.webContents.print({ printBackground: true }, ok => resolve(ok));
-}));
+})));
 
 handle('doc:exportPdf', async ctx => {
   const base = ctx.filePath ? path.basename(ctx.filePath).replace(/\.[^.]+$/, '') : 'document';
@@ -842,12 +853,12 @@ handle('doc:exportPdf', async ctx => {
   });
   if (canceled || !filePath) return null;
   try {
-    const data = await ctx.win.webContents.printToPDF({
+    const data = await onPaper(ctx, () => ctx.win.webContents.printToPDF({
       printBackground: true,
       pageSize: 'A4',
       margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 },
       generateDocumentOutline: true,
-    });
+    }));
     await fs.promises.writeFile(filePath, data);
     return filePath;
   } catch (err) {

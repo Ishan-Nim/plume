@@ -1197,6 +1197,9 @@ summary.callout-title::-webkit-details-marker { display: none; }
   body { display: block; height: auto; overflow: visible; background: #fff; }
   [data-theme] .code-block { border-color: var(--border-soft); }
   [data-theme] .callout-title { color: color-mix(in srgb, rgb(var(--callout)) 60%, black); }
+  /* Mermaid bakes the screen theme into its SVG; flip dark diagrams for paper
+     (hue-rotate keeps the colours' hues after the inversion). */
+  [data-theme="dark"] .mermaid-svg svg { filter: invert(1) hue-rotate(180deg); }
   .titlebar,
   .sidebar,
   .findbar,
