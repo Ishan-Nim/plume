@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('plume', {
 
   loadDoc: p => invoke('doc:load', p),
   readNote: p => invoke('doc:read', p),
+  saveDoc: content => invoke('doc:save', content),
   resolveLink: href => invoke('link:resolve', href),
   openFile: p => invoke('link:openFile', p),
   openExternal: url => invoke('link:external', url),
@@ -65,6 +66,15 @@ contextBridge.exposeInMainWorld('plume', {
     unlink: () => invoke('vault:unlink'),
   },
 
+  update: {
+    state: () => invoke('update:state'),
+    check: force => invoke('update:check', force),
+    download: () => invoke('update:download'),
+    install: () => invoke('update:install'),
+    page: () => invoke('update:page'),
+    skip: version => invoke('update:skip', version),
+  },
+
   sync: {
     state: () => invoke('sync:state'),
     choose: () => invoke('sync:choose'),
@@ -91,4 +101,7 @@ contextBridge.exposeInMainWorld('plume', {
   onVaultChanged: subscribe('vault:changed'),
   onVaultProgress: subscribe('vault:progress'),
   onSyncChanged: subscribe('sync:changed'),
+  onUpdateAvailable: subscribe('update:available'),
+  onUpdateProgress: subscribe('update:progress'),
+  onUpdateReady: subscribe('update:ready'),
 });

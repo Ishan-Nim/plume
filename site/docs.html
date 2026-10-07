@@ -140,6 +140,8 @@
     <a href="#vault">Plume Vault</a>
     <a href="#sync">Syncing</a>
     <a href="#web">The web vault</a>
+    <a href="#editing">Editing</a>
+    <a href="#updates">Updates</a>
     <a href="#graph">The graph</a>
     <a href="#tokens">API tokens</a>
     <a href="#mcp">Claude &amp; MCP</a>
@@ -407,6 +409,47 @@ people/notes.md                 who said what, and when</code></pre>
       what the assistant has remembered.
     </p>
 
+    <h2 id="editing">Editing</h2>
+    <p>
+      Plume is a reader first, so editing is a mode you turn on rather than the state you are always
+      in. Press the pencil in the toolbar, or <code>Ctrl+E</code>, and the document becomes editable:
+      the raw Markdown, in a plain editor, with no hidden formatting model between what you type and
+      what is saved.
+    </p>
+    <ul>
+      <li><code>Ctrl+S</code> saves. <code>Esc</code> goes back to reading.</li>
+      <li><b>Tab</b> indents and <b>Shift+Tab</b> outdents, across a whole selection.</li>
+      <li><b>Enter</b> continues a list — bullets, numbers and task boxes — and ends it when you press Enter on an empty item.</li>
+      <li><code>Ctrl+Shift+E</code> still hands the file to VS Code, Cursor or your system editor.</li>
+    </ul>
+
+    <h3>What it will not do to your work</h3>
+    <ul>
+      <li><b>Nothing is written until you ask.</b> Typing changes nothing on disk.</li>
+      <li><b>Unsaved work is never dropped silently.</b> A dot appears beside the file name while there are unsaved changes, and leaving edit mode asks before discarding them.</li>
+      <li><b>A file changed elsewhere cannot overwrite you.</b> If something else writes to the document while you are editing it — another editor, or a sync from another machine — Plume stops, tells you, and lets you choose which version to keep.</li>
+      <li><b>Saving does not fight live reload.</b> Plume recognises its own write, so the editor is not reloaded out from under you.</li>
+    </ul>
+
+    <h2 id="updates">Updates</h2>
+    <p>
+      Plume looks for a newer release shortly after it starts and offers it in a bar at the top of
+      the window. Nothing is downloaded until you press <b>Install</b>, and nothing is installed
+      without you asking. <b>Not now</b> means not again for that version.
+    </p>
+    <div class="callout">
+      <b>Why an unsigned app can still update safely.</b> Every release publishes
+      <code>SHA256SUMS.txt</code> alongside the installers. Plume downloads the installer, hashes it,
+      and compares it against that file before letting it run — a download that does not match is
+      deleted rather than executed. It will also only ever download from this project's own release
+      URLs, over HTTPS.
+    </div>
+    <p>
+      On <b>macOS</b> and <b>Linux</b> the bar offers the download page instead of installing: an
+      unsigned macOS app is not allowed to replace itself, and Linux packages belong to your package
+      manager.
+    </p>
+
     <h2 id="keyboard">Keyboard</h2>
     <p>On macOS, use <code>⌘</code> in place of <code>Ctrl</code> and <code>⌥</code> in place of <code>Alt</code>.</p>
     <div class="table-wrap">
@@ -421,7 +464,9 @@ people/notes.md                 who said what, and when</code></pre>
           <tr><td>Toggle sidebar</td><td><code>Ctrl+\</code></td></tr>
           <tr><td>Text size</td><td><code>Ctrl+=</code> / <code>Ctrl+-</code> / <code>Ctrl+0</code></td></tr>
           <tr><td>Reload</td><td><code>F5</code></td></tr>
-          <tr><td>Open in editor</td><td><code>Ctrl+E</code></td></tr>
+          <tr><td>Edit this document</td><td><code>Ctrl+E</code></td></tr>
+          <tr><td>Save</td><td><code>Ctrl+S</code></td></tr>
+          <tr><td>Open in your editor</td><td><code>Ctrl+Shift+E</code></td></tr>
           <tr><td>Print</td><td><code>Ctrl+P</code></td></tr>
           <tr><td>Full screen</td><td><code>F11</code></td></tr>
         </tbody>

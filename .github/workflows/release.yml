@@ -78,6 +78,14 @@ jobs:
           path: assets
           merge-multiple: true
 
+      - name: Checksums
+        run: |
+          cd assets
+          # The updater refuses to run an installer whose hash is not in here,
+          # so this file is what makes an unsigned auto-update safe to accept.
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Create or update the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

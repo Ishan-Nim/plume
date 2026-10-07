@@ -7,6 +7,8 @@ import { Finder } from './find.js';
 import { FileTree, Outline } from './sidebar.js';
 import { Vault } from './vault.js';
 import { Graph } from './graph.js';
+import { Updates } from './updates.js';
+import { Editor } from './editor.js';
 import { icon, LOGO } from './icons.js';
 import { el, debounce, basename, dirname, samePath, readingStats, slugify, relativeSegments } from './util.js';
 
@@ -933,6 +935,52 @@ function buildMoreMenu() {
 }
 
 // ---------------------------------------------------------------------------
+// Editing
+
+let editor = null;
+
+function markDirty(editing, dirty) {
+  $('#btn-edit').setAttribute('aria-pressed', String(editing));
+  $('#btn-edit').title = editing ? 'Stop editing (Esc)' : 'Edit (Ctrl+E)';
+  $('#btn-save').hidden = !editing;
+  $('#btn-save').disabled = !dirty;
+  ui.crumbFile.classList.toggle('is-dirty', dirty);
+}
+
+function toggleEdit() {
+  if (!state.doc) return;
+  if (!editor) {
+    editor = new Editor({
+      host: ui.viewer,
+      api,
+      toast,
+      onModeChange: markDirty,
+      onSaved: content => {
+        // Keep the rendered copy in step, so leaving edit mode shows what was
+        // just written rather than what was there before.
+        state.doc = { ...state.doc, content };
+      },
+    });
+  }
+  if (editor.editing) {
+    if (!editor.stop()) return;
+    renderDoc({ keepScroll: true }).catch(console.error);
+    return;
+  }
+  editor.start(state.doc);
+}
+
+function saveDoc() {
+  if (editor && editor.editing) editor.save();
+}
+
+/** True when leaving now would lose work, after asking. */
+function mayLeaveDocument() {
+  if (!editor || !editor.hasUnsaved) return true;
+  return editor.stop();
+}
+
+// ---------------------------------------------------------------------------
 // Plume Vault
 
 let vaultPanel = null;
@@ -1212,6 +1260,11 @@ function wireUi() {
   $('#btn-tree-refresh').addEventListener('click', () => fileTree.refresh());
   $('#banner-close').addEventListener('click', hideBanner);
 
+  new Updates(api, toast);
+
+  $('#btn-edit').addEventListener('click', toggleEdit);
+  $('#btn-save').addEventListener('click', saveDoc);
+
   $('#vault-bar').addEventListener('click', toggleVault);
   api.onSyncChanged(sync => {
     lastSyncState = sync;
@@ -1388,7 +1441,8 @@ function wireKeys() {
         f: () => finder.open(),
         g: () => (finder.isOpen ? finder.step(1) : finder.open()),
         r: reloadDoc,
-        e: openInEditor,
+        e: () => (e.shiftKey ? openInEditor() : toggleEdit()),
+        s: saveDoc,
         p: printDoc,
         '\\': () => toggleSidebar(),
         '=': () => setFontSize(state.settings.fontSize + 1),
@@ -1486,6 +1540,31 @@ function wireIpc() {
   });
   api.onDocChanged(({ path, content }) => {
     if (!state.doc || !samePath(path, state.doc.path)) return;
+
+    if (editor && editor.editing) {
+      const outcome = editor.externalChange(content);
+      if (outcome === 'handled') {
+        state.doc = { ...state.doc, content };
+        return;
+      }
+      if (outcome === 'conflict') {
+        // Someone else wrote to this file while it was being edited here.
+        // Nothing is overwritten without being asked.
+        const takeTheirs = window.confirm(
+          ['This document changed on disk while you were editing it.', '',
+            'OK to load the version from disk and lose your changes,',
+            'or Cancel to keep editing yours.'].join('\n'),
+        );
+        if (takeTheirs) {
+          editor.takeExternal();
+          state.doc = { ...state.doc, content };
+        } else {
+          editor.keepMine();
+        }
+        return;
+      }
+    }
+
     state.doc = { ...state.doc, content };
     hideBanner();
     renderDoc({ keepScroll: true }).catch(console.error);

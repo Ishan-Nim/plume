@@ -1,6 +1,31 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no vault, no project, no editor chrome.
 
-**1.2.0 syncs a whole folder, and keeps your folder structure.**
+**1.3.0 can edit, and can update itself.**
+
+## New in 1.3.0
+
+### Editing
+
+Press the pencil, or `Ctrl+E`, and the document becomes editable — the raw Markdown, in a plain editor, with no hidden formatting model. `Ctrl+S` saves. `Esc` goes back to reading.
+
+Plume is still a reader first, so editing is a mode you turn on rather than the state you are always in. The rules it keeps:
+
+- **Nothing is written until you ask.** Typing changes nothing on disk.
+- **An unsaved change is never thrown away silently.** The title shows a dot while there is unsaved work, and leaving edit mode asks first.
+- **A file changed elsewhere cannot overwrite your unsaved work.** If something else writes to the document while you are editing it, Plume tells you and lets you choose which version to keep.
+- Tab indents, Shift+Tab outdents, and Enter continues a list the way you would expect.
+
+`Ctrl+Shift+E` still hands the file to VS Code or your system editor.
+
+### Updates
+
+Plume looks for a new release shortly after it starts, and offers it in a bar at the top of the window. Nothing is downloaded until you press Install, and nothing is installed without you asking.
+
+Every release now publishes `SHA256SUMS.txt`, and the installer is checked against it before it is allowed to run. A download that does not match is deleted rather than executed — which is what makes an automatic update safe to accept from an app that is not yet code-signed.
+
+On macOS and Linux the bar offers the download page instead: an unsigned macOS app cannot replace itself, and Linux packages belong to your package manager.
+
+**Not now** means not again for that version.
 
 ## New in 1.2.0
 
@@ -67,10 +92,10 @@ Open **⋯ → Plume Vault**, create an account with an email and a password, an
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.2.0.exe` |
-| macOS, Apple silicon | `Plume-1.2.0-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.2.0-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.2.0-linux-x86_64.AppImage` or `Plume-1.2.0-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.3.0.exe` |
+| macOS, Apple silicon | `Plume-1.3.0-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.3.0-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.3.0-linux-x86_64.AppImage` or `Plume-1.3.0-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html), which offers the right build for your system.
 
@@ -78,7 +103,7 @@ Or get them from [plume-md.com/download](https://plume-md.com/download.html), wh
 
 ### Windows
 
-Run `Plume-Setup-1.2.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
+Run `Plume-Setup-1.3.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 
 To make Plume the default for `.md`, right-click a Markdown file and choose **Open with → Choose another app → Plume → Always**, or use **⋯ → Make Plume the default for .md** inside Plume.
 
@@ -91,5 +116,5 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 ### Linux
 
-- **AppImage:** make it executable with `chmod +x Plume-1.2.0-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.2.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+- **AppImage:** make it executable with `chmod +x Plume-1.3.0-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.3.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.

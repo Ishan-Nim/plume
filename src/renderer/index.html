@@ -22,6 +22,8 @@
       <span id="crumb-file" class="crumb-file">Plume</span>
     </div>
     <div class="tb-group tb-right">
+      <button id="btn-save" class="icon-btn needs-doc" type="button" title="Save (Ctrl+S)" aria-label="Save" data-icon="check" hidden></button>
+      <button id="btn-edit" class="icon-btn needs-doc" type="button" title="Edit (Ctrl+E)" aria-label="Edit this document" aria-pressed="false" data-icon="pencil"></button>
       <button id="btn-find" class="icon-btn needs-doc" type="button" title="Find (Ctrl+F)" aria-label="Find" data-icon="search"></button>
       <button id="btn-reading" class="icon-btn" type="button" title="Reading settings" aria-label="Reading settings" aria-haspopup="true" aria-expanded="false" data-icon="type" data-size="18"></button>
       <button id="btn-more" class="icon-btn" type="button" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false" data-icon="more" data-size="18"></button>
@@ -88,6 +90,16 @@
           <div id="graph-view-tip" class="graph-view-tip" role="status"></div>
         </div>
       </section>
+
+      <div id="update-bar" class="update-bar" role="status" hidden>
+        <span class="update-bar-icon" data-icon="zap" data-size="15"></span>
+        <span class="update-bar-text" id="update-bar-text"></span>
+        <span class="update-bar-acts">
+          <button id="update-notes" class="vault-btn ghost small" type="button">What&rsquo;s new</button>
+          <button id="update-go" class="vault-btn primary small" type="button">Install</button>
+          <button id="update-later" class="vault-btn ghost small" type="button">Not now</button>
+        </span>
+      </div>
 
       <div id="banner" class="banner" hidden>
         <span class="banner-text"></span>

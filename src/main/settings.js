@@ -20,6 +20,8 @@ const DEFAULTS = Object.freeze({
   sidebarTab: 'files',    // 'files' | 'outline' | 'vault'
   sidebarWidth: 260,
   recent: [],
+  autoUpdate: true,       // check GitHub for a newer release on launch
+  skippedVersion: null,   // a version the user chose not to be told about again
   vaultFolder: null,      // the folder kept in step with the vault, if any
   syncPaused: false,
   bounds: null,           // { x, y, width, height } of the last closed window
@@ -36,6 +38,8 @@ const VALIDATORS = {
   sidebarTab: v => ['files', 'outline', 'vault'].includes(v),
   sidebarWidth: v => Number.isInteger(v) && v >= 180 && v <= 520,
   recent: v => Array.isArray(v) && v.every(p => typeof p === 'string' && p.length < 4096),
+  autoUpdate: v => typeof v === 'boolean',
+  skippedVersion: v => v === null || (typeof v === 'string' && v.length < 40),
   vaultFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
   syncPaused: v => typeof v === 'boolean',
   bounds: v => v === null || (typeof v === 'object' &&
@@ -46,7 +50,7 @@ const VALIDATORS = {
 // Keys the renderer may change. Window geometry and the recent list are
 // managed by the main process only.
 const RENDERER_KEYS = new Set(['theme', 'fontSize', 'width', 'font', 'lineBreaks',
-  'sidebar', 'sidebarTab', 'sidebarWidth']);
+  'sidebar', 'sidebarTab', 'sidebarWidth', 'autoUpdate', 'skippedVersion']);
 
 let state = { ...DEFAULTS, recent: [] };
 let file = null;

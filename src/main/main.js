@@ -16,6 +16,7 @@ const settings = require('./settings');
 const files = require('./files');
 const vault = require('./vault');
 const sync = require('./sync');
+const updater = require('./updater');
 
 const APP_ID = 'app.plume.viewer';
 const PROG_ID = 'Plume.Markdown';
@@ -131,6 +132,15 @@ function onReady() {
   // The folder picks up where it left off, including anything changed while
   // Plume was closed.
   setTimeout(() => sync.start(), 1500);
+
+  // A quiet look for a newer release, well after the window is usable.
+  setTimeout(async () => {
+    if (!settings.get().autoUpdate) return;
+    const update = await updater.check();
+    if (!update) return;
+    if (update.version === settings.get().skippedVersion) return;
+    for (const win of liveWindows()) win.webContents.send('update:available', update);
+  }, 8000);
 
   // Clicking the Dock icon with no windows open.
   app.on('activate', () => {
@@ -626,6 +636,40 @@ handle('doc:load', async (ctx, p) => {
 });
 
 // Read another note for ![[transclusion]]. Markdown files only.
+/**
+ * Writes the open document back to disk.
+ *
+ * The path is never taken from the renderer: it is whatever this window
+ * already has open, so a document can only ever overwrite itself. The write is
+ * atomic, and the watcher's stamp is updated afterwards so Plume does not
+ * treat its own save as somebody else changing the file and reload over the
+ * editor.
+ */
+handle('doc:save', async (ctx, content) => {
+  if (!ctx.filePath) throw new Error('No document is open.');
+  if (typeof content !== 'string') throw new Error('Invalid content');
+  if (content.length > 20 * 1024 * 1024) throw new Error('That document is too large to save.');
+
+  const target = ctx.filePath;
+  const tmp = `${target}.${process.pid}.plume-tmp`;
+
+  try {
+    await fs.promises.writeFile(tmp, content, 'utf8');
+    await fs.promises.rename(tmp, target);
+  } catch (err) {
+    await fs.promises.rm(tmp, { force: true }).catch(() => {});
+    return { error: friendlyError(err) };
+  }
+
+  try {
+    const stat = await fs.promises.stat(target);
+    ctx.stamp = `${stat.mtimeMs}:${stat.size}`;
+    return { path: target, mtimeMs: stat.mtimeMs, size: stat.size };
+  } catch (err) {
+    return { path: target };
+  }
+});
+
 handle('doc:read', async (ctx, p) => {
   const abs = path.resolve(str(p));
   if (!files.isMarkdown(abs)) return { error: 'Not a Markdown file' };
@@ -983,6 +1027,40 @@ sync.onChange(state => {
 });
 
 handle('sync:state', () => sync.publicState());
+
+// ---------------------------------------------------------------------------
+// Updates. Nothing is downloaded or installed without being asked for.
+
+handle('update:state', () => updater.state());
+
+handle('update:check', vaultResult(async (_ctx, force) => {
+  const update = await updater.check({ force: Boolean(force) });
+  return { update, state: updater.state() };
+}));
+
+handle('update:download', vaultResult(async ctx => {
+  const result = await updater.download(progress => {
+    if (!ctx.win.isDestroyed()) ctx.win.webContents.send('update:progress', progress);
+  });
+  for (const win of liveWindows()) win.webContents.send('update:ready', updater.state());
+  return result;
+}));
+
+handle('update:install', vaultResult(async () => {
+  await updater.install();
+  return { installing: true };
+}));
+
+handle('update:page', vaultResult(async () => {
+  await updater.openReleasePage();
+  return { opened: true };
+}));
+
+handle('update:skip', vaultResult(async (_ctx, version) => {
+  settings.update({ skippedVersion: typeof version === 'string' ? version : null });
+  broadcastSettings();
+  return { skipped: version };
+}));
 
 handle('sync:choose', vaultResult(async ctx => {
   const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
