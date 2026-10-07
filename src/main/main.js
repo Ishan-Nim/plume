@@ -15,6 +15,7 @@ const { spawn, execFile } = require('node:child_process');
 const settings = require('./settings');
 const files = require('./files');
 const vault = require('./vault');
+const sync = require('./sync');
 
 const APP_ID = 'app.plume.viewer';
 const PROG_ID = 'Plume.Markdown';
@@ -126,6 +127,10 @@ function onReady() {
   const paths = [...pathsFromArgv(process.argv, process.cwd()), ...pendingOpen];
   if (paths.length) paths.forEach(openPath);
   else createWindow(null);
+
+  // The folder picks up where it left off, including anything changed while
+  // Plume was closed.
+  setTimeout(() => sync.start(), 1500);
 
   // Clicking the Dock icon with no windows open.
   app.on('activate', () => {
@@ -969,13 +974,102 @@ function vaultResult(fn) {
 function broadcastVault() {
   const state = vault.publicState();
   for (const win of liveWindows()) win.webContents.send('vault:changed', state);
+  // Signing in or out starts or stops the folder sync.
+  sync.refresh();
 }
 
-handle('vault:state', ctx => ({
+sync.onChange(state => {
+  for (const win of liveWindows()) win.webContents.send('sync:changed', state);
+});
+
+handle('sync:state', () => sync.publicState());
+
+handle('sync:choose', vaultResult(async ctx => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
+    title: 'Choose the folder to keep in your vault',
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Sync this folder',
+  });
+  if (canceled || !filePaths.length) return { canceled: true };
+
+  const folder = filePaths[0];
+  const look = await sync.preview(folder);
+  settings.update({ vaultFolder: folder, syncPaused: false });
+  broadcastSettings();
+  sync.refresh();
+  return { folder, preview: look, state: sync.publicState() };
+}));
+
+handle('sync:forget', vaultResult(async () => {
+  settings.update({ vaultFolder: null, syncPaused: false });
+  broadcastSettings();
+  sync.stop();
+  // Nothing is deleted anywhere: the folder stays on disk and the documents
+  // already in the vault stay in the vault.
+  return { state: sync.publicState() };
+}));
+
+handle('sync:pause', vaultResult(async (_ctx, paused) => {
+  settings.update({ syncPaused: Boolean(paused) });
+  broadcastSettings();
+  sync.refresh();
+  return { state: sync.publicState() };
+}));
+
+handle('sync:now', vaultResult(async () => {
+  await sync.syncNow();
+  return { state: sync.publicState() };
+}));
+
+handle('sync:reveal', vaultResult(async () => {
+  const folder = settings.get().vaultFolder;
+  if (!folder) throw new Error('No folder is being synced yet.');
+  shell.openPath(folder);
+  return { folder };
+}));
+
+handle('vault:state', (ctx, rootDir) => ({
   ...vault.publicState(),
   link: vault.linkFor(ctx.filePath),
   syncable: vault.isSyncable(ctx.filePath),
-  suggested: ctx.filePath ? vault.suggestVaultPath(ctx.filePath) : null,
+  // Named relative to the folder on screen, so a notebook keeps its shape in
+  // the vault instead of collapsing into one flat list.
+  suggested: ctx.filePath
+    ? vault.suggestVaultPath(ctx.filePath, typeof rootDir === 'string' ? rootDir : null)
+    : null,
+}));
+
+handle('vault:suggest', vaultResult(async (_ctx, paths, rootDir) => {
+  const list = Array.isArray(paths) ? paths.slice(0, 2000) : [];
+  const root = typeof rootDir === 'string' ? rootDir : null;
+  const items = list
+    .filter(p => typeof p === 'string' && vault.isSyncable(p))
+    .map(p => ({ localPath: path.resolve(p), vaultPath: vault.suggestVaultPath(path.resolve(p), root) }));
+  return { items, skipped: list.length - items.length };
+}));
+
+handle('vault:collectFolder', vaultResult(async (_ctx, dir, rootDir) => {
+  const root = typeof rootDir === 'string' ? rootDir : path.dirname(path.resolve(str(dir)));
+  const items = await vault.collectFolder(path.resolve(str(dir)), root);
+  return { items };
+}));
+
+handle('vault:pushMany', vaultResult(async (ctx, items, options) => {
+  const clean = (Array.isArray(items) ? items : [])
+    .filter(i => i && typeof i.localPath === 'string' && typeof i.vaultPath === 'string')
+    .slice(0, 2000)
+    .map(i => ({ localPath: path.resolve(i.localPath), vaultPath: i.vaultPath }));
+
+  if (!clean.length) throw new Error('Nothing to sync.');
+
+  const result = await vault.pushMany(clean, {
+    force: Boolean(options && options.force),
+    onProgress: progress => {
+      if (!ctx.win.isDestroyed()) ctx.win.webContents.send('vault:progress', progress);
+    },
+  });
+  broadcastVault();
+  return result;
 }));
 
 handle('vault:signUp', vaultResult(async (_ctx, email, password) => {

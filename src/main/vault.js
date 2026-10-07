@@ -193,9 +193,85 @@ function requireSession() {
   if (!session) throw new Error('Sign in to your vault first.');
 }
 
-/** A sensible vault name for a local file: its own name, nothing above it. */
-function suggestVaultPath(localPath) {
-  return path.basename(localPath);
+const MAX_DEPTH = 10;
+const SKIP_DIR = /^[.]|^node_modules$|^__pycache__$/;
+
+/**
+ * Where a file should live in the vault.
+ *
+ * Keeping only the file name flattens a notebook: two documents called
+ * `README` in different folders become one, and nothing in the graph can tell
+ * which folder a note came from. So the path is taken relative to the folder
+ * the user is syncing from, and only falls back to the bare name when the file
+ * sits outside it.
+ */
+function suggestVaultPath(localPath, rootDir) {
+  const name = path.basename(localPath);
+  if (!rootDir) return name;
+
+  const relative = path.relative(rootDir, localPath);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return name;
+
+  const parts = relative.split(path.sep).filter(Boolean);
+  // The server accepts twelve segments; past that, keep the deepest ones that
+  // still say something useful.
+  const trimmed = parts.length > 12 ? parts.slice(parts.length - 12) : parts;
+  return trimmed.join('/');
+}
+
+/** Every syncable document under a folder, with the vault path each would take. */
+async function collectFolder(dir, rootDir, depth = 0) {
+  const found = [];
+  if (depth > MAX_DEPTH) return found;
+
+  let entries;
+  try {
+    entries = await fsp.readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    return found;
+  }
+
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIR.test(entry.name)) continue;
+      found.push(...(await collectFolder(full, rootDir, depth + 1)));
+    } else if (entry.isFile() && SYNCABLE.has(path.extname(entry.name).toLowerCase())) {
+      found.push({ localPath: full, vaultPath: suggestVaultPath(full, rootDir) });
+    }
+  }
+  return found;
+}
+
+/**
+ * Sends several documents up, one after another rather than all at once: the
+ * vault serialises writes per account anyway, and a failure partway through
+ * should leave a clear account of what did and did not go.
+ */
+async function pushMany(items, { force = false, onProgress } = {}) {
+  requireSession();
+
+  const done = [];
+  const failed = [];
+
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    if (onProgress) onProgress({ index: i, total: items.length, localPath: item.localPath });
+    try {
+      const result = await push(item.localPath, item.vaultPath, { force });
+      done.push({ ...result, vaultPath: item.vaultPath });
+    } catch (err) {
+      failed.push({
+        localPath: item.localPath,
+        vaultPath: item.vaultPath,
+        error: err && err.message ? err.message : 'Could not sync that document.',
+        status: err && err.status,
+        conflict: err && err.conflict,
+      });
+    }
+  }
+
+  return { done, failed, account: session ? session.account : null };
 }
 
 function sha256(buf) {
@@ -331,4 +407,7 @@ module.exports = {
   linkFor,
   isSyncable,
   suggestVaultPath,
+  collectFolder,
+  pushMany,
+  SYNCABLE,
 };

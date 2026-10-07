@@ -33,7 +33,6 @@
       <div class="sidebar-tabs" role="tablist">
         <button class="sidebar-tab active" type="button" role="tab" data-tab="files" data-icon="folder" data-size="15">Files</button>
         <button class="sidebar-tab" type="button" role="tab" data-tab="outline" data-icon="outline" data-size="15">Outline</button>
-        <button class="sidebar-tab" type="button" role="tab" data-tab="vault" data-icon="cloud" data-size="15">Vault</button>
       </div>
       <section class="sidebar-panel" data-panel="files">
         <div class="panel-head">
@@ -50,6 +49,14 @@
       <section class="sidebar-panel" data-panel="vault" hidden>
         <div id="vault-panel" class="vault-panel"></div>
       </section>
+      <button id="vault-bar" class="vault-bar" type="button" aria-expanded="false">
+        <span class="vault-bar-icon" data-icon="cloud" data-size="15"></span>
+        <span class="vault-bar-text">
+          <b id="vault-bar-title">Plume Vault</b>
+          <span id="vault-bar-status">Sign in to sync</span>
+        </span>
+        <span class="vault-bar-chevron" data-icon="chevron" data-size="14"></span>
+      </button>
       <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize"></div>
     </aside>
 

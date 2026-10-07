@@ -49,7 +49,10 @@ contextBridge.exposeInMainWorld('plume', {
   exportPdf: () => invoke('doc:exportPdf'),
 
   vault: {
-    state: () => invoke('vault:state'),
+    state: rootDir => invoke('vault:state', rootDir),
+    suggest: (paths, rootDir) => invoke('vault:suggest', paths, rootDir),
+    collectFolder: (dir, rootDir) => invoke('vault:collectFolder', dir, rootDir),
+    pushMany: (items, options) => invoke('vault:pushMany', items, options),
     signUp: (email, password) => invoke('vault:signUp', email, password),
     signIn: (email, password) => invoke('vault:signIn', email, password),
     signOut: () => invoke('vault:signOut'),
@@ -60,6 +63,15 @@ contextBridge.exposeInMainWorld('plume', {
     keepBoth: vaultPath => invoke('vault:keepBoth', vaultPath),
     remove: vaultPath => invoke('vault:remove', vaultPath),
     unlink: () => invoke('vault:unlink'),
+  },
+
+  sync: {
+    state: () => invoke('sync:state'),
+    choose: () => invoke('sync:choose'),
+    forget: () => invoke('sync:forget'),
+    pause: paused => invoke('sync:pause', paused),
+    now: () => invoke('sync:now'),
+    reveal: () => invoke('sync:reveal'),
   },
 
   pathForFile: file => {
@@ -77,4 +89,6 @@ contextBridge.exposeInMainWorld('plume', {
   onOpenPath: subscribe('open-path'),
   onCommand: subscribe('command'),
   onVaultChanged: subscribe('vault:changed'),
+  onVaultProgress: subscribe('vault:progress'),
+  onSyncChanged: subscribe('sync:changed'),
 });

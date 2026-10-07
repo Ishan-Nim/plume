@@ -754,6 +754,7 @@ function updateTitlebar() {
 
 function showSidebarTab(tab) {
   if (tab === 'vault') vault().show();
+  else lastDocTab = tab;
   for (const btn of document.querySelectorAll('.sidebar-tab')) {
     btn.classList.toggle('active', btn.dataset.tab === tab);
     btn.setAttribute('aria-selected', String(btn.dataset.tab === tab));
@@ -938,20 +939,76 @@ let vaultPanel = null;
 let graphView = null;
 
 function currentDoc() {
-  return state.doc ? { path: state.doc.path, name: basename(state.doc.path) } : null;
+  if (!state.doc) return null;
+  // The name offered for the vault keeps the folders between the tree root and
+  // the document. Offering the bare file name made every README.md in a
+  // notebook collide, so syncing one replaced another.
+  const root = fileTree.root || state.doc.vaultRoot;
+  const parts = root ? relativeSegments(root, state.doc.path) : null;
+  const name = parts && parts.length ? parts.join('/') : basename(state.doc.path);
+  return { path: state.doc.path, name };
 }
 
 function vault() {
   if (!vaultPanel) {
-    vaultPanel = new Vault($('#vault-panel'), api, toast, currentDoc, showGraph);
+    vaultPanel = new Vault($('#vault-panel'), api, toast, currentDoc, showGraph,
+      () => fileTree.root || (state.doc && state.doc.vaultRoot) || null);
   }
   return vaultPanel;
 }
 
 // The menu item does not open a dialog: it shows the sidebar on the Vault tab,
 // where signing in lives permanently.
+let lastDocTab = 'files';
+let lastVaultState = null;
+let lastSyncState = null;
+
 function openVault() {
   updateSettings({ sidebar: true, sidebarTab: 'vault' });
+}
+
+function toggleVault() {
+  const showing = state.settings && state.settings.sidebarTab === 'vault';
+  updateSettings({ sidebar: true, sidebarTab: showing ? lastDocTab : 'vault' });
+}
+
+/** Keeps the bar at the foot of the sidebar saying something true. */
+function paintVaultBar(sync, account) {
+  const title = $('#vault-bar-title');
+  const status = $('#vault-bar-status');
+  if (!title || !status) return;
+
+  $('#vault-bar').setAttribute('aria-expanded',
+    String(Boolean(state.settings && state.settings.sidebarTab === 'vault')));
+
+  if (!account || !account.signedIn) {
+    title.textContent = 'Plume Vault';
+    status.textContent = 'Sign in to sync';
+    return;
+  }
+
+  title.textContent = account.email || 'Plume Vault';
+
+  if (!sync || !sync.folder) {
+    status.textContent = 'No folder synced';
+    return;
+  }
+  switch (sync.status) {
+    case 'scanning':
+      status.textContent = 'Checking the folder…';
+      break;
+    case 'syncing':
+      status.textContent = sync.total ? `Syncing ${Math.min(sync.done + 1, sync.total)} of ${sync.total}…` : 'Syncing…';
+      break;
+    case 'paused':
+      status.textContent = 'Sync paused';
+      break;
+    case 'error':
+      status.textContent = sync.lastError || 'Sync problem';
+      break;
+    default:
+      status.textContent = 'Folder up to date';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1154,6 +1211,16 @@ function wireUi() {
   $('#btn-default').addEventListener('click', () => api.openDefaultApps());
   $('#btn-tree-refresh').addEventListener('click', () => fileTree.refresh());
   $('#banner-close').addEventListener('click', hideBanner);
+
+  $('#vault-bar').addEventListener('click', toggleVault);
+  api.onSyncChanged(sync => {
+    lastSyncState = sync;
+    paintVaultBar(sync, lastVaultState);
+  });
+  api.onVaultChanged(account => {
+    lastVaultState = account;
+    paintVaultBar(lastSyncState, account);
+  });
 
   $('#graph-view-close').addEventListener('click', closeGraph);
   $('#graph-view-fit').addEventListener('click', () => graphView && graphView.fit());

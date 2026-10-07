@@ -94,7 +94,7 @@ async function main(win) {
   await sleep(400);
 
   // ---- the vault, signed out ----
-  await run(`document.querySelector('.sidebar-tab[data-tab="vault"]').click();`);
+  await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
   await until('!!document.getElementById("vault-email")');
   await sleep(500);
   await shoot(win, 'vault-signin');
@@ -130,7 +130,7 @@ async function main(win) {
       if (row) row.click();
     `);
     await sleep(1400);
-    await run(`document.querySelector('.sidebar-tab[data-tab="vault"]').click();`);
+    await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
     await sleep(700);
     await run(`
       const sync = [...document.querySelectorAll('.vault-btn')]
@@ -148,7 +148,7 @@ async function main(win) {
     if (row) row.click();
   `);
   await sleep(1500);
-  await run(`document.querySelector('.sidebar-tab[data-tab="vault"]').click();`);
+  await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
   await sleep(900);
   await shoot(win, 'vault-synced');
 

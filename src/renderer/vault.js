@@ -35,12 +35,13 @@ export class Vault {
    * @param {Function} getDoc    returns the open document, or null
    * @param {Function} onGraph   asked to show the graph of these documents
    */
-  constructor(root, api, toast, getDoc, onGraph) {
+  constructor(root, api, toast, getDoc, onGraph, getRoot) {
     this.root = root;
     this.api = api;
     this.toast = toast;
     this.getDoc = getDoc;
     this.onGraph = onGraph;
+    this.getRoot = getRoot || (() => null);
 
     this.mode = 'signin';
     this.state = null;
@@ -48,6 +49,13 @@ export class Vault {
     this.links = {};
     this.loaded = false;
     this.busy = false;
+    this.sync = null;
+
+    // The main process drives the folder sync; the panel just shows what it says.
+    this.api.onSyncChanged(state => {
+      this.sync = state;
+      if (this.loaded && this.state && this.state.signedIn) this.drawVault();
+    });
   }
 
   render(...nodes) {
@@ -66,7 +74,8 @@ export class Vault {
   }
 
   async load() {
-    this.state = await this.api.vault.state();
+    this.state = await this.api.vault.state(this.getRoot());
+    this.sync = await this.api.sync.state();
     this.loaded = true;
 
     if (!this.state.signedIn) {
@@ -193,9 +202,125 @@ export class Vault {
 
     const parts = [head, meter];
     if (message) parts.push(el('p', { class: 'vault-error', text: message }));
-    parts.push(this.drawCurrent(), this.drawFiles());
+    parts.push(this.drawFolder(), this.drawCurrent(), this.drawFiles());
 
     this.render(...parts);
+  }
+
+
+  /**
+   * The folder kept in step with the vault. This is the part that runs on its
+   * own: everything else in the panel is a one-off action.
+   */
+  drawFolder() {
+    const section = el('section', { class: 'vault-section' });
+    const head = el('div', { class: 'vault-section-head' });
+    head.append(el('h3', { text: 'Synced folder' }));
+    section.append(head);
+
+    const sync = this.sync || { status: 'off', folder: null };
+
+    if (!sync.folder) {
+      section.append(
+        el('p', {
+          class: 'vault-note',
+          text: 'Choose one folder and Plume keeps everything in it — notes, images and sub-folders — in your vault, by itself.',
+        }),
+        el('p', {
+          class: 'vault-hint',
+          text: 'Only documents and images are uploaded. Programs, installers and archives are never sent.',
+        }),
+      );
+      const choose = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Choose a folder…' });
+      choose.addEventListener('click', () => this.chooseFolder(choose));
+      section.append(el('div', { class: 'vault-row-acts' }, choose));
+      return section;
+    }
+
+    const name = sync.folder.replace(/[\/]+$/, '').split(/[\/]/).pop() || sync.folder;
+    const info = el('div', { class: 'vault-current-info' });
+    const title = el('b', { text: name });
+    title.title = sync.folder;
+    info.append(title, el('span', { text: this.syncLine(sync) }));
+    section.append(info);
+
+    if (sync.status === 'syncing' && sync.total) {
+      const bar = el('div', { class: 'vault-meter' });
+      const fill = el('i');
+      fill.style.width = `${Math.min(100, (sync.done / sync.total) * 100).toFixed(0)}%`;
+      bar.append(fill);
+      section.append(bar);
+    }
+
+    if (sync.lastError) section.append(el('p', { class: 'vault-error', text: sync.lastError }));
+    else if (sync.message) section.append(el('p', { class: 'vault-hint', text: sync.message }));
+
+    const acts = el('div', { class: 'vault-row-acts' });
+
+    const now = el('button', {
+      class: 'vault-btn primary small', type: 'button', text: 'Sync now',
+      disabled: sync.status === 'syncing' || sync.status === 'scanning',
+    });
+    now.addEventListener('click', async () => {
+      now.disabled = true;
+      await this.api.sync.now();
+      await this.load();
+    });
+
+    const paused = sync.status === 'paused';
+    const pause = el('button', {
+      class: 'vault-btn ghost small', type: 'button', text: paused ? 'Resume' : 'Pause',
+    });
+    pause.addEventListener('click', async () => {
+      await this.api.sync.pause(!paused);
+      await this.load();
+    });
+
+    const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open folder' });
+    open.addEventListener('click', () => this.api.sync.reveal());
+
+    const forget = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Stop' });
+    forget.addEventListener('click', async () => {
+      const warning = 'Stop syncing this folder?\n\n'
+        + 'Nothing is deleted: the folder stays on your computer, and what is '
+        + 'already in your vault stays in your vault.';
+      if (!window.confirm(warning)) return;
+      await this.api.sync.forget();
+      this.toast('This folder is no longer synced');
+      await this.load();
+    });
+
+    acts.append(now, pause, open, forget);
+    section.append(acts);
+    return section;
+  }
+
+  syncLine(sync) {
+    switch (sync.status) {
+      case 'scanning': return 'Looking through the folder…';
+      case 'syncing': return sync.total ? `Syncing ${Math.min(sync.done + 1, sync.total)} of ${sync.total}…` : 'Syncing…';
+      case 'paused': return 'Paused';
+      case 'error': return 'Could not sync';
+      case 'off': return sync.message || 'Not syncing';
+      default:
+        return sync.lastSyncAt ? `Up to date · checked ${when(sync.lastSyncAt)}` : 'Up to date';
+    }
+  }
+
+  async chooseFolder(button) {
+    button.disabled = true;
+    const res = await this.api.sync.choose();
+    button.disabled = false;
+    if (!res.ok) return this.toast(res.error, 'error');
+    if (res.canceled) return;
+
+    const look = res.preview || {};
+    const skipped = look.skippedTotal || 0;
+    this.toast(
+      `Syncing ${look.files || 0} document${look.files === 1 ? '' : 's'}`
+      + (skipped ? ` · ${skipped} other file${skipped === 1 ? '' : 's'} left alone` : ''),
+    );
+    await this.load();
   }
 
   /** The "this document" block: push it up, or show that it is already linked. */

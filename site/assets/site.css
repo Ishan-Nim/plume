@@ -375,3 +375,34 @@ table.kb td:last-child { font-family: var(--mono); font-size: .86rem; color: var
 }
 .nav-links button.navlink:hover { color: var(--text); background: var(--bg-3); }
 .nav-links a.navlink#nav-account { color: var(--accent-strong); font-weight: 560; }
+
+/* ---------- translations ---------- */
+
+/* Held back only while a dictionary is on its way, and released by a timer in
+   the page itself so a script that never loads cannot leave a blank screen. */
+.i18n-pending body { visibility: hidden; }
+
+.lang-wrap { display: flex; align-items: center; }
+.lang-picker {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: .88rem;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 6px 26px 6px 10px;
+  margin-left: 4px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2385858f' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  background-size: 13px;
+}
+.lang-picker:hover { color: var(--text); background-color: var(--bg-3); }
+.lang-picker:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lang-picker option { background: var(--card); color: var(--text); }
+@media (max-width: 520px) {
+  .lang-picker { max-width: 108px; padding-right: 22px; }
+}

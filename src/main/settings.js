@@ -20,6 +20,8 @@ const DEFAULTS = Object.freeze({
   sidebarTab: 'files',    // 'files' | 'outline' | 'vault'
   sidebarWidth: 260,
   recent: [],
+  vaultFolder: null,      // the folder kept in step with the vault, if any
+  syncPaused: false,
   bounds: null,           // { x, y, width, height } of the last closed window
   maximized: false,
 });
@@ -34,6 +36,8 @@ const VALIDATORS = {
   sidebarTab: v => ['files', 'outline', 'vault'].includes(v),
   sidebarWidth: v => Number.isInteger(v) && v >= 180 && v <= 520,
   recent: v => Array.isArray(v) && v.every(p => typeof p === 'string' && p.length < 4096),
+  vaultFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
+  syncPaused: v => typeof v === 'boolean',
   bounds: v => v === null || (typeof v === 'object' &&
     ['x', 'y', 'width', 'height'].every(k => Number.isFinite(v[k]))),
   maximized: v => typeof v === 'boolean',

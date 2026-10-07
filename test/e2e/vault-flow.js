@@ -50,6 +50,12 @@ const NOTES = {
 for (const [name, body] of Object.entries(NOTES)) {
   fs.writeFileSync(path.join(notebook, name), body);
 }
+fs.mkdirSync(path.join(notebook, 'Projects'), { recursive: true });
+fs.writeFileSync(
+  path.join(notebook, 'Projects', 'Index.md'),
+  ['# Project index', '', 'A second Index, under a folder.', ''].join('\n'),
+);
+
 const firstNote = path.join(notebook, 'Index.md');
 process.argv.push(firstNote);
 
@@ -57,6 +63,12 @@ const EMAIL = `qa-${Date.now()}@plume-md.test`;
 const PASSWORD = 'qa-flow-password-1';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// The vault sits in a bar at the foot of the sidebar, and that bar toggles —
+// so clicking it blindly a second time would close what we just opened.
+const OPEN_VAULT = 'var p = document.querySelector("[data-panel=vault]");'
+  + ' if (p && p.hidden) document.getElementById("vault-bar").click();';
+
 const logs = [];
 const results = [];
 let failures = 0;
@@ -94,10 +106,10 @@ async function main(win) {
   await shot('01-document');
 
   // ---- the vault tab exists and is not a dialog ----
-  record('the sidebar has a Vault tab', await read('!!document.querySelector(\'.sidebar-tab[data-tab="vault"]\')'));
+  record('the sidebar has a vault bar at the foot', await read('!!document.getElementById("vault-bar")'));
   record('no modal overlay is used', await read('!document.querySelector(".vault-overlay")'));
 
-  await run('document.querySelector(\'.sidebar-tab[data-tab="vault"]\').click();');
+  await run(OPEN_VAULT);
   const gotForm = await until('!!document.getElementById("vault-email")');
   record('the sign-in form appears in place', gotForm);
   await shot('02-signin');
@@ -158,7 +170,7 @@ async function main(win) {
     const other = BrowserWindow.getAllWindows().find(x => x.id !== win.id);
     if (!other) continue;
     await other.webContents.executeJavaScript(`(async () => {
-      document.querySelector('.sidebar-tab[data-tab="vault"]').click();
+      var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();
       await new Promise(r => setTimeout(r, 1200));
       const buttons = [...document.querySelectorAll('.vault-btn')];
       const sync = buttons.find(b => b.textContent.trim() === 'Sync to vault');
@@ -170,7 +182,7 @@ async function main(win) {
     await sleep(400);
   }
 
-  await run('document.querySelector(\'.sidebar-tab[data-tab="vault"]\').click();');
+  await run(OPEN_VAULT);
   await sleep(300);
   await run(`
     const buttons = [...document.querySelectorAll('.vault-btn')];
@@ -190,10 +202,30 @@ async function main(win) {
     if (row) row.click();
   `);
   await sleep(1600);
-  await run("document.querySelector('.sidebar-tab[data-tab=\"vault\"]').click();");
+  await run(OPEN_VAULT);
   await sleep(800);
   const offered = await read('(document.querySelector(".vault-name") || {}).value');
   record('the name offered is the open document, not a stale one', offered === 'Reading.md', offered);
+
+  // A note inside a folder must keep that folder in its vault name. Offering
+  // the bare file name made two documents called Index.md collide, and syncing
+  // the second one replaced the first.
+  await run(`
+    document.querySelector('.sidebar-tab[data-tab="files"]').click();
+    await new Promise(r => setTimeout(r, 400));
+    const folder = [...document.querySelectorAll('.tree-row')].find(r => r.textContent.trim() === 'Projects');
+    if (folder) folder.click();
+    await new Promise(r => setTimeout(r, 900));
+    const rows = [...document.querySelectorAll('.tree-row.is-file')];
+    const deep = rows.find(r => r.textContent.trim() === 'Index');
+    if (deep) deep.click();
+  `);
+  await sleep(1600);
+  await run(OPEN_VAULT);
+  await sleep(800);
+  const nested = await read('(document.querySelector(".vault-name") || {}).value');
+  record('a note in a folder keeps its folder in the vault name',
+    nested === 'Projects/Index.md', nested);
 
   await run(`
     const again = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Graph');

@@ -21,15 +21,41 @@
 <meta name="twitter:description" content="Everything Plume does, from opening a file to giving an AI assistant a place to keep project memory.">
 <meta name="twitter:image" content="https://plume-md.com/assets/shots/reading-light.png">
 
+<link rel="alternate" hreflang="en" href="https://plume-md.com/docs.html">
+<link rel="alternate" hreflang="ja" href="https://plume-md.com/docs.html?lang=ja">
+<link rel="alternate" hreflang="zh" href="https://plume-md.com/docs.html?lang=zh">
+<link rel="alternate" hreflang="ko" href="https://plume-md.com/docs.html?lang=ko">
+<link rel="alternate" hreflang="hi" href="https://plume-md.com/docs.html?lang=hi">
+<link rel="alternate" hreflang="es" href="https://plume-md.com/docs.html?lang=es">
+<link rel="alternate" hreflang="fr" href="https://plume-md.com/docs.html?lang=fr">
+<link rel="alternate" hreflang="de" href="https://plume-md.com/docs.html?lang=de">
+<link rel="alternate" hreflang="pt" href="https://plume-md.com/docs.html?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://plume-md.com/docs.html?lang=ru">
+<link rel="alternate" hreflang="x-default" href="https://plume-md.com/docs.html">
+
 <link rel="stylesheet" href="assets/site.css">
 <script>
   (function () {
+    var d = document.documentElement;
     try {
       var t = localStorage.getItem('plume-theme');
-      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+    } catch (e) {}
+
+    // Hide the page only while a translation is actually on its way, and never
+    // for longer than a moment: a failed script must not leave a blank screen.
+    try {
+      var stored = localStorage.getItem('plume-lang');
+      var asked = /[?&]lang=/.test(location.search);
+      var browser = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+      if (asked || (stored && stored !== 'en') || !/^en/i.test(browser)) {
+        d.classList.add('i18n-pending');
+        setTimeout(function () { d.classList.remove('i18n-pending'); }, 2000);
+      }
     } catch (e) {}
   })();
 </script>
+<script src="assets/i18n.js" defer></script>
 <style>
   .docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; align-items: start; padding-block: clamp(36px, 6vw, 64px); }
   @media (max-width: 900px) { .docs { grid-template-columns: 1fr; gap: 28px; } }
@@ -149,7 +175,7 @@
       its own window instantly, with no cold start.
     </p>
     <ul>
-      <li><b>The sidebar</b> has three tabs: <b>Files</b> (the folder around your document, or the whole vault if it is in one), <b>Outline</b> (every heading, with a reading time) and <b>Vault</b>. Toggle it with <code>Ctrl+\</code>.</li>
+      <li><b>The sidebar</b> has two tabs — <b>Files</b> (the folder around your document, or the whole vault if it is in one) and <b>Outline</b> (every heading, with a reading time) — and the <b>Plume Vault</b> bar at its foot. Toggle the sidebar with <code>Ctrl+\</code>.</li>
       <li><b>Reading settings</b> (the <code>Aa</code> button) set the theme, text size, reading width, serif or sans, and whether a single newline is a line break.</li>
       <li><b>Live reload:</b> save the file in any editor and Plume updates in place, keeping your scroll position. Write in your editor, read here.</li>
       <li><b>Find in page</b> with <code>Ctrl+F</code>; <b>back and forward</b> between linked notes with <code>Alt+←</code> and <code>Alt+→</code>, or your mouse side buttons.</li>
@@ -200,7 +226,7 @@
     </p>
     <p>To create one, either:</p>
     <ul>
-      <li>In Plume, open the <b>Vault</b> tab in the sidebar, choose <b>Create account</b>, and enter an email and a password; or</li>
+      <li>In Plume, open the <b>Plume Vault</b> bar at the foot of the sidebar, choose <b>Create account</b>, and enter an email and a password; or</li>
       <li>On the web at <a href="app.html">plume-md.com/app.html</a>.</li>
     </ul>
     <p>
@@ -209,7 +235,7 @@
     </p>
     <figure>
       <img src="assets/shots/vault-signin.png" width="1340" height="880" loading="lazy" alt="The Vault tab in Plume’s sidebar, showing the sign-in form in place">
-      <figcaption>Signing in happens in the sidebar, beside Files and Outline — not in a dialog over your document.</figcaption>
+      <figcaption>Signing in happens at the foot of the sidebar, under Files and Outline — not in a dialog over your document.</figcaption>
     </figure>
 
     <div class="callout">
@@ -218,19 +244,51 @@
       general file store.
     </div>
 
-    <h2 id="sync">Syncing documents</h2>
-    <p>Syncing is per document and always deliberate. Nothing leaves your machine until you say so.</p>
-    <ol>
-      <li>Open the document you want.</li>
-      <li>Go to the <b>Vault</b> tab. Under <b>This document</b>, check the name it will have in the vault and press <b>Sync to vault</b>.</li>
-      <li>From then on that document is linked: the panel shows when it last synced, and <b>Sync now</b> sends your latest version up.</li>
-      <li>On another computer, sign in, find it under <b>In your vault</b> and press <b>Open</b>. Plume asks where to save it, then opens it — and links it there too.</li>
-    </ol>
+    <h2 id="sync">Syncing</h2>
+    <p>
+      There are two ways to get a document into your vault. A <b>synced folder</b> keeps itself up
+      to date and is what most people want; syncing <b>one document</b> is there for notes that live
+      outside that folder.
+    </p>
+
+    <h3>A synced folder</h3>
+    <p>
+      Open the <b>Plume Vault</b> bar at the foot of the sidebar, sign in, and choose a folder.
+      From then on everything inside it — notes, images and sub-folders — goes up by itself and
+      stays up to date, keeping the same shape it has on disk.
+    </p>
+    <ul>
+      <li><b>Folders are kept.</b> <code>Projects/Plume.md</code> arrives as <code>Projects/Plume.md</code>, so two notes called <code>README</code> in different folders never collide.</li>
+      <li><b>Only documents and images are uploaded.</b> Markdown, text, CSV, JSON, YAML, and PNG, JPEG, GIF, WebP and AVIF images. Programs, installers, archives and anything else are refused by an allow-list and stay on your computer.</li>
+      <li><b>It watches while Plume is open</b> and checks again every few minutes, so edits made in any editor go up on their own.</li>
+      <li><b>Pause</b> it at any time, or <b>Stop</b> syncing the folder. Stopping deletes nothing: the folder stays on your computer and what is already in the vault stays in the vault.</li>
+      <li>Up to 2000 documents and 10&nbsp;MB per file. Hidden folders, <code>node_modules</code> and the like are skipped.</li>
+    </ul>
+    <div class="callout">
+      <b>Where is the vault folder on my computer?</b> Wherever you chose — Plume does not create
+      one. It syncs a folder you already have, in place, and never moves or renames your files.
+    </div>
     <figure>
-      <img src="assets/shots/vault-synced.png" width="1340" height="880" loading="lazy" alt="The Vault tab showing a synced document and the documents already in the vault">
-      <figcaption>Once a document is linked, the panel shows when it last synced and what else is in the vault.</figcaption>
+      <img src="assets/shots/vault-signin.png" width="1340" height="880" loading="lazy" alt="The Plume Vault bar at the foot of the sidebar, with the sign-in form open above it">
+      <figcaption>The vault lives at the foot of the sidebar, under Files and Outline.</figcaption>
     </figure>
 
+    <h3>One document at a time</h3>
+    <ol>
+      <li>Open the document you want.</li>
+      <li>Open the <b>Plume Vault</b> bar. Under <b>This document</b>, check the name it will take in the vault and press <b>Sync to vault</b>.</li>
+      <li>That document is now linked: the panel shows when it last synced, and <b>Sync now</b> sends your latest version up.</li>
+      <li>On another computer, sign in, find it under <b>In your vault</b> and press <b>Open</b>. Plume asks where to save it, then opens it — and links it there too.</li>
+    </ol>
+    <p>
+      The name offered is the path from the folder shown in the sidebar, not just the file name,
+      for the same reason: so nothing collides. If something already in the vault uses that name,
+      Plume says so before replacing it.
+    </p>
+    <figure>
+      <img src="assets/shots/vault-synced.png" width="1340" height="880" loading="lazy" alt="The vault panel showing a synced document and the documents already in the vault">
+      <figcaption>Once a document is linked, the panel shows when it last synced and what else is in the vault.</figcaption>
+    </figure>
 
     <h3>When the same document changes in two places</h3>
     <p>
@@ -257,7 +315,7 @@
 
     <h2 id="graph">The graph</h2>
     <p>
-      The <b>Graph</b> button in the Vault tab draws how your documents link to each other —
+      The <b>Graph</b> button in the vault panel draws how your documents link to each other —
       wiki links, embeds and ordinary Markdown links all count; links inside code blocks do not.
     </p>
     <ul>
@@ -399,7 +457,7 @@ people/notes.md                 who said what, and when</code></pre>
     <p>Use the <code>.deb</code> rather than the AppImage — it installs the AppArmor profile Electron apps need there.</p>
 
     <h3>"Your session expired"</h3>
-    <p>Sessions last 14 days. Sign in again from the Vault tab. Changing your password ends every session on purpose.</p>
+    <p>Sessions last 14 days. Sign in again from the Plume Vault bar. Changing your password ends every session on purpose.</p>
 
     <h3>Something is wrong</h3>
     <p>Open an issue on <a href="https://github.com/Ishan-Nim/plume/issues">GitHub</a> with your system and what you were doing. Plume is MIT-licensed and the source is all there.</p>

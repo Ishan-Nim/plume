@@ -8,15 +8,40 @@
 <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
 <meta name="theme-color" content="#6e56cf">
 <meta name="robots" content="noindex, follow">
+<link rel="alternate" hreflang="en" href="https://plume-md.com/404.html">
+<link rel="alternate" hreflang="ja" href="https://plume-md.com/404.html?lang=ja">
+<link rel="alternate" hreflang="zh" href="https://plume-md.com/404.html?lang=zh">
+<link rel="alternate" hreflang="ko" href="https://plume-md.com/404.html?lang=ko">
+<link rel="alternate" hreflang="hi" href="https://plume-md.com/404.html?lang=hi">
+<link rel="alternate" hreflang="es" href="https://plume-md.com/404.html?lang=es">
+<link rel="alternate" hreflang="fr" href="https://plume-md.com/404.html?lang=fr">
+<link rel="alternate" hreflang="de" href="https://plume-md.com/404.html?lang=de">
+<link rel="alternate" hreflang="pt" href="https://plume-md.com/404.html?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://plume-md.com/404.html?lang=ru">
+
 <link rel="stylesheet" href="/assets/site.css">
 <script>
   (function () {
+    var d = document.documentElement;
     try {
       var t = localStorage.getItem('plume-theme');
-      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+    } catch (e) {}
+
+    // Hide the page only while a translation is actually on its way, and never
+    // for longer than a moment: a failed script must not leave a blank screen.
+    try {
+      var stored = localStorage.getItem('plume-lang');
+      var asked = /[?&]lang=/.test(location.search);
+      var browser = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+      if (asked || (stored && stored !== 'en') || !/^en/i.test(browser)) {
+        d.classList.add('i18n-pending');
+        setTimeout(function () { d.classList.remove('i18n-pending'); }, 2000);
+      }
     } catch (e) {}
   })();
 </script>
+<script src="/assets/i18n.js" defer></script>
 </head>
 <body>
 

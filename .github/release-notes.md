@@ -1,6 +1,24 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no vault, no project, no editor chrome.
 
-**1.1.1 fixes a sync bug found in 1.1.0 right after release. If you use the vault, please update.**
+**1.2.0 syncs a whole folder, and keeps your folder structure.**
+
+## New in 1.2.0
+
+### Sync a folder, not one file at a time
+
+Choose one folder and Plume keeps everything in it — notes, images and sub-folders — in your vault by itself, while you are signed in. It watches the folder while Plume is open and checks again every few minutes, so edits made in any editor go up on their own.
+
+Only documents and images are ever uploaded: Markdown, text, CSV, JSON, YAML, and PNG, JPEG, GIF, WebP and AVIF. Programs, installers, archives and everything else are refused by an allow-list and stay on your computer. Pausing or stopping deletes nothing.
+
+### Folders are kept
+
+A note now arrives in the vault under the folder it lives in. `Projects/Plume.md` stays `Projects/Plume.md`.
+
+Before this, every document was sent up under its bare file name, so two notes called `README` in different folders became one — and syncing the second replaced the first. If you synced a notebook on 1.1, sync it again on 1.2 and it will arrive with its structure intact.
+
+### The vault moved to the foot of the sidebar
+
+Signing in is not a document view, so it is no longer a tab beside Files and Outline. There is a **Plume Vault** bar at the bottom of the sidebar instead, which always shows what sync is doing, and opens the panel when you click it.
 
 ## Fixed in 1.1.1
 
@@ -49,10 +67,10 @@ Open **⋯ → Plume Vault**, create an account with an email and a password, an
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.1.1.exe` |
-| macOS, Apple silicon | `Plume-1.1.1-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.1.1-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.1.1-linux-x86_64.AppImage` or `Plume-1.1.1-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.2.0.exe` |
+| macOS, Apple silicon | `Plume-1.2.0-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.2.0-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.2.0-linux-x86_64.AppImage` or `Plume-1.2.0-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html), which offers the right build for your system.
 
@@ -60,7 +78,7 @@ Or get them from [plume-md.com/download](https://plume-md.com/download.html), wh
 
 ### Windows
 
-Run `Plume-Setup-1.1.1.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
+Run `Plume-Setup-1.2.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 
 To make Plume the default for `.md`, right-click a Markdown file and choose **Open with → Choose another app → Plume → Always**, or use **⋯ → Make Plume the default for .md** inside Plume.
 
@@ -73,5 +91,5 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 ### Linux
 
-- **AppImage:** make it executable with `chmod +x Plume-1.1.1-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.1.1-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+- **AppImage:** make it executable with `chmod +x Plume-1.2.0-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.2.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.

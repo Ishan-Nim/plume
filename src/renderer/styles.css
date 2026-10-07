@@ -1241,9 +1241,81 @@ summary.callout-title::-webkit-details-marker { display: none; }
   .markdown-body a.external::after { display: none; }
 }
 
+.vault-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: var(--chrome);
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex: none;
+}
+.vault-bar:hover { background: var(--chrome-2); color: var(--text); }
+.vault-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.vault-bar[aria-expanded="true"] { background: var(--chrome-2); color: var(--text); }
+.vault-bar[aria-expanded="true"] .vault-bar-icon { color: var(--accent); }
+
+.vault-bar-icon { flex: none; display: flex; color: var(--text-3); }
+.vault-bar-text { flex: 1; min-width: 0; }
+.vault-bar-text b {
+  display: block; font-size: 12.5px; font-weight: 600; color: var(--heading);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vault-bar-text span {
+  display: block; font-size: 11px; color: var(--text-3); margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vault-bar-chevron { flex: none; display: flex; color: var(--text-3); transition: transform .15s ease; }
+.vault-bar[aria-expanded="true"] .vault-bar-chevron { transform: rotate(180deg); }
+
+/* The vault panel sits above the bar rather than replacing the whole sidebar. */
+.sidebar-panel[data-panel="vault"] { border-top: 1px solid var(--border); }
+
 /* ---------------------------------------------------------------------------
    Plume Vault — sidebar panel
    --------------------------------------------------------------------------- */
+
+.vault-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: var(--chrome);
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex: none;
+}
+.vault-bar:hover { background: var(--chrome-2); color: var(--text); }
+.vault-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.vault-bar[aria-expanded="true"] { background: var(--chrome-2); color: var(--text); }
+.vault-bar[aria-expanded="true"] .vault-bar-icon { color: var(--accent); }
+
+.vault-bar-icon { flex: none; display: flex; color: var(--text-3); }
+.vault-bar-text { flex: 1; min-width: 0; }
+.vault-bar-text b {
+  display: block; font-size: 12.5px; font-weight: 600; color: var(--heading);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vault-bar-text span {
+  display: block; font-size: 11px; color: var(--text-3); margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vault-bar-chevron { flex: none; display: flex; color: var(--text-3); transition: transform .15s ease; }
+.vault-bar[aria-expanded="true"] .vault-bar-chevron { transform: rotate(180deg); }
+
+/* The vault panel sits above the bar rather than replacing the whole sidebar. */
+.sidebar-panel[data-panel="vault"] { border-top: 1px solid var(--border); }
 
 /* ---------------------------------------------------------------------------
    Plume Vault — sidebar panel
