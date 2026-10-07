@@ -51,6 +51,7 @@ let state = {
   done: 0,
   uploaded: 0,
   skipped: 0,
+  wontFit: 0,
   failed: 0,
   lastSyncAt: null,
   lastError: null,
@@ -158,6 +159,66 @@ function onChange(fn) {
   return () => { listeners = listeners.filter(x => x !== fn); };
 }
 
+// ---------- what will fit, and what went wrong ----------
+
+/**
+ * Bytes left in the vault, or null when we cannot tell. A folder is routinely
+ * much larger than a vault — a 1.45 GB notebook holding 3 MB of Markdown is
+ * normal, because only documents and images are ever sent — but a notebook
+ * that really does hold more than 100 MB of documents should be told so once,
+ * not discovered one refused upload at a time.
+ */
+function roomLeft() {
+  const account = vault.publicState().account;
+  if (!account || typeof account.quotaBytes !== 'number') return null;
+  const used = typeof account.usedBytes === 'number' ? account.usedBytes : 0;
+  return Math.max(0, account.quotaBytes - used);
+}
+
+function mb(bytes) {
+  if (bytes >= 1024 * 1024) return `${Math.round(bytes / (1024 * 1024))} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Why documents failed, rather than how many. "259 documents could not be
+ * synced" tells the reader nothing they can act on; the reason almost always
+ * applies to most of them at once.
+ */
+function describeFailures(failed) {
+  if (!failed || !failed.length) return null;
+
+  const byReason = new Map();
+  for (const f of failed) {
+    const reason = (f.error || 'could not be synced').replace(/[.]$/, '');
+    byReason.set(reason, (byReason.get(reason) || 0) + 1);
+  }
+  const ranked = [...byReason.entries()].sort((a, b) => b[1] - a[1]);
+  const [top, count] = ranked[0];
+
+  if (ranked.length === 1) {
+    return `${plural(failed.length, 'document', 'documents')} not synced — ${top}`;
+  }
+  return `${plural(failed.length, 'document', 'documents')} not synced — ${count} because ${top}, `
+    + `and ${ranked.length - 1} other ${ranked.length === 2 ? 'reason' : 'reasons'}`;
+}
+
+/** The standing note under the folder: what is deliberately left behind. */
+function describeFolder(skipped, tooBig) {
+  const parts = [];
+  if (tooBig && tooBig.length) {
+    const bytes = tooBig.reduce((n, f) => n + (f.size || 0), 0);
+    parts.push(`${plural(tooBig.length, 'document is', 'documents are')} waiting on space — `
+      + `${mb(bytes)} more than your vault holds`);
+  }
+  if (skipped) {
+    parts.push(`${plural(skipped, 'file', 'files')} left alone — only documents and images are uploaded`);
+  }
+  return parts.length ? parts.join('. ') : null;
+}
+
 // ---------- the sync itself ----------
 
 async function runOnce() {
@@ -202,36 +263,53 @@ async function runOnce() {
       changed.push({ localPath: file.localPath, vaultPath: file.vaultPath });
     }
 
+    // What will actually fit. A folder can hold far more than a vault does —
+    // the one this was written against is 1.45 GB — and sending documents until
+    // the server starts refusing them is a slow way to find that out, and
+    // leaves the reader with a number of failures and no reason.
+    const room = roomLeft();
+    const fitting = [];
+    const tooBig = [];
+    let planned = 0;
+    for (const file of changed) {
+      const already = vault.linkFor(file.localPath);
+      // Replacing a document only costs the difference.
+      const cost = file.size - (already ? already.size || 0 : 0);
+      if (room !== null && planned + cost > room) {
+        tooBig.push(file);
+        continue;
+      }
+      planned += Math.max(0, cost);
+      fitting.push(file);
+    }
+
     set({
-      status: changed.length ? 'syncing' : 'idle',
-      total: changed.length,
+      status: fitting.length ? 'syncing' : 'idle',
+      total: fitting.length,
       done: 0,
       skipped: found.skipped.length,
+      wontFit: tooBig.length,
     });
 
-    if (changed.length) {
-      const result = await vault.pushMany(changed, {
+    if (fitting.length) {
+      const result = await vault.pushMany(fitting, {
         onProgress: ({ index, total }) => set({ done: index, total }),
       });
       set({
         uploaded: result.done.filter(r => !r.unchanged).length,
         failed: result.failed.length,
-        done: changed.length,
-        lastError: result.failed.length
-          ? `${result.failed.length} document${result.failed.length === 1 ? '' : 's'} could not be synced`
-          : null,
+        done: fitting.length,
+        lastError: describeFailures(result.failed),
       });
     } else {
-      set({ uploaded: 0, failed: 0 });
+      set({ uploaded: 0, failed: 0, lastError: null });
     }
 
     set({
       status: 'idle',
       folder,
       lastSyncAt: new Date().toISOString(),
-      message: found.skipped.length
-        ? `${found.skipped.length} file${found.skipped.length === 1 ? '' : 's'} left alone — only documents and images are uploaded`
-        : null,
+      message: describeFolder(found.skipped.length, tooBig),
     });
   } catch (err) {
     set({

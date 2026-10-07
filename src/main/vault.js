@@ -111,6 +111,14 @@ function ready() {
 
 // ---------- talking to the API ----------
 
+/** How long the server asked us to wait, in milliseconds, within reason. */
+function retryAfter(res) {
+  const header = res.headers.get('retry-after');
+  const seconds = header ? Number(header) : NaN;
+  if (Number.isFinite(seconds) && seconds > 0) return Math.min(60000, seconds * 1000);
+  return 2000;
+}
+
 async function call(endpoint, { method = 'GET', body, json, headers = {}, auth = true } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -138,6 +146,17 @@ async function call(endpoint, { method = 'GET', body, json, headers = {}, auth =
     session = null;
     saveSession();
     throw new Error('Your session expired. Sign in again.');
+  }
+
+  // The vault asks callers to slow down rather than refusing them outright.
+  // Syncing a real notebook is hundreds of uploads in a row, so a sync that
+  // treated 429 as a failure simply stopped partway through and reported a
+  // number with no reason attached.
+  if (res.status === 429) {
+    const err = new Error('The vault asked us to slow down.');
+    err.status = 429;
+    err.retryAfterMs = retryAfter(res);
+    throw err;
   }
 
   const type = res.headers.get('content-type') || '';
@@ -289,27 +308,56 @@ async function collectFolder(dir, rootDir, depth = 0, found = []) {
  * vault serialises writes per account anyway, and a failure partway through
  * should leave a clear account of what did and did not go.
  */
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Sends many documents, one at a time, slowly enough that the vault does not
+ * have to ask us to stop — and waiting rather than giving up when it does.
+ *
+ * A notebook of a thousand documents is a thousand requests. Sent as fast as
+ * the network allows, that trips the vault's own per-account limit a few
+ * hundred in, and everything after it fails. Which is exactly what it looked
+ * like: hundreds of documents "could not be synced", no reason given, and a
+ * folder that never finished.
+ */
 async function pushMany(items, { force = false, onProgress } = {}) {
   requireSession();
 
   const done = [];
   const failed = [];
+  // Comfortably under the vault's per-account ceiling, and invisible next to
+  // the time an upload takes anyway.
+  const SPACING_MS = 120;
+  const MAX_WAITS = 5;
 
   for (let i = 0; i < items.length; i += 1) {
     const item = items[i];
     if (onProgress) onProgress({ index: i, total: items.length, localPath: item.localPath });
-    try {
-      const result = await push(item.localPath, item.vaultPath, { force });
-      done.push({ ...result, vaultPath: item.vaultPath });
-    } catch (err) {
-      failed.push({
-        localPath: item.localPath,
-        vaultPath: item.vaultPath,
-        error: err && err.message ? err.message : 'Could not sync that document.',
-        status: err && err.status,
-        conflict: err && err.conflict,
-      });
+
+    let sent = false;
+    for (let attempt = 0; attempt <= MAX_WAITS && !sent; attempt += 1) {
+      try {
+        const result = await push(item.localPath, item.vaultPath, { force });
+        done.push({ ...result, vaultPath: item.vaultPath });
+        sent = true;
+      } catch (err) {
+        const askedToWait = err && (err.status === 429 || err.status === 409 && /too quickly/i.test(err.message || ''));
+        if (askedToWait && attempt < MAX_WAITS) {
+          await wait((err.retryAfterMs || 2000) * (attempt + 1));
+          continue;
+        }
+        failed.push({
+          localPath: item.localPath,
+          vaultPath: item.vaultPath,
+          error: err && err.message ? err.message : 'Could not sync that document.',
+          status: err && err.status,
+          conflict: err && err.conflict,
+        });
+        sent = true;
+      }
     }
+
+    if (i + 1 < items.length) await wait(SPACING_MS);
   }
 
   return { done, failed, account: session ? session.account : null };
