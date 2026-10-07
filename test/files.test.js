@@ -37,9 +37,34 @@ test('isMarkdown recognises common extensions case-insensitively', () => {
   for (const f of ['a.txt', 'b.mdx.bak', 'c', 'd.html']) assert.ok(!files.isMarkdown(f), f);
 });
 
-test('isViewable accepts Markdown and plain text only', () => {
-  for (const f of ['a.md', 'b.MARKDOWN', 'c.txt', 'd.log']) assert.ok(files.isViewable(f), f);
-  for (const f of ['a.png', 'b.pdf', 'c.exe', 'd', 'e.html']) assert.ok(!files.isViewable(f), f);
+test('isViewable accepts Markdown, plain text and extensionless files', () => {
+  for (const f of ['a.md', 'b.MARKDOWN', 'c.txt', 'd.log', 'e.Rmd', 'f.qmd', 'README', path.join('repo', 'LICENSE')]) {
+    assert.ok(files.isViewable(f), f);
+  }
+  for (const f of ['a.png', 'b.pdf', 'c.exe', 'e.html']) assert.ok(!files.isViewable(f), f);
+});
+
+test('readDocument refuses binary content but reads UTF-16', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-bin-'));
+  const bin = path.join(dir, 'README');
+  fs.writeFileSync(bin, Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x00, 0x00]));
+  await assert.rejects(files.readDocument(bin), { code: 'EBINARY' });
+  const utf16 = path.join(dir, 'NOTES');
+  fs.writeFileSync(utf16, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('# Hi', 'utf16le')]));
+  assert.equal((await files.readDocument(utf16)).content, '# Hi');
+});
+
+test('isPlainFolder keeps app bundles and shell folders out of link opening', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-bundle-'));
+  const bare = path.join(dir, 'Tool');
+  fs.mkdirSync(path.join(bare, 'Contents'), { recursive: true });
+  fs.writeFileSync(path.join(bare, 'Contents', 'Info.plist'), '<plist/>');
+  assert.ok(!files.isPlainFolder(path.join(dir, 'Tool.app'), 'darwin'));
+  assert.ok(!files.isPlainFolder(bare, 'darwin'));
+  assert.ok(files.isPlainFolder(dir, 'darwin'));
+  assert.ok(!files.isPlainFolder(String.raw`C:\T\Bin.{645FF040-5081-101B-9F08-00AA002F954E}`, 'win32'));
+  assert.ok(files.isPlainFolder(String.raw`C:\T\notes v1.2`, 'win32'));
+  assert.ok(files.isPlainFolder('/home/me/Tool.app', 'linux'));
 });
 
 test('isWithin', () => {
@@ -106,6 +131,36 @@ test('resolveWiki finds notes and attachments across the vault', async () => {
   assert.equal(self.hash, 'Math');
 
   assert.equal(await files.resolveWiki(SINK, 'Missing note'), null);
+});
+
+test('wiki names match case-insensitively on every platform', async () => {
+  files.clearCaches();
+  assert.equal((await files.resolveWiki(SINK, 'other note')).path, OTHER);
+  const section = await files.resolveWiki(SINK, 'OTHER NOTE#Section two');
+  assert.equal(section.path, OTHER);
+  assert.equal(section.hash, 'Section two');
+});
+
+test('an expired wiki index still sees notes created or renamed since', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-idx-'));
+  fs.mkdirSync(path.join(dir, '.obsidian'));
+  fs.mkdirSync(path.join(dir, 'sub'));
+  const from = path.join(dir, 'a.md');
+  fs.writeFileSync(from, '[[New]]');
+  const created = path.join(dir, 'sub', 'New.md');
+  const renamed = path.join(dir, 'sub', 'Renamed.md');
+  files.clearCaches();
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  assert.equal(await files.resolveWiki(from, 'New'), null);
+
+  t.mock.timers.tick(11_000);
+  fs.writeFileSync(created, '# New');
+  assert.equal((await files.resolveWiki(from, 'New')).path, created);
+
+  t.mock.timers.tick(11_000);
+  fs.renameSync(created, renamed);
+  assert.equal(await files.resolveWiki(from, 'New'), null);
+  assert.equal((await files.resolveWiki(from, 'Renamed')).path, renamed);
 });
 
 test('concurrent wiki lookups share one index build', async () => {

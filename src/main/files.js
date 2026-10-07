@@ -9,6 +9,8 @@ const fsp = fs.promises;
 const path = require('node:path');
 
 const MD_EXTS = new Set(['.md', '.markdown', '.mdown', '.mkd', '.mkdn', '.mdwn', '.mdtxt', '.mdtext']);
+// R Markdown and Quarto: shown as documents, but not treated as notes.
+const MD_LIKE_EXTS = new Set(['.rmd', '.qmd']);
 const TEXT_EXTS = new Set(['.txt', '.text', '.log']);
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif', '.ico']);
 const SKIP_DIRS = new Set(['node_modules', '$recycle.bin', 'system volume information', '__pycache__']);
@@ -43,6 +45,16 @@ function isOpenableFromLink(abs, platform = process.platform) {
   return !isAmbiguousWindowsName(abs, platform) && OPENABLE_EXTS.has(path.extname(abs).toLowerCase());
 }
 
+// A folder a link may open in the file manager. On macOS an app, plug-in or
+// other bundle is a folder too, and opening it launches it; on Windows a
+// folder named "name.{CLSID}" opens as a shell object, not as a folder.
+function isPlainFolder(abs, platform = process.platform) {
+  const ext = path.extname(abs);
+  if (platform === 'darwin') return !ext && !fs.existsSync(path.join(abs, 'Contents', 'Info.plist'));
+  if (platform === 'win32') return !/^\.\{.*\}$/.test(ext);
+  return true;
+}
+
 // The lower-case server of a Windows network path (\\server\share\…), '' for
 // another device-namespace path (\\.\pipe\…), or null for a local path.
 function uncHost(p, platform = process.platform) {
@@ -66,10 +78,18 @@ function isMarkdown(p) {
   return MD_EXTS.has(path.extname(p).toLowerCase());
 }
 
-// Files Plume displays as documents: Markdown plus plain text.
+// Files Plume displays as documents: Markdown, plain text and files with no
+// extension at all (README, LICENSE, CHANGELOG). Binary content behind such a
+// name is refused when the file is read.
 function isViewable(p) {
   const ext = path.extname(p).toLowerCase();
-  return MD_EXTS.has(ext) || TEXT_EXTS.has(ext);
+  return !ext || MD_EXTS.has(ext) || MD_LIKE_EXTS.has(ext) || TEXT_EXTS.has(ext);
+}
+
+// Text never contains NUL bytes, except UTF-16, which starts with a BOM.
+function looksBinary(buf) {
+  if (buf.length >= 2 && ((buf[0] === 0xff && buf[1] === 0xfe) || (buf[0] === 0xfe && buf[1] === 0xff))) return false;
+  return buf.subarray(0, 8192).includes(0);
 }
 
 function isImage(p) {
@@ -129,6 +149,11 @@ async function readDocument(p) {
     throw err;
   }
   const buf = await fsp.readFile(abs);
+  if (looksBinary(buf)) {
+    const err = new Error('It is not a text file.');
+    err.code = 'EBINARY';
+    throw err;
+  }
   return { path: abs, content: decode(buf), mtimeMs: st.mtimeMs, size: st.size };
 }
 
@@ -240,11 +265,12 @@ async function buildIndex(root, maxDepth) {
   return map;
 }
 
-// The file-name index of a folder tree. Walking a large vault takes a while,
-// and wiki links resolve on every render, so an expired index is still served
-// while a fresh one is built in the background. Concurrent callers share one
-// walk, and only the very first lookup waits for it.
-function getIndex(root, maxDepth) {
+// The file-name index of a folder tree, as { map, fresh }. Walking a large
+// vault takes a while, and wiki links resolve on every render, so an expired
+// index is still served at once while a new walk runs; `fresh` is then that
+// walk's promise. Concurrent callers share one walk, and only the very first
+// lookup waits for it.
+async function getIndex(root, maxDepth) {
   const key = `${norm(root)}|${maxDepth}`;
   let entry = indexCache.get(key);
   if (!entry) {
@@ -260,7 +286,23 @@ function getIndex(root, maxDepth) {
       }, () => entry.map || new Map())
       .finally(() => { entry.building = null; });
   }
-  return entry.map ? Promise.resolve(entry.map) : entry.building;
+  if (entry.map) return { map: entry.map, fresh: entry.building };
+  return { map: await entry.building, fresh: null };
+}
+
+// The closest file in the index whose path ends with one of `candidates`.
+// Obsidian matches names case-insensitively on every platform.
+function findInIndex(map, candidates, fromDir) {
+  for (const c of candidates) {
+    const hits = map.get(path.basename(c).toLowerCase());
+    if (!hits) continue;
+    const suffix = `/${c}`.toLowerCase();
+    const matches = hits.filter(h => h.replace(/\\/g, '/').toLowerCase().endsWith(suffix));
+    if (!matches.length) continue;
+    matches.sort((a, b) => relDepth(fromDir, a) - relDepth(fromDir, b) || a.length - b.length);
+    return matches[0];
+  }
+  return null;
 }
 
 // Split "Note#Heading|Alias" into its parts.
@@ -305,16 +347,13 @@ async function resolveWiki(fromFile, raw) {
 
   // 3. Anywhere in the vault by file name (Obsidian's "shortest path" links).
   const index = await getIndex(root, vault ? INDEX_MAX_DEPTH : NO_VAULT_MAX_DEPTH);
-  for (const c of candidates) {
-    const hits = index.get(path.basename(c).toLowerCase());
-    if (!hits) continue;
-    const suffix = norm(`/${c}`);
-    const matches = hits.filter(h => norm(h.replace(/\\/g, '/')).endsWith(suffix));
-    if (!matches.length) continue;
-    matches.sort((a, b) => relDepth(fromDir, a) - relDepth(fromDir, b) || a.length - b.length);
-    return { path: matches[0], hash, isMarkdown: isMarkdown(matches[0]) };
+  let hit = findInIndex(index.map, candidates, fromDir);
+  // An expired index may not know a note created or renamed since: on a miss
+  // or a vanished file, wait for the walk already running and look again.
+  if (index.fresh && !(hit && await isFile(hit))) {
+    hit = findInIndex(await index.fresh, candidates, fromDir);
   }
-  return null;
+  return hit ? { path: hit, hash, isMarkdown: isMarkdown(hit) } : null;
 }
 
 function clearCaches() {
@@ -324,9 +363,11 @@ function clearCaches() {
 
 module.exports = {
   MD_EXTS,
+  MD_LIKE_EXTS,
   OPENABLE_EXTS,
   isAmbiguousWindowsName,
   isOpenableFromLink,
+  isPlainFolder,
   uncHost,
   isForeignUnc,
   IMAGE_EXTS,

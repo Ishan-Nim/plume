@@ -114,4 +114,4 @@ docs/           screenshots and the demo notebook they are taken from
 
 ## Security
 
-Markdown files are untrusted input. Plume renders them in a sandboxed, context-isolated window with a strict Content-Security-Policy; HTML is sanitised with DOMPurify, scripts never run, external links open in your browser, and links to local files only open documents, images and media — programs, scripts and shortcuts are only ever revealed in the file manager. A document cannot make Plume load files from other computers on your network.
+Markdown files are untrusted input. Plume renders them in a sandboxed, context-isolated window with a strict Content-Security-Policy; HTML is sanitised with DOMPurify, scripts never run, external links open in your browser, and links to local files only open documents, images, media and plain folders — programs, apps, scripts and shortcuts are only ever revealed in the file manager. A document cannot make Plume load files from other computers on your network.

@@ -71,6 +71,22 @@ test('Obsidian block comments spanning blank lines are hidden', () => {
   assert.doesNotMatch(html('- a\n  %%\n  x\n\n  y\n  %%\n- b'), /x|y/);
 });
 
+test('a "%%" line closing a comment opened mid-paragraph is not a new block comment', () => {
+  const out = html('Here is a note %%private SECRET\n%%\n\nNext paragraph.\n\n## Later heading\n\nMore text.');
+  assert.doesNotMatch(out, /SECRET|%%/);
+  assert.match(out, /<p>Next paragraph\.<\/p>/);
+  assert.match(out, /<h2>Later heading<\/h2>/);
+  assert.match(out, /More text\./);
+  const tail = html('Visible start %%hidden SECRET\n%% visible end\n\nAfter.');
+  assert.doesNotMatch(tail, /SECRET|%%/);
+  assert.match(tail, /visible end/);
+  assert.match(tail, /<p>After\.<\/p>/);
+  const multi = html('A %%one\ntwo SECRET\n%%\nB');
+  assert.doesNotMatch(multi, /SECRET|one|%%/);
+  assert.match(multi, /B/);
+  assert.equal(html('text %%x\n%%\n\nafter').replace(/\s+/g, ''), '<p>text</p><p>after</p>');
+});
+
 test('block comment markers inside code stay code', () => {
   assert.match(html('```\n%%\nkept\n```'), /%%\nkept/);
   assert.match(html('    %%\n    indented'), /%%\nindented/);

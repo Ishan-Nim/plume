@@ -27,6 +27,15 @@ const TITLEBAR_HEIGHT = 40;
 const isWin = process.platform === 'win32';
 const isMac = process.platform === 'darwin';
 const FILE_MANAGER = isWin ? 'File Explorer' : isMac ? 'Finder' : 'the file manager';
+const OPEN_DIALOG = {
+  title: 'Open Markdown file',
+  properties: ['openFile', 'multiSelections'],
+  filters: [
+    { name: 'Markdown', extensions: [...files.MD_EXTS, ...files.MD_LIKE_EXTS].map(e => e.slice(1)) },
+    { name: 'Text', extensions: ['txt', 'text', 'log'] },
+    { name: 'All files', extensions: ['*'] },
+  ],
+};
 
 // Explorer starts Plume in the folder of the file that was double-clicked,
 // and Windows looks in the current folder before PATH for a bare program
@@ -35,9 +44,12 @@ const FILE_MANAGER = isWin ? 'File Explorer' : isMac ? 'Finder' : 'the file mana
 const SYSTEM32 = path.join(process.env.SystemRoot || process.env.windir || 'C:\\Windows', 'System32');
 if (isWin) process.env.NoDefaultCurrentDirectoryInExePath = '1';
 
-// The packaged app's fuses already refuse --inspect and NODE_OPTIONS; a
-// Chromium debugging port would give the same control over the app.
-if (app.isPackaged && ['remote-debugging-port', 'remote-debugging-pipe'].some(s => app.commandLine.hasSwitch(s))) {
+// The packaged app's fuses already refuse --inspect and NODE_OPTIONS. These
+// Chromium switches would give the same control over the app (a debugging
+// port) or make Plume start any program as a helper process.
+const UNSAFE_SWITCHES = ['remote-debugging-port', 'remote-debugging-pipe', 'gpu-launcher', 'renderer-cmd-prefix',
+  'utility-cmd-prefix', 'zygote-cmd-prefix', 'browser-subprocess-path'];
+if (app.isPackaged && UNSAFE_SWITCHES.some(s => app.commandLine.hasSwitch(s))) {
   app.exit(1);
 }
 
@@ -47,7 +59,7 @@ const THEME = {
   dark: { chrome: '#18181b', symbol: '#a4a4ae', bg: '#1e1e22' },
 };
 
-/** @type {Map<number, {win: BrowserWindow, filePath: string|null, initialPath: string|null, ready: boolean, crashes: number[], watcher: fs.FSWatcher|null, timer: any, dirTimer: any, poll: any, stamp: string}>} */
+/** @type {Map<number, {win: BrowserWindow, filePath: string|null, initialPath: string|null, ready: boolean, crashes: number[], watcher: fs.FSWatcher|null, timer: any, dirTimer: any, poll: any, folderPoll: any, checkFolder: Function|null, stamp: string}>} */
 const windows = new Map();
 const pendingOpen = [];
 
@@ -120,11 +132,21 @@ function onReady() {
   });
 }
 
-// macOS needs an application menu for Quit, Hide and the clipboard shortcuts.
-// Elsewhere the window has no menu bar at all.
+// macOS needs an application menu for Quit, Hide and the clipboard shortcuts,
+// and a File menu that still works once every window is closed (the app keeps
+// running). Elsewhere the window has no menu bar at all.
 function macMenu() {
   return Menu.buildFromTemplate([
     { role: 'appMenu' },
+    {
+      label: 'File',
+      submenu: [
+        { label: 'New Window', accelerator: 'CmdOrCtrl+N', click: () => createWindow(null) },
+        { label: 'Open…', accelerator: 'CmdOrCtrl+O', click: () => openFromMenu() },
+        { type: 'separator' },
+        { role: 'close' },
+      ],
+    },
     {
       label: 'Edit',
       submenu: [
@@ -134,6 +156,19 @@ function macMenu() {
     },
     { role: 'windowMenu' },
   ]);
+}
+
+// File › Open: in the focused window, as Cmd+O works elsewhere; with no
+// window open, ask here and give each file a window.
+async function openFromMenu() {
+  const win = BrowserWindow.getFocusedWindow();
+  const ctx = win && windows.get(win.webContents.id);
+  if (ctx && ctx.ready) {
+    win.webContents.send('command', 'open');
+    return;
+  }
+  const { canceled, filePaths } = await dialog.showOpenDialog(OPEN_DIALOG);
+  if (!canceled) filePaths.forEach(openPath);
 }
 
 function hardenSession() {
@@ -263,7 +298,7 @@ function createWindow(initialPath) {
 
   const ctx = {
     win, filePath: null, initialPath: initialPath || null, ready: false, crashes: [],
-    watcher: null, timer: null, dirTimer: null, poll: null, stamp: '',
+    watcher: null, timer: null, dirTimer: null, poll: null, folderPoll: null, checkFolder: null, stamp: '',
   };
   const id = win.webContents.id;
   windows.set(id, ctx);
@@ -278,6 +313,9 @@ function createWindow(initialPath) {
   win.on('closed', () => {
     stopWatching(ctx);
     windows.delete(id);
+  });
+  win.on('focus', () => {
+    if (ctx.checkFolder) ctx.checkFolder();
   });
   win.webContents.on('context-menu', (_e, params) => showContextMenu(win, params));
   win.webContents.on('render-process-gone', (_e, details) => {
@@ -392,7 +430,8 @@ function stopWatching(ctx) {
   clearTimeout(ctx.timer);
   clearTimeout(ctx.dirTimer);
   clearInterval(ctx.poll);
-  ctx.timer = ctx.dirTimer = ctx.poll = null;
+  clearInterval(ctx.folderPoll);
+  ctx.timer = ctx.dirTimer = ctx.poll = ctx.folderPoll = ctx.checkFolder = null;
   if (ctx.watcher) {
     try { ctx.watcher.close(); } catch { /* ignore */ }
   }
@@ -405,7 +444,7 @@ function startWatching(ctx, filePath, stamp) {
   const dir = path.dirname(filePath);
   const base = path.basename(filePath).toLowerCase();
   try {
-    ctx.watcher = fs.watch(dir, { persistent: false }, (_type, name) => {
+    const watcher = fs.watch(dir, { persistent: false }, (_type, name) => {
       // When the folder itself is deleted, Windows reports the folder's own
       // path in a tight loop, and the open watch keeps the folder from being
       // created again until it is closed.
@@ -425,10 +464,37 @@ function startWatching(ctx, filePath, stamp) {
       clearTimeout(ctx.timer);
       ctx.timer = setTimeout(() => refresh(ctx, filePath), 140);
     });
-    ctx.watcher.on('error', () => folderGone(ctx, filePath));
+    ctx.watcher = watcher;
+    watcher.on('error', () => folderGone(ctx, filePath));
+    watchFolderPlace(ctx, watcher, filePath);
   } catch {
     ctx.watcher = null;
   }
+}
+
+// Moving the folder away (Explorer's Delete moves it to the Recycle Bin)
+// fires no watch event, and the watch follows the folder to its new place.
+// So check now and then, and whenever the window is focused, that the same
+// folder is still where the document was.
+function watchFolderPlace(ctx, watcher, filePath) {
+  const dir = path.dirname(filePath);
+  let ino = null;
+  ctx.checkFolder = () => fs.stat(dir, (err, st) => {
+    if (ctx.watcher !== watcher) return;
+    if (err ? err.code === 'ENOENT' || err.code === 'ENOTDIR' : !st.isDirectory()) {
+      folderGone(ctx, filePath);
+    } else if (st && st.ino) {
+      if (ino === null) {
+        ino = st.ino;
+      } else if (st.ino !== ino) {
+        // A new folder of the same name: watch that one instead.
+        startWatching(ctx, filePath, ctx.stamp);
+        refresh(ctx, filePath);
+      }
+    }
+  });
+  ctx.checkFolder();
+  ctx.folderPoll = setInterval(ctx.checkFolder, 3000);
 }
 
 // The document's folder vanished or can no longer be watched: report the
@@ -603,39 +669,50 @@ handle('link:resolve', async (ctx, href) => {
   return { kind: 'file', path: p };
 });
 
+function refuseLink(ctx, detail) {
+  return dialog.showMessageBox(ctx.win, {
+    type: 'warning',
+    buttons: ['OK'],
+    title: 'Plume',
+    message: 'Plume will not open this link.',
+    detail,
+    noLink: true,
+  });
+}
+
 // Non-Markdown local file linked from a document: ask before handing it to the OS.
 handle('link:openFile', async (ctx, p) => {
   const abs = path.resolve(str(p));
   const name = path.basename(abs);
+  const remote = `“${abs}” is on another computer. Windows would sign in to it with your account.`;
   if (files.isForeignUnc(abs, ctx.filePath)) {
-    await dialog.showMessageBox(ctx.win, {
-      type: 'warning',
-      buttons: ['OK'],
-      title: 'Plume',
-      message: 'Plume will not open this link.',
-      detail: `“${abs}” is on another computer. Windows would sign in to it with your account.`,
-      noLink: true,
-    });
+    await refuseLink(ctx, remote);
     return true;
   }
   if (files.isAmbiguousWindowsName(abs)) {
-    await dialog.showMessageBox(ctx.win, {
-      type: 'warning',
-      buttons: ['OK'],
-      title: 'Plume',
-      message: 'Plume will not open this link.',
-      detail: `“${name}” is not a plain file name (it uses a stream suffix or trailing dot), a trick used to disguise programs.`,
-      noLink: true,
-    });
+    await refuseLink(ctx, `“${name}” is not a plain file name (it uses a stream suffix or trailing dot), a trick used to disguise programs.`);
     return true;
   }
-  let isDirectory = false;
-  try { isDirectory = fs.statSync(abs).isDirectory(); } catch { return false; }
-  if (isDirectory) {
-    await shell.openPath(abs);
+  // Judge what the link really leads to: a symlink called "guide.pdf" or
+  // "docs" can point at a program or an app bundle. (The JS realpath keeps a
+  // mapped drive letter rather than turning it into \\server.)
+  let real;
+  let isDirectory;
+  try {
+    real = fs.realpathSync(abs);
+    isDirectory = fs.statSync(real).isDirectory();
+  } catch {
+    return false;
+  }
+  if (files.isForeignUnc(real, ctx.filePath)) {
+    await refuseLink(ctx, remote);
     return true;
   }
-  if (!files.isOpenableFromLink(abs)) {
+  if (isDirectory && files.isPlainFolder(real)) {
+    await shell.openPath(real);
+    return true;
+  }
+  if (isDirectory || !files.isOpenableFromLink(abs) || !files.isOpenableFromLink(real)) {
     const { response } = await dialog.showMessageBox(ctx.win, {
       type: 'warning',
       buttons: ['Show in folder', 'Cancel'],
@@ -643,8 +720,8 @@ handle('link:openFile', async (ctx, p) => {
       cancelId: 1,
       title: 'Plume',
       message: `Plume does not open “${name}” from a link.`,
-      detail: 'Only documents, images and media open directly; programs, scripts and other files are never launched ' +
-        `from a document. You can reveal it in ${FILE_MANAGER} instead.`,
+      detail: 'Only documents, images, media and plain folders open directly; programs, apps, scripts and other ' +
+        `files are never launched from a document. You can reveal it in ${FILE_MANAGER} instead.`,
       noLink: true,
     });
     if (response === 0) shell.showItemInFolder(abs);
@@ -660,7 +737,7 @@ handle('link:openFile', async (ctx, p) => {
     detail: 'It will open in its default app.',
     noLink: true,
   });
-  if (response === 0) await shell.openPath(abs);
+  if (response === 0) await shell.openPath(real);
   else if (response === 1) shell.showItemInFolder(abs);
   return true;
 });
@@ -713,21 +790,20 @@ handle('recent:remove', (_ctx, p) => {
   return settings.publicView();
 });
 
+// Returns the file to show in this window. Any others the user picked open in
+// windows of their own here, whatever their type: the user chose them. This
+// window is marked as taken first, so openPath does not hand one of them to it.
 handle('app:openDialog', async ctx => {
-  const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
-    title: 'Open Markdown file',
-    properties: ['openFile', 'multiSelections'],
-    filters: [
-      { name: 'Markdown', extensions: [...files.MD_EXTS].map(e => e.slice(1)) },
-      { name: 'Text', extensions: ['txt', 'text', 'log'] },
-      { name: 'All files', extensions: ['*'] },
-    ],
-  });
-  return canceled ? [] : filePaths;
+  const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, OPEN_DIALOG);
+  if (canceled || !filePaths.length) return [];
+  if (!ctx.filePath) ctx.initialPath = filePaths[0];
+  filePaths.slice(1, 20).forEach(openPath);
+  return filePaths.slice(0, 1);
 });
 
 // Extra windows for dropped files and Ctrl+clicked links: documents only, so
-// a dropped image or PDF never opens a window of binary noise.
+// a dropped image or PDF never opens a window of binary noise (doc:load also
+// refuses binary content behind a text-like name).
 handle('app:openPaths', (_ctx, paths) => {
   if (!Array.isArray(paths)) return false;
   paths.filter(p => typeof p === 'string' && p && files.isViewable(p))

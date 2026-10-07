@@ -50,11 +50,14 @@ export class FileTree {
     this.active = activePath;
     // A file already inside the tree (say, a click into a subfolder of a
     // plain folder) is revealed in place rather than re-rooting the tree.
-    if (this.root && (samePath(this.root, root) || relativeSegments(this.root, dirname(activePath)))) {
+    const dir = dirname(activePath);
+    if (this.root && (samePath(this.root, root) || relativeSegments(this.root, dir))) {
       await this.reveal(activePath);
-    } else {
-      await this.setRoot(root, activePath);
+      // The tree leaves out dot-folders and node_modules. A file in one has
+      // no row, so show its own folder instead (a vault root stays put).
+      if (samePath(this.root, root) || samePath(this.root, dir) || this.rows.has(pathKey(dir))) return;
     }
+    await this.setRoot(root, activePath);
   }
 
   async setRoot(root, activePath) {

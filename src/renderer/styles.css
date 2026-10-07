@@ -218,7 +218,9 @@ kbd {
   -webkit-app-region: drag;
   user-select: none;
 }
-.platform-win .titlebar { padding-right: calc(100vw - env(titlebar-area-width, calc(100vw - 146px))); }
+/* Windows and Linux draw their caption buttons over the right end of the bar. */
+.platform-win .titlebar,
+.platform-linux .titlebar { padding-right: calc(100vw - env(titlebar-area-width, calc(100vw - 146px))); }
 .platform-mac .titlebar { padding-left: 80px; }
 
 .tb-group { display: flex; align-items: center; gap: 2px; flex: 1 1 0; min-width: max-content; }
@@ -646,6 +648,7 @@ body:not(.is-welcome) .welcome { display: none; }
   background: var(--toast-bg);
   color: var(--toast-text);
   font-size: 13px;
+  overflow-wrap: anywhere;
   box-shadow: var(--shadow);
   opacity: 0;
   transform: translate(-50%, 12px);
@@ -900,8 +903,11 @@ body:not(.is-welcome) .welcome { display: none; }
   font-size: 0.84em;
 }
 
+/* z-index: document markup cannot set one (confineStyle), so nothing it
+   positions can be laid over a genuine block's code. */
 .code-block {
   position: relative;
+  z-index: 1;
   border: 1px solid var(--border-soft);
   border-radius: 10px;
   background: var(--code-bg);
@@ -1197,9 +1203,7 @@ summary.callout-title::-webkit-details-marker { display: none; }
   body { display: block; height: auto; overflow: visible; background: #fff; }
   [data-theme] .code-block { border-color: var(--border-soft); }
   [data-theme] .callout-title { color: color-mix(in srgb, rgb(var(--callout)) 60%, black); }
-  /* Mermaid bakes the screen theme into its SVG; flip dark diagrams for paper
-     (hue-rotate keeps the colours' hues after the inversion). */
-  [data-theme="dark"] .mermaid-svg svg { filter: invert(1) hue-rotate(180deg); }
+  /* Mermaid diagrams are redrawn in the light theme before printing (onPaper in app.js). */
   .titlebar,
   .sidebar,
   .findbar,

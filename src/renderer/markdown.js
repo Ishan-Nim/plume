@@ -155,6 +155,19 @@ function tagPlugin(md) {
     `<span class="tag">#${escapeHtml(tokens[idx].content)}</span>`;
 }
 
+// An odd number of "%%" in the lines of the current block above `line`
+// means a comment is still open there. While a paragraph is being read,
+// state.line is its first line.
+function closesInlineComment(state, line) {
+  const first = state.parentType === 'paragraph' ? state.line : 0;
+  let count = 0;
+  for (let l = line - 1; l >= first && !state.isEmpty(l); l--) {
+    const text = state.src.slice(state.bMarks[l] + state.tShift[l], state.eMarks[l]);
+    count += text.split('%%').length - 1;
+  }
+  return count % 2 === 1;
+}
+
 // %%comment%% — hidden in Obsidian's reading view.
 function commentPlugin(md) {
   md.inline.ruler.before('emphasis', 'obsidian_comment', (state, silent) => {
@@ -177,7 +190,9 @@ function commentPlugin(md) {
     const max = state.eMarks[startLine];
     if (state.src.charCodeAt(start) !== 0x25 || state.src.charCodeAt(start + 1) !== 0x25) return false;
     if (state.src.slice(start + 2, max).includes('%%')) return false;
-    if (silent) return true;
+    // Asked whether this line ends the paragraph above: not when it closes
+    // a comment opened inside that paragraph ("Note %%private" / "%%").
+    if (silent) return !closesInlineComment(state, startLine);
 
     let line = startLine + 1;
     let rest = '';

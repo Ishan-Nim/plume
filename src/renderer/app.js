@@ -22,8 +22,15 @@ const FONT_MAX = 28;
 // Above this many characters the document is laid out lazily (see .is-large).
 const LARGE_DOC_CHARS = 250000;
 
-// What a drop is allowed to open: Markdown plus the text types of the Open dialog.
-const DROP_DOC_RE = /\.(md|markdown|mdown|mkd|mkdn|mdwn|mdtxt|mdtext|txt|text|log)$/i;
+// What a drop is allowed to open: Markdown, the text types of the Open
+// dialog, and files with no extension (README, LICENSE). The main process
+// refuses binary content behind any of these names.
+const DROP_DOC_RE = /\.(md|markdown|mdown|mkd|mkdn|mdwn|mdtxt|mdtext|rmd|qmd|txt|text|log)$/i;
+
+function isDroppableDoc(p) {
+  const name = basename(p);
+  return DROP_DOC_RE.test(name) || !name.slice(1).includes('.');
+}
 
 const state = {
   settings: null,
@@ -71,21 +78,27 @@ DOMPurify.addHook('afterSanitizeAttributes', node => {
   if (node.style && node.hasAttribute('style')) confineStyle(node.style);
 });
 
-// Inline styles must not escape the reading pane (fake title bars, overlays)
-// or turn it into a window drag region. The parsed declaration is checked,
-// not the raw text, so comments, escapes and var() cannot sneak past.
+// Inline styles must not escape the reading pane (fake title bars, overlays),
+// stack above Plume's code blocks, or turn the page into a window drag
+// region. The parsed declaration is checked, not the raw text, so comments,
+// escapes and var() cannot sneak past.
 const SAFE_POSITIONS = new Set(['', 'static', 'relative', 'absolute']);
 
 function confineStyle(style) {
   if (!SAFE_POSITIONS.has(style.position)) style.removeProperty('position');
+  style.removeProperty('z-index');
   style.removeProperty('-webkit-app-region');
   style.removeProperty('app-region');
 }
 
+// Attributes that open an element in the browser's top layer, above the
+// whole window and outside #doc's containment, with no script at all.
+const TOP_LAYER_ATTRS = ['popover', 'popovertarget', 'popovertargetaction', 'commandfor', 'command', 'interestfor'];
+
 const PURIFY_CONFIG = {
   FORBID_TAGS: ['style', 'script', 'form', 'button', 'textarea', 'select', 'option', 'iframe', 'frame',
     'frameset', 'object', 'embed', 'link', 'meta', 'base', 'noscript', 'template', 'dialog', 'portal'],
-  FORBID_ATTR: ['autofocus', 'formaction', 'action'],
+  FORBID_ATTR: ['autofocus', 'formaction', 'action', ...TOP_LAYER_ATTRS],
   ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|file):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
   RETURN_DOM_FRAGMENT: true,
 };
@@ -149,7 +162,54 @@ function setBase(url) {
   base.href = url;
 }
 
-async function openDoc(p, { push = true, hash = '', scroll = null } = {}) {
+// Where the reader is: scrollTop, plus the top-level block at the top of the
+// pane and how far into it. Large documents lay out lazily (.is-large), so
+// after a re-render the blocks above the viewport only have an estimated
+// height and the same scrollTop shows other text; the block is still right.
+function readingPosition() {
+  const pos = { scroll: ui.viewer.scrollTop, anchor: null };
+  const blocks = ui.article.children;
+  if (!blocks.length || !ui.article.offsetParent) return pos;
+  // A hidden block has an empty rect; it counts as ending where the visible
+  // block before it ends, which keeps the search below in order.
+  const bottomAt = i => {
+    for (let j = i; j >= 0; j--) {
+      const r = blocks[j].getBoundingClientRect();
+      if (r.width || r.height) return r.bottom;
+    }
+    return -Infinity;
+  };
+  const top = ui.viewer.getBoundingClientRect().top;
+  let lo = 0;
+  let hi = blocks.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (bottomAt(mid) > top) hi = mid;
+    else lo = mid + 1;
+  }
+  pos.anchor = {
+    index: lo,
+    offset: blocks[lo].getBoundingClientRect().top - top,
+    large: ui.article.classList.contains('is-large'),
+  };
+  return pos;
+}
+
+function restorePosition(pos) {
+  const large = ui.article.classList.contains('is-large');
+  const anchor = pos.anchor;
+  const block = anchor && (large || anchor.large) ? ui.article.children[anchor.index] : null;
+  if (!block) {
+    ui.viewer.scrollTop = pos.scroll;
+    return;
+  }
+  // Lay the block out for real: with its placeholder height, a reader deep
+  // inside a long table or list would land past it.
+  if (large) block.style.contentVisibility = 'visible';
+  ui.viewer.scrollTop += block.getBoundingClientRect().top - ui.viewer.getBoundingClientRect().top - anchor.offset;
+}
+
+async function openDoc(p, { push = true, hash = '', position = null } = {}) {
   const res = await api.loadDoc(p);
   if (res.error) {
     toast(`Couldn’t open ${basename(p)}: ${res.error}`, 'error');
@@ -157,7 +217,7 @@ async function openDoc(p, { push = true, hash = '', scroll = null } = {}) {
     return false;
   }
   if (push && state.doc && !samePath(state.doc.path, res.path)) {
-    pushHistory({ path: state.doc.path, scroll: ui.viewer.scrollTop });
+    pushHistory({ path: state.doc.path, ...readingPosition() });
   }
   state.doc = res;
   hideBanner();
@@ -169,7 +229,7 @@ async function openDoc(p, { push = true, hash = '', scroll = null } = {}) {
   try {
     // Start at the top even when a hash is given: a missing target must not
     // leave the previous document's scroll offset behind.
-    await renderDoc({ scroll: scroll ?? 0 });
+    await renderDoc({ position: position || { scroll: 0, anchor: null } });
     if (hash) scrollToTarget(hash, { flash: true });
   } catch (err) {
     console.error(err);
@@ -179,11 +239,12 @@ async function openDoc(p, { push = true, hash = '', scroll = null } = {}) {
   return true;
 }
 
-async function renderDoc({ scroll = null, keepScroll = false } = {}) {
+// `position` (from readingPosition) is where to put the reader; keepScroll
+// keeps them where they are.
+async function renderDoc({ position = null, keepScroll = false } = {}) {
   const doc = state.doc;
   if (!doc) return;
   const seq = ++state.renderSeq;
-  const previousScroll = ui.viewer.scrollTop;
 
   let out;
   try {
@@ -207,6 +268,7 @@ async function renderDoc({ scroll = null, keepScroll = false } = {}) {
   const usedIds = new Map();
   const { outline } = enhance(frag, { wikiMap, frontMatter: out.frontMatter, usedIds });
   useCachedMermaid(frag);
+  const previous = keepScroll ? readingPosition() : null;
   ui.article.classList.toggle('is-large', doc.content.length > LARGE_DOC_CHARS);
   ui.article.replaceChildren(frag);
   state.wikiMap = wikiMap;
@@ -215,8 +277,7 @@ async function renderDoc({ scroll = null, keepScroll = false } = {}) {
   state.usedIds = usedIds;
 
   outlineView.set(outline, readingStats(plainText(ui.article)));
-  if (keepScroll) ui.viewer.scrollTop = previousScroll;
-  else if (scroll != null) ui.viewer.scrollTop = scroll;
+  if (previous || position) restorePosition(previous || position);
   trackActiveHeading();
   if (finder.isOpen) finder.search({ keepPosition: true });
 
@@ -227,7 +288,7 @@ async function renderDoc({ scroll = null, keepScroll = false } = {}) {
   await renderMermaid(seq);
   if (seq !== state.renderSeq) return;
   if (finder.isOpen && ui.article.querySelector('.wiki-transclude.loaded')) finder.search({ keepPosition: true });
-  if (keepScroll) ui.viewer.scrollTop = previousScroll;
+  if (previous) restorePosition(previous);
 }
 
 // Map heading ids to the document's own heading elements, so an id shared
@@ -325,14 +386,20 @@ function loadMermaid() {
 
 let mermaidCounter = 0;
 let mermaidRun = 0;
+// Set to 'light' while printing: paper is white in every theme.
+let paperTheme = null;
 
 // Rendered diagrams by theme, font and source. Live reload reuses them, so
 // unchanged diagrams do not collapse and shift the reading position.
 const MERMAID_CACHE_MAX = 100;
 const mermaidCache = new Map();
 
+function mermaidTheme() {
+  return paperTheme || root.dataset.theme;
+}
+
 function mermaidConfig() {
-  return `${root.dataset.theme}|${root.dataset.font}`;
+  return `${mermaidTheme()}|${root.dataset.font}`;
 }
 
 function mermaidKey(block, config = mermaidConfig()) {
@@ -346,11 +413,23 @@ function rememberMermaid(key, id, svg) {
   if (mermaidCache.size > MERMAID_CACHE_MAX) mermaidCache.delete(mermaidCache.keys().next().value);
 }
 
+// Mermaid sanitises its own labels, but more loosely than Plume does the
+// document: it keeps buttons, dialogs and popover attributes, which can lay
+// an element over the whole window, and inline styles skip confineStyle.
+function cleanMermaidSvg(holder) {
+  for (const node of holder.querySelectorAll('button, dialog, input, select, textarea, form')) node.remove();
+  for (const node of holder.querySelectorAll(TOP_LAYER_ATTRS.map(a => `[${a}]`).join(', '))) {
+    for (const attr of TOP_LAYER_ATTRS) node.removeAttribute(attr);
+  }
+  for (const node of holder.querySelectorAll('[style]')) confineStyle(node.style);
+}
+
 function setMermaidSvg(block, svg) {
   block.querySelector('.mermaid-svg')?.remove();
   block.querySelector('.mermaid-msg')?.remove();
   const holder = el('div', { class: 'mermaid-svg' });
   holder.innerHTML = svg;
+  cleanMermaidSvg(holder);
   block.append(holder);
   block.classList.remove('has-error');
   block.dataset.done = '1';
@@ -381,7 +460,7 @@ async function renderMermaid(seq) {
   }
   if (run !== mermaidRun) return;
   const config = mermaidConfig();
-  const dark = root.dataset.theme === 'dark';
+  const dark = mermaidTheme() === 'dark';
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
@@ -420,12 +499,39 @@ function showMermaidError(block, err) {
 }
 
 function rerenderMermaid() {
-  if (!state.doc || !mermaidApi) return;
+  if (!state.doc || !mermaidApi) return Promise.resolve();
   // Includes blocks still waiting in a running pass, which then hands over.
   const blocks = ui.article.querySelectorAll('.mermaid-block');
-  if (!blocks.length) return;
+  if (!blocks.length) return Promise.resolve();
   for (const b of blocks) delete b.dataset.done;
-  renderMermaid(state.renderSeq);
+  // Stop a running pass even when the cache serves every block and no new
+  // pass starts: switching back before it finishes must not leave it drawing
+  // the other theme over the cached diagrams.
+  mermaidRun++;
+  return renderMermaid(state.renderSeq);
+}
+
+// Print and PDF: Mermaid bakes its theme into the SVG, so dark diagrams are
+// redrawn in the light theme for the paper (from the cache after the first
+// time) and switched back afterwards.
+async function onPaper(action) {
+  const swap = root.dataset.theme === 'dark' && !!ui.article.querySelector('.mermaid-block');
+  if (swap) {
+    paperTheme = 'light';
+    await rerenderMermaid();
+  }
+  try {
+    return await action();
+  } finally {
+    if (swap) {
+      paperTheme = null;
+      rerenderMermaid();
+    }
+  }
+}
+
+function printDoc() {
+  if (state.doc) onPaper(() => api.print()).catch(console.error);
 }
 
 // ---------------------------------------------------------------------------
@@ -445,21 +551,21 @@ function pushHistory(entry) {
 // Jumps inside the open document are recorded too, so Back returns to the
 // reading position as it does in a browser.
 function jumpInPage(hash) {
-  const scroll = ui.viewer.scrollTop;
+  const position = readingPosition();
   if (!scrollToTarget(hash, { flash: true })) return;
-  pushHistory({ path: state.doc.path, scroll });
+  pushHistory({ path: state.doc.path, ...position });
   updateNavButtons();
 }
 
 async function goBack() {
   const prev = state.back.pop();
   if (!prev) return;
-  const here = state.doc && { path: state.doc.path, scroll: ui.viewer.scrollTop };
+  const here = state.doc && { path: state.doc.path, ...readingPosition() };
   if (here) state.forward.push(here);
   if (here && samePath(prev.path, here.path)) {
-    ui.viewer.scrollTop = prev.scroll;
+    restorePosition(prev);
   } else {
-    const ok = await openDoc(prev.path, { push: false, scroll: prev.scroll });
+    const ok = await openDoc(prev.path, { push: false, position: prev });
     if (!ok && here) state.forward.pop();
   }
   updateNavButtons();
@@ -468,12 +574,12 @@ async function goBack() {
 async function goForward() {
   const next = state.forward.pop();
   if (!next) return;
-  const here = state.doc && { path: state.doc.path, scroll: ui.viewer.scrollTop };
+  const here = state.doc && { path: state.doc.path, ...readingPosition() };
   if (here) state.back.push(here);
   if (here && samePath(next.path, here.path)) {
-    ui.viewer.scrollTop = next.scroll;
+    restorePosition(next);
   } else {
-    const ok = await openDoc(next.path, { push: false, scroll: next.scroll });
+    const ok = await openDoc(next.path, { push: false, position: next });
     if (!ok && here) state.back.pop();
   }
   updateNavButtons();
@@ -806,7 +912,7 @@ function buildMoreMenu() {
     menuItem(isMac() ? 'Show in Finder' : 'Show in folder', 'folder', () => api.showInFolder(state.doc.path), { disabled: !hasDoc }),
     menuItem('Copy file path', 'link', copyPath, { disabled: !hasDoc }),
     sep(),
-    menuItem('Print…', 'printer', () => api.print(), { shortcut: 'Ctrl+P', disabled: !hasDoc }),
+    menuItem('Print…', 'printer', printDoc, { shortcut: 'Ctrl+P', disabled: !hasDoc }),
     menuItem('Export as PDF…', 'fileDown', exportPdf, { disabled: !hasDoc }),
     sep(),
     menuItem('Full screen', 'maximize', () => api.toggleFullscreen(), { shortcut: 'F11' }),
@@ -821,17 +927,15 @@ function buildMoreMenu() {
 // ---------------------------------------------------------------------------
 // Actions
 
+// Any further files picked in the dialog open in their own windows (main).
 async function openDialog() {
-  const paths = await api.openDialog();
-  if (!paths.length) return;
-  const [first, ...rest] = paths;
-  await openDoc(first);
-  if (rest.length) api.openPaths(rest);
+  const [first] = await api.openDialog();
+  if (first) await openDoc(first);
 }
 
 async function reloadDoc() {
   if (!state.doc) return;
-  const scroll = ui.viewer.scrollTop;
+  const position = readingPosition();
   const res = await api.loadDoc(state.doc.path);
   if (res.error) {
     toast(res.error, 'error');
@@ -839,7 +943,7 @@ async function reloadDoc() {
   }
   state.doc = res;
   hideBanner();
-  await renderDoc({ scroll });
+  await renderDoc({ position });
 }
 
 async function openInEditor() {
@@ -858,7 +962,7 @@ async function exportPdf() {
   if (!state.doc) return;
   let out;
   try {
-    out = await api.exportPdf();
+    out = await onPaper(() => api.exportPdf());
   } catch (err) {
     console.error(err);
     return toast('Couldn’t export the PDF', 'error');
@@ -877,6 +981,16 @@ function toast(message, kind = 'info') {
   ui.toast.className = `toast show ${kind}`;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { ui.toast.className = 'toast'; }, kind === 'error' ? 4000 : 2200);
+}
+
+// Raw HTML can lay a decoy over a genuine code block, so the toast says what
+// was really copied: the first line, and how many more follow.
+function copiedSummary(text) {
+  const lines = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (!lines.length) return 'Copied';
+  const first = lines[0].length > 100 ? `${lines[0].slice(0, 99)}…` : lines[0];
+  const more = lines.length - 1;
+  return `Copied: ${first}${more ? ` (+${more} more line${more > 1 ? 's' : ''})` : ''}`;
 }
 
 function showBanner(message) {
@@ -989,7 +1103,9 @@ function wireUi() {
     const copy = e.target.closest('.code-copy');
     if (copy && copy.tagName === 'BUTTON' && copy.closest('.code-block')?.dataset.plumeCode === CODE_MARK) {
       const code = copy.closest('.code-block').querySelector('pre code');
-      await api.copyText(code ? code.textContent : '');
+      const text = code ? code.textContent : '';
+      await api.copyText(text);
+      toast(copiedSummary(text));
       copy.classList.add('copied');
       copy.querySelector('span').textContent = 'Copied';
       setTimeout(() => {
@@ -1099,6 +1215,8 @@ function wireKeys() {
       return setFontSize(state.settings.fontSize + 1);
     }
     if (ctrl && !e.shiftKey && !e.altKey) {
+      // On macOS the File menu owns these, so one press never acts twice.
+      if (isMac() && e.metaKey && (lower === 'o' || lower === 'n' || lower === 'w')) return;
       const handled = {
         o: openDialog,
         n: () => api.newWindow(),
@@ -1107,7 +1225,7 @@ function wireKeys() {
         g: () => (finder.isOpen ? finder.step(1) : finder.open()),
         r: reloadDoc,
         e: openInEditor,
-        p: () => state.doc && api.print(),
+        p: printDoc,
         '\\': () => toggleSidebar(),
         '=': () => setFontSize(state.settings.fontSize + 1),
         '+': () => setFontSize(state.settings.fontSize + 1),
@@ -1181,7 +1299,7 @@ function wireDragDrop() {
     body.classList.remove('dragging');
     const paths = [...(e.dataTransfer ? e.dataTransfer.files : [])].map(f => api.pathForFile(f)).filter(Boolean);
     if (!paths.length) return;
-    const docs = paths.filter(p => DROP_DOC_RE.test(p));
+    const docs = paths.filter(isDroppableDoc);
     if (!docs.length) {
       toast('Plume opens Markdown files');
       return;
@@ -1200,6 +1318,7 @@ function wireIpc() {
   api.onCommand(cmd => {
     if (cmd === 'back') goBack();
     else if (cmd === 'forward') goForward();
+    else if (cmd === 'open') openDialog();
   });
   api.onDocChanged(({ path, content }) => {
     if (!state.doc || !samePath(path, state.doc.path)) return;
@@ -1230,6 +1349,7 @@ async function boot() {
   state.info = info;
   body.classList.toggle('platform-win', info.platform === 'win32');
   body.classList.toggle('platform-mac', info.platform === 'darwin');
+  body.classList.toggle('platform-linux', info.platform !== 'win32' && info.platform !== 'darwin');
   localiseChrome();
   applySettings(info.settings);
   if (info.initialPath) {
