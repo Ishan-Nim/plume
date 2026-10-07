@@ -150,6 +150,12 @@
     viewer.classList.remove('show');
     clearNote(vaultMsg);
 
+    $('tok-list').textContent = '';
+    $('tok-empty').hidden = true;
+    $('tok-reveal').classList.remove('show');
+    $('tok-value').textContent = '';
+    clearNote(tokMsg);
+
     if (graph) graph.setData([], []);
     $('graph-legend').textContent = '';
     $('graph-tip').classList.remove('show');
@@ -238,7 +244,92 @@
     paintAccount(data.account);
     paintFiles(data.files);
     loadGraph();
+    loadTokens();
   }
+
+  // ---------- API tokens ----------
+
+  var tokMsg = $('tok-msg');
+
+  function paintTokens(list) {
+    var ul = $('tok-list');
+    ul.textContent = '';
+    $('tok-empty').hidden = list.length > 0;
+
+    list.forEach(function (token) {
+      var li = document.createElement('li');
+
+      var t = document.createElement('div');
+      t.className = 't';
+      var name = document.createElement('b');
+      name.textContent = token.name;
+      var meta = document.createElement('span');
+      meta.textContent = token.hint + ' · created ' + when(token.createdAt);
+      t.appendChild(name);
+      t.appendChild(meta);
+
+      var revoke = document.createElement('button');
+      revoke.type = 'button';
+      revoke.className = 'btn btn-ghost btn-sm';
+      revoke.textContent = 'Revoke';
+      revoke.addEventListener('click', async function () {
+        if (!window.confirm('Revoke "' + token.name + '"? Anything using it stops working straight away.')) return;
+        try {
+          var data = await apiJson('/tokens?id=' + encodeURIComponent(token.id), { method: 'DELETE' });
+          paintTokens(data.tokens);
+          note(tokMsg, 'Token revoked.', 'ok');
+        } catch (err) {
+          note(tokMsg, err.message);
+        }
+      });
+
+      li.appendChild(t);
+      li.appendChild(revoke);
+      ul.appendChild(li);
+    });
+  }
+
+  async function loadTokens() {
+    try {
+      var data = await apiJson('/tokens');
+      paintTokens(data.tokens);
+    } catch (err) {
+      note(tokMsg, err.message);
+    }
+  }
+
+  $('tok-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var name = $('tok-name').value.trim();
+    try {
+      var data = await apiJson('/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name || 'Untitled token' }),
+      });
+      // Shown once, and only here: the server keeps nothing but its hash.
+      $('tok-value').textContent = data.token;
+      $('tok-reveal').classList.add('show');
+      $('tok-name').value = '';
+      await loadTokens();
+    } catch (err) {
+      note(tokMsg, err.message);
+    }
+  });
+
+  $('tok-copy').addEventListener('click', async function () {
+    try {
+      await navigator.clipboard.writeText($('tok-value').textContent);
+      note(tokMsg, 'Token copied to the clipboard.', 'ok');
+    } catch (err) {
+      note(tokMsg, 'Could not copy — select the token and copy it by hand.');
+    }
+  });
+
+  $('tok-done').addEventListener('click', function () {
+    $('tok-reveal').classList.remove('show');
+    $('tok-value').textContent = '';
+  });
 
   // ---------- the graph ----------
 

@@ -1,0 +1,15 @@
+{
+  "name": "@plume-md/vault-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Plume Vault — durable project memory and notes for Claude Code, Codex and any MCP client",
+  "license": "MIT",
+  "author": "Ishan Nim",
+  "homepage": "https://plume-md.com",
+  "repository": { "type": "git", "url": "https://github.com/Ishan-Nim/plume.git", "directory": "mcp" },
+  "type": "commonjs",
+  "bin": { "plume-vault-mcp": "index.js" },
+  "main": "index.js",
+  "files": ["index.js", "README.md"],
+  "engines": { "node": ">=20" },
+  "keywords": ["mcp", "model-context-protocol", "claude", "memory", "notes", "markdown", "plume"]
+}

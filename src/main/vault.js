@@ -202,6 +202,13 @@ function sha256(buf) {
   return crypto.createHash('sha256').update(buf).digest('hex');
 }
 
+async function graph() {
+  requireSession();
+  const data = await call('/vault/graph');
+  session.account = data.account;
+  return { nodes: data.nodes, edges: data.edges, unresolved: data.unresolved, account: data.account };
+}
+
 async function list() {
   requireSession();
   const data = await call('/vault/list');
@@ -315,6 +322,7 @@ module.exports = {
   signOut,
   refresh,
   list,
+  graph,
   push,
   pull,
   saveConflictCopy,

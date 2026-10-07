@@ -10,9 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Ishan-Nim/plume/releases/latest"><b>Download</b></a> ·
+  <a href="https://plume-md.com/download.html"><b>Download</b></a> ·
+  <a href="https://plume-md.com/docs.html">Documentation</a> ·
   <a href="#features">Features</a> ·
-  <a href="#install">Install</a> ·
+  <a href="#vault">Vault &amp; sync</a> ·
   <a href="#keyboard">Keyboard</a> ·
   <a href="#build-from-source">Build</a>
 </p>
@@ -39,6 +40,43 @@
 - **Print** and **Export to PDF** (with a PDF outline from your headings).
 - **Open in editor** (VS Code or Cursor if installed, otherwise the system text editor), **Open in Obsidian** for vault files, **Open with…** (Windows), **Show in folder**.
 - Safe by default: documents are sanitised, scripts never run, links to programs are never executed.
+
+## Vault &amp; sync
+
+Plume reads the files already on your disk, and that needs no account. Create a free
+one and you also get **Plume Vault**: 100 MB of storage for syncing documents between
+your computers, and a browser to read them in. It is free — there is no paid tier.
+
+- **Sync from the app.** The **Vault** tab in the sidebar signs you in and pushes the
+  open document up. Another machine pulls it down.
+- **Nothing is flattened.** Every upload carries the revision that machine last saw. If
+  the vault copy moved on in the meantime the write is refused, and you choose which
+  copy to keep — Plume can save the other one beside yours so neither is lost.
+- **A graph** of how your documents link to each other, from wiki links and Markdown links.
+- **Read them anywhere** at [plume-md.com/app.html](https://plume-md.com/app.html).
+
+### Project memory for Claude Code and other MCP clients
+
+Create an API token in the web vault and an AI assistant can keep project memory,
+decisions and notes in it — somewhere that outlives the session and that you can read
+in Plume afterwards.
+
+```json
+{
+  "mcpServers": {
+    "plume-vault": {
+      "command": "npx",
+      "args": ["-y", "@plume-md/vault-mcp"],
+      "env": { "PLUME_TOKEN": "plm_your_token" }
+    }
+  }
+}
+```
+
+See [`mcp/`](mcp) for the server and its tools.
+
+The vault's own server is closed source; the app, the website and the MCP client in
+this repository are not.
 
 ## Install
 
@@ -93,6 +131,13 @@ npm run dist:mac    # build the macOS .dmg and .zip (on a Mac)
 npm run dist:linux  # build the Linux AppImage and .deb
 ```
 
+End-to-end check of the whole vault flow in the real app — sign up, sync, graph, sign out
+(point it at a vault API of your own, never production):
+
+```bash
+PLUME_VAULT_API=http://127.0.0.1:8098/api npx electron test/e2e/vault-flow.js
+```
+
 Visual smoke test (renders a document in the real app and saves a screenshot):
 
 ```bash
@@ -104,11 +149,13 @@ The screenshots above come from the sample notes in [`docs/demo-notebook`](docs/
 ## Project layout
 
 ```
-src/main/       main process — windows, file access, settings, IPC, preload bridge
-src/renderer/   UI — markdown pipeline, DOM enhancements, find, sidebar, styles
+src/main/       main process — windows, file access, settings, vault client, IPC, preload
+src/renderer/   UI — markdown pipeline, DOM enhancements, find, sidebar, vault panel, graph
+mcp/            MCP server, so an AI assistant can use the vault as project memory
+site/           plume-md.com — the landing, download, docs and web-vault pages
 resources/      icons (SVG sources + generated ICO/PNG), NSIS installer additions
 scripts/        build + icon generation
-test/           unit tests, e2e capture harness, fixture vault
+test/           unit tests, e2e capture + vault-flow harnesses, fixture vault
 docs/           screenshots and the demo notebook they are taken from
 ```
 

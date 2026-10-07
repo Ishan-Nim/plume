@@ -6,6 +6,7 @@ import { enhance, rebaseUrls, extractSection, plainText } from './enhance.js';
 import { Finder } from './find.js';
 import { FileTree, Outline } from './sidebar.js';
 import { Vault } from './vault.js';
+import { Graph } from './graph.js';
 import { icon, LOGO } from './icons.js';
 import { el, debounce, basename, dirname, samePath, readingStats, slugify, relativeSegments } from './util.js';
 
@@ -752,6 +753,7 @@ function updateTitlebar() {
 }
 
 function showSidebarTab(tab) {
+  if (tab === 'vault') vault().show();
   for (const btn of document.querySelectorAll('.sidebar-tab')) {
     btn.classList.toggle('active', btn.dataset.tab === tab);
     btn.setAttribute('aria-selected', String(btn.dataset.tab === tab));
@@ -933,14 +935,86 @@ function buildMoreMenu() {
 // Plume Vault
 
 let vaultPanel = null;
+let graphView = null;
 
-function openVault() {
+function currentDoc() {
+  return state.doc ? { path: state.doc.path, name: basename(state.doc.path) } : null;
+}
+
+function vault() {
   if (!vaultPanel) {
-    vaultPanel = new Vault(api, toast, () => (state.doc
-      ? { path: state.doc.path, name: basename(state.doc.path) }
-      : null));
+    vaultPanel = new Vault($('#vault-panel'), api, toast, currentDoc, showGraph);
   }
-  vaultPanel.open();
+  return vaultPanel;
+}
+
+// The menu item does not open a dialog: it shows the sidebar on the Vault tab,
+// where signing in lives permanently.
+function openVault() {
+  updateSettings({ sidebar: true, sidebarTab: 'vault' });
+}
+
+// ---------------------------------------------------------------------------
+// The vault graph, shown as a view over the document rather than in a dialog.
+
+function closeGraph() {
+  $('#graph-view').hidden = true;
+  if (graphView) graphView.destroy();
+}
+
+async function showGraph() {
+  const view = $('#graph-view');
+  const empty = $('#graph-view-empty');
+  const canvas = $('#graph-view-canvas');
+
+  view.hidden = false;
+  empty.hidden = false;
+  empty.textContent = 'Reading your vault…';
+  $('#graph-view-meta').textContent = '';
+
+  const res = await api.vault.graph();
+  if (!res.ok) {
+    empty.textContent = res.error;
+    return;
+  }
+  if (!res.nodes.length) {
+    empty.textContent = 'Sync some documents and the links between them appear here.';
+    return;
+  }
+  empty.hidden = true;
+
+  const linked = res.nodes.filter(n => n.links).length;
+  $('#graph-view-meta').textContent =
+    `${res.nodes.length} ${res.nodes.length === 1 ? 'document' : 'documents'} · ` +
+    `${res.edges.length} ${res.edges.length === 1 ? 'link' : 'links'} · ` +
+    `${res.nodes.length - linked} unlinked`;
+
+  const tip = $('#graph-view-tip');
+  if (!graphView) {
+    graphView = new Graph(canvas, {
+      onHover: node => {
+        if (!node) {
+          tip.classList.remove('show');
+          return;
+        }
+        tip.replaceChildren(
+          el('b', { text: node.path }),
+          el('span', { text: `${node.links} ${node.links === 1 ? 'link' : 'links'}` }),
+        );
+        tip.classList.add('show');
+      },
+      onOpen: node => api.vault.pull(node.path),
+    });
+    window.addEventListener('resize', () => {
+      if (graphView && !$('#graph-view').hidden) graphView.resize();
+    });
+  }
+
+  graphView.setData(res.nodes, res.edges);
+  graphView.resize();
+  setTimeout(() => {
+    if (graphView && !view.hidden) graphView.fit();
+  }, 900);
 }
 
 // ---------------------------------------------------------------------------
@@ -1080,6 +1154,10 @@ function wireUi() {
   $('#btn-default').addEventListener('click', () => api.openDefaultApps());
   $('#btn-tree-refresh').addEventListener('click', () => fileTree.refresh());
   $('#banner-close').addEventListener('click', hideBanner);
+
+  $('#graph-view-close').addEventListener('click', closeGraph);
+  $('#graph-view-fit').addEventListener('click', () => graphView && graphView.fit());
+  $('#graph-view-shake').addEventListener('click', () => graphView && graphView.nudge());
 
   for (const tab of document.querySelectorAll('.sidebar-tab')) {
     tab.addEventListener('click', () => updateSettings({ sidebarTab: tab.dataset.tab }));

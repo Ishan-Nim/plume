@@ -393,7 +393,9 @@
     var height = this.canvas.clientHeight;
     var spanX = Math.max(1, maxX - minX);
     var spanY = Math.max(1, maxY - minY);
-    this.scale = Math.min(4, Math.max(0.25, Math.min((width - pad * 2) / spanX, (height - pad * 2) / spanY)));
+    // Capped well below the manual zoom limit: fitting three notes to a
+  // full pane would otherwise draw them as giant discs.
+  this.scale = Math.min(1.6, Math.max(0.25, Math.min((width - pad * 2) / spanX, (height - pad * 2) / spanY)));
     this.offset.x = width / 2 - ((minX + maxX) / 2) * this.scale;
     this.offset.y = height / 2 - ((minY + maxY) / 2) * this.scale;
     this.draw();

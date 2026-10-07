@@ -1,10 +1,13 @@
-// Plume Vault — the panel behind "⋯ → Plume Vault".
+// Plume Vault — the sidebar panel.
+//
+// It lives in the sidebar beside Files and Outline rather than in a dialog:
+// signing in is not an interruption, and the vault is somewhere you look
+// things up while you read, not something that covers what you are reading.
 //
 // Everything that touches the network happens in the main process; this file
 // only asks for actions and draws the answers.
 
 import { el } from './util.js';
-import { icon } from './icons.js';
 
 function bytes(n) {
   if (!Number.isFinite(n)) return '—';
@@ -26,80 +29,46 @@ function when(iso) {
 
 export class Vault {
   /**
-   * @param {object} api     the preload bridge (window.plume)
-   * @param {Function} toast the app's notification helper
-   * @param {Function} getDoc returns the open document, or null
+   * @param {HTMLElement} root   the sidebar panel to draw into
+   * @param {object} api         the preload bridge (window.plume)
+   * @param {Function} toast     the app's notification helper
+   * @param {Function} getDoc    returns the open document, or null
+   * @param {Function} onGraph   asked to show the graph of these documents
    */
-  constructor(api, toast, getDoc) {
+  constructor(root, api, toast, getDoc, onGraph) {
+    this.root = root;
     this.api = api;
     this.toast = toast;
     this.getDoc = getDoc;
+    this.onGraph = onGraph;
+
     this.mode = 'signin';
     this.state = null;
     this.files = [];
     this.links = {};
+    this.loaded = false;
     this.busy = false;
-    this.root = null;
-  }
-
-  // ---------- shell ----------
-
-  build() {
-    if (this.root) return this.root;
-
-    this.body = el('div', { class: 'vault-body' });
-
-    const close = el('button', {
-      class: 'icon-btn small', type: 'button', title: 'Close', 'aria-label': 'Close',
-    });
-    close.innerHTML = icon('close', 16);
-    close.addEventListener('click', () => this.close());
-
-    const head = el('div', { class: 'vault-head' });
-    const title = el('div', { class: 'vault-title' });
-    title.append(el('b', { text: 'Plume Vault' }));
-    head.append(title, close);
-
-    const card = el('div', { class: 'vault-card', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Plume Vault' });
-    card.append(head, this.body);
-
-    this.root = el('div', { class: 'vault-overlay', hidden: true });
-    this.root.append(card);
-    this.root.addEventListener('mousedown', ev => {
-      if (ev.target === this.root) this.close();
-    });
-
-    this.onKey = ev => {
-      if (ev.key === 'Escape' && !this.root.hidden) {
-        ev.stopPropagation();
-        this.close();
-      }
-    };
-
-    document.body.append(this.root);
-    return this.root;
-  }
-
-  async open() {
-    this.build();
-    this.root.hidden = false;
-    document.addEventListener('keydown', this.onKey, true);
-    this.render(el('p', { class: 'vault-note', text: 'Checking your vault…' }));
-    await this.load();
-  }
-
-  close() {
-    if (!this.root) return;
-    this.root.hidden = true;
-    document.removeEventListener('keydown', this.onKey, true);
   }
 
   render(...nodes) {
-    this.body.replaceChildren(...nodes);
+    this.root.replaceChildren(...nodes);
+  }
+
+  /** Called whenever the panel becomes visible, and after the document changes. */
+  async show({ force = false } = {}) {
+    if (this.loaded && !force) {
+      // Already drawn: just refresh the part that depends on the open document.
+      if (this.state && this.state.signedIn) this.drawVault();
+      return;
+    }
+    if (!this.loaded) this.render(el('p', { class: 'vault-note', text: 'Checking your vault…' }));
+    await this.load();
   }
 
   async load() {
     this.state = await this.api.vault.state();
+    this.loaded = true;
+
     if (!this.state.signedIn) {
       this.drawAuth();
       return;
@@ -121,15 +90,10 @@ export class Vault {
   drawAuth(message) {
     const form = el('form', { class: 'vault-form' });
 
-    const intro = el('p', { class: 'vault-note' });
-    intro.textContent = this.mode === 'signup'
-      ? 'A free account gives you a 100 MB vault. Your documents stay private.'
-      : 'Sign in to sync documents between your computers.';
-
-    const tabs = el('div', { class: 'vault-tabs', role: 'tablist' });
+    const tabs = el('div', { class: 'vault-tabs' });
     const mk = (key, label) => {
-      const b = el('button', { type: 'button', role: 'tab', text: label });
-      b.setAttribute('aria-selected', String(this.mode === key));
+      const b = el('button', { type: 'button', text: label });
+      b.setAttribute('aria-pressed', String(this.mode === key));
       b.addEventListener('click', () => {
         this.mode = key;
         this.drawAuth();
@@ -138,10 +102,19 @@ export class Vault {
     };
     tabs.append(mk('signin', 'Sign in'), mk('signup', 'Create account'));
 
-    const email = el('input', { type: 'email', id: 'vault-email', autocomplete: 'email', placeholder: 'you@example.com', required: true });
+    const intro = el('p', { class: 'vault-note' });
+    intro.textContent = this.mode === 'signup'
+      ? 'A free account gives you a 100 MB vault for syncing documents between your computers.'
+      : 'Sign in to sync documents between your computers.';
+
+    const email = el('input', {
+      type: 'email', id: 'vault-email', autocomplete: 'email',
+      placeholder: 'you@example.com', required: true,
+    });
     const password = el('input', {
       type: 'password', id: 'vault-password', placeholder: '••••••••••', required: true,
       autocomplete: this.mode === 'signup' ? 'new-password' : 'current-password',
+      'aria-describedby': this.mode === 'signup' ? 'vault-pw-hint' : null,
     });
 
     const submit = el('button', {
@@ -149,19 +122,19 @@ export class Vault {
       text: this.mode === 'signup' ? 'Create my vault' : 'Sign in',
     });
 
-    const error = el('p', { class: 'vault-error', hidden: !message, text: message || '' });
-
+    form.append(tabs, intro);
+    if (message) form.append(el('p', { class: 'vault-error', text: message }));
     form.append(
-      tabs,
-      intro,
-      error,
       el('label', { for: 'vault-email', class: 'vault-label', text: 'Email' }),
       email,
       el('label', { for: 'vault-password', class: 'vault-label', text: 'Password' }),
       password,
     );
     if (this.mode === 'signup') {
-      form.append(el('span', { class: 'vault-hint', text: 'At least 10 characters, with a number or symbol.' }));
+      form.append(el('span', {
+        class: 'vault-hint', id: 'vault-pw-hint',
+        text: 'At least 10 characters, with a number or symbol.',
+      }));
     }
     form.append(submit);
 
@@ -180,12 +153,11 @@ export class Vault {
         this.drawAuth(res.error);
         return;
       }
-      this.toast(this.mode === 'signup' ? 'Vault created' : 'Signed in');
+      this.toast(this.mode === 'signup' ? 'Vault created' : 'Signed in to your vault');
       await this.load();
     });
 
     this.render(form);
-    setTimeout(() => email.focus(), 0);
   }
 
   // ---------- signed in ----------
@@ -195,27 +167,31 @@ export class Vault {
     const used = account.usedBytes || 0;
     const quota = account.quotaBytes || 1;
 
-    const who = el('div', { class: 'vault-account' });
-    const left = el('div');
-    left.append(
+    const head = el('div', { class: 'vault-account' });
+    const who = el('div', { class: 'vault-who' });
+    who.append(
       el('b', { text: account.email || this.state.email || '' }),
-      el('span', { text: `${bytes(used)} of ${bytes(quota)} used · ${this.files.length} ${this.files.length === 1 ? 'document' : 'documents'}` }),
+      el('span', { text: `${bytes(used)} of ${bytes(quota)} · ${this.files.length} ${this.files.length === 1 ? 'document' : 'documents'}` }),
     );
-    const out = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Sign out' });
-    out.addEventListener('click', async () => {
+    const menu = el('button', {
+      class: 'vault-btn ghost small', type: 'button', text: 'Sign out',
+      title: 'Sign out of your vault',
+    });
+    menu.addEventListener('click', async () => {
       await this.api.vault.signOut();
       this.files = [];
+      this.links = {};
       this.toast('Signed out of your vault');
       await this.load();
     });
-    who.append(left, out);
+    head.append(who, menu);
 
     const meter = el('div', { class: 'vault-meter' });
     const fill = el('i');
     fill.style.width = `${Math.min(100, (used / quota) * 100).toFixed(1)}%`;
     meter.append(fill);
 
-    const parts = [who, meter];
+    const parts = [head, meter];
     if (message) parts.push(el('p', { class: 'vault-error', text: message }));
     parts.push(this.drawCurrent(), this.drawFiles());
 
@@ -234,19 +210,18 @@ export class Vault {
     }
 
     const link = this.links[doc.path];
-    const row = el('div', { class: 'vault-current' });
 
     if (link) {
       const info = el('div', { class: 'vault-current-info' });
       info.append(
         el('b', { text: link.vaultPath }),
-        el('span', { text: link.syncedAt ? `last synced ${when(link.syncedAt)}` : 'not synced yet' }),
+        el('span', { text: link.syncedAt ? `synced ${when(link.syncedAt)}` : 'not synced yet' }),
       );
 
       const sync = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Sync now' });
       sync.addEventListener('click', () => this.push(link.vaultPath, sync));
 
-      const stop = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Stop syncing' });
+      const stop = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Unlink' });
       stop.addEventListener('click', async () => {
         const res = await this.api.vault.unlink();
         if (res.ok) {
@@ -256,24 +231,32 @@ export class Vault {
         }
       });
 
-      row.append(info, el('div', { class: 'vault-current-acts' }, sync, stop));
+      section.append(info, el('div', { class: 'vault-row-acts' }, sync, stop));
     } else {
       const name = el('input', {
-        type: 'text', class: 'vault-name', value: this.state.suggested || doc.name || '',
+        type: 'text', class: 'vault-name',
+        value: this.state.suggested || doc.name || '',
         'aria-label': 'Name in the vault',
       });
       const send = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Sync to vault' });
       send.addEventListener('click', () => this.push(name.value.trim(), send));
-      row.append(name, send);
+      section.append(name, el('div', { class: 'vault-row-acts' }, send));
     }
 
-    section.append(row);
     return section;
   }
 
   drawFiles() {
     const section = el('section', { class: 'vault-section' });
-    section.append(el('h3', { text: 'In your vault' }));
+
+    const head = el('div', { class: 'vault-section-head' });
+    head.append(el('h3', { text: 'In your vault' }));
+    if (this.files.length) {
+      const graph = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Graph' });
+      graph.addEventListener('click', () => this.onGraph());
+      head.append(graph);
+    }
+    section.append(head);
 
     if (!this.files.length) {
       section.append(el('p', { class: 'vault-note', text: 'Nothing here yet. Sync a document to get started.' }));
@@ -289,14 +272,12 @@ export class Vault {
         el('span', { text: `${bytes(file.size)} · ${when(file.updatedAt)}` }),
       );
 
-      const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Save & open' });
+      const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open' });
       open.addEventListener('click', async () => {
         open.disabled = true;
         const res = await this.api.vault.pull(file.path);
         open.disabled = false;
-        if (!res.ok) return this.toast(res.error, 'error');
-        if (res.canceled) return;
-        this.close();
+        if (!res.ok) this.toast(res.error, 'error');
       });
 
       const del = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Delete' });
@@ -308,7 +289,7 @@ export class Vault {
         await this.load();
       });
 
-      li.append(info, el('div', { class: 'vault-file-acts' }, open, del));
+      li.append(info, el('div', { class: 'vault-row-acts' }, open, del));
       list.append(li);
     }
 
@@ -347,16 +328,16 @@ export class Vault {
    * without the user saying so.
    */
   drawConflict(vaultPath, conflict) {
-    const box = el('div', { class: 'vault-conflict' });
+    const box = el('section', { class: 'vault-section vault-conflict' });
     box.append(
-      el('h3', { text: 'This document changed somewhere else' }),
+      el('h3', { text: 'Changed somewhere else' }),
       el('p', {
         class: 'vault-note',
         text: `The vault copy of “${vaultPath}” was updated ${when(conflict.updatedAt)}, after this computer last synced. Choose what to keep.`,
       }),
     );
 
-    const keep = el('button', { class: 'vault-btn primary', type: 'button', text: 'Save the vault copy beside this one' });
+    const keep = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Save the vault copy beside mine' });
     keep.addEventListener('click', async () => {
       keep.disabled = true;
       const res = await this.api.vault.keepBoth(vaultPath);
@@ -366,7 +347,7 @@ export class Vault {
       await this.load();
     });
 
-    const over = el('button', { class: 'vault-btn ghost', type: 'button', text: 'Replace the vault copy with mine' });
+    const over = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Replace the vault copy' });
     over.addEventListener('click', async () => {
       over.disabled = true;
       const res = await this.api.vault.push(vaultPath, { force: true });
@@ -379,7 +360,7 @@ export class Vault {
     const back = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Cancel' });
     back.addEventListener('click', () => this.drawVault());
 
-    box.append(el('div', { class: 'vault-conflict-acts' }, keep, over, back));
+    box.append(el('div', { class: 'vault-stack' }, keep, over, back));
     this.render(box);
   }
 }

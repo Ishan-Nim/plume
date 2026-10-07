@@ -17,7 +17,7 @@ const DEFAULTS = Object.freeze({
   font: 'sans',           // 'sans' | 'serif'
   lineBreaks: true,       // Obsidian-style: a single newline is a line break
   sidebar: true,
-  sidebarTab: 'files',    // 'files' | 'outline'
+  sidebarTab: 'files',    // 'files' | 'outline' | 'vault'
   sidebarWidth: 260,
   recent: [],
   bounds: null,           // { x, y, width, height } of the last closed window
@@ -31,7 +31,7 @@ const VALIDATORS = {
   font: v => ['sans', 'serif'].includes(v),
   lineBreaks: v => typeof v === 'boolean',
   sidebar: v => typeof v === 'boolean',
-  sidebarTab: v => ['files', 'outline'].includes(v),
+  sidebarTab: v => ['files', 'outline', 'vault'].includes(v),
   sidebarWidth: v => Number.isInteger(v) && v >= 180 && v <= 520,
   recent: v => Array.isArray(v) && v.every(p => typeof p === 'string' && p.length < 4096),
   bounds: v => v === null || (typeof v === 'object' &&

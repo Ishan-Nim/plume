@@ -33,6 +33,7 @@
       <div class="sidebar-tabs" role="tablist">
         <button class="sidebar-tab active" type="button" role="tab" data-tab="files" data-icon="folder" data-size="15">Files</button>
         <button class="sidebar-tab" type="button" role="tab" data-tab="outline" data-icon="outline" data-size="15">Outline</button>
+        <button class="sidebar-tab" type="button" role="tab" data-tab="vault" data-icon="cloud" data-size="15">Vault</button>
       </div>
       <section class="sidebar-panel" data-panel="files">
         <div class="panel-head">
@@ -46,6 +47,9 @@
         <nav id="outline" class="outline" aria-label="Outline"></nav>
         <div id="outline-footer" class="panel-footer"></div>
       </section>
+      <section class="sidebar-panel" data-panel="vault" hidden>
+        <div id="vault-panel" class="vault-panel"></div>
+      </section>
       <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize"></div>
     </aside>
 
@@ -58,6 +62,25 @@
         <button id="find-next" class="icon-btn small" type="button" title="Next (Enter)" aria-label="Next match" data-icon="down"></button>
         <button id="find-close" class="icon-btn small" type="button" title="Close (Esc)" aria-label="Close find" data-icon="close"></button>
       </div>
+
+      <section id="graph-view" class="graph-view" aria-label="Vault graph" hidden>
+        <header class="graph-view-head">
+          <div>
+            <b>Vault graph</b>
+            <span id="graph-view-meta"></span>
+          </div>
+          <div class="graph-view-acts">
+            <button id="graph-view-fit" class="vault-btn ghost small" type="button">Fit</button>
+            <button id="graph-view-shake" class="vault-btn ghost small" type="button">Re-arrange</button>
+            <button id="graph-view-close" class="icon-btn small" type="button" title="Close graph" aria-label="Close graph" data-icon="close" data-size="15"></button>
+          </div>
+        </header>
+        <div class="graph-view-stage">
+          <canvas id="graph-view-canvas"></canvas>
+          <p id="graph-view-empty" class="graph-view-empty"></p>
+          <div id="graph-view-tip" class="graph-view-tip" role="status"></div>
+        </div>
+      </section>
 
       <div id="banner" class="banner" hidden>
         <span class="banner-text"></span>

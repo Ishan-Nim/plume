@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plume documentation — reading, syncing and the vault</title>
+<meta name="description" content="How to use Plume: open Markdown files, create a free 100 MB vault, sync documents between computers, read them in a browser, and give Claude Code or any MCP client a place to keep project memory.">
+<link rel="canonical" href="https://plume-md.com/docs.html">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<meta name="theme-color" content="#6e56cf">
+
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://plume-md.com/docs.html">
+<meta property="og:site_name" content="Plume">
+<meta property="og:title" content="Plume documentation">
+<meta property="og:description" content="Everything Plume does, from opening a file to giving an AI assistant a place to keep project memory.">
+<meta property="og:image" content="https://plume-md.com/assets/shots/light.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Plume documentation">
+<meta name="twitter:description" content="Everything Plume does, from opening a file to giving an AI assistant a place to keep project memory.">
+<meta name="twitter:image" content="https://plume-md.com/assets/shots/light.png">
+
+<link rel="stylesheet" href="assets/site.css">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('plume-theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  .docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; align-items: start; padding-block: clamp(36px, 6vw, 64px); }
+  @media (max-width: 900px) { .docs { grid-template-columns: 1fr; gap: 28px; } }
+
+  .toc { position: sticky; top: 84px; font-size: .9rem; }
+  @media (max-width: 900px) {
+    .toc { position: static; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: var(--bg-2); }
+  }
+  .toc b { display: block; font-size: .78rem; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 10px; }
+  .toc a { display: block; padding: 5px 0; color: var(--text-2); }
+  .toc a:hover { color: var(--accent-strong); text-decoration: none; }
+
+  .prose { max-width: 70ch; }
+  .prose h2 {
+    font-size: clamp(1.4rem, 3vw, 1.85rem); margin-top: 52px; padding-top: 8px;
+    scroll-margin-top: 84px;
+  }
+  .prose h2:first-of-type { margin-top: 0; }
+  .prose h3 { font-size: 1.08rem; margin-top: 30px; scroll-margin-top: 84px; }
+  .prose p, .prose ul, .prose ol { margin-top: 14px; color: var(--text-2); line-height: 1.7; }
+  .prose ul, .prose ol { padding-left: 22px; display: grid; gap: 8px; }
+  .prose li { line-height: 1.6; }
+  .prose b, .prose strong { color: var(--text); font-weight: 620; }
+  .prose a { text-decoration: underline; text-underline-offset: 2px; }
+  .prose code {
+    font-family: var(--mono); font-size: .86em; background: var(--bg-3);
+    border: 1px solid var(--line); padding: 1px 5px; border-radius: 5px; color: var(--text);
+    word-break: break-word;
+  }
+  .prose pre {
+    margin-top: 16px; padding: 16px 18px; border-radius: 12px; overflow-x: auto;
+    background: var(--bg-3); border: 1px solid var(--line);
+    font-family: var(--mono); font-size: .83rem; line-height: 1.65;
+  }
+  .prose pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+  .prose figure { margin: 22px 0 0; }
+  .prose figure img { border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+  .prose figcaption { margin-top: 9px; font-size: .85rem; color: var(--text-3); }
+  .prose table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: .92rem; }
+  .prose th, .prose td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .prose th { color: var(--text-3); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 580; }
+  .prose td code { white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+  .callout {
+    margin-top: 18px; border: 1px solid var(--accent-line); background: var(--accent-soft);
+    border-radius: 11px; padding: 14px 16px; font-size: .92rem; color: var(--text-2);
+  }
+  .callout b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="/">
+      <img src="assets/logo.svg" alt="" width="28" height="28">
+      Plume
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="navlink nav-hide" href="/#features">Features</a>
+      <a class="navlink nav-hide" href="docs.html">Docs</a>
+      <a class="navlink nav-hide" href="https://github.com/Ishan-Nim/plume">GitHub</a>
+      <button class="navlink" id="nav-signout" type="button" hidden>Sign out</button>
+      <a class="navlink" id="nav-account" href="app.html">Sign in</a>
+      <a class="btn btn-primary btn-sm" href="download.html">Download</a>
+      <button class="theme-toggle" type="button" aria-label="Switch between light and dark">
+        <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap docs">
+
+  <nav class="toc" aria-label="On this page">
+    <b>On this page</b>
+    <a href="#start">Getting started</a>
+    <a href="#reading">Reading documents</a>
+    <a href="#obsidian">Obsidian notes</a>
+    <a href="#vault">Plume Vault</a>
+    <a href="#sync">Syncing</a>
+    <a href="#web">The web vault</a>
+    <a href="#graph">The graph</a>
+    <a href="#tokens">API tokens</a>
+    <a href="#mcp">Claude &amp; MCP</a>
+    <a href="#keyboard">Keyboard</a>
+    <a href="#privacy">Privacy</a>
+    <a href="#trouble">Troubleshooting</a>
+  </nav>
+
+  <article class="prose">
+
+    <h1 style="font-size:clamp(2rem,4.5vw,2.8rem)">Documentation</h1>
+    <p class="lede" style="margin-left:0">
+      Plume is a Markdown reader. Everything below the first section is optional — the app works
+      fully with no account at all.
+    </p>
+
+    <h2 id="start">Getting started</h2>
+    <ol>
+      <li><b>Install it.</b> Pick your system on the <a href="download.html">download page</a>. The builds are not code-signed yet, so Windows and macOS warn on first run; the download page explains how to get past that for each system.</li>
+      <li><b>Open a document.</b> Double-click any <code>.md</code> file, drag one onto the window, or press <code>Ctrl+O</code>.</li>
+      <li><b>Make it the default</b> if you want every Markdown file to open here. Windows and macOS only let you choose that yourself — see <a href="#trouble">Troubleshooting</a>.</li>
+    </ol>
+    <p>That is the whole app. No vault to create, no project to open, no account.</p>
+
+    <h2 id="reading">Reading documents</h2>
+    <p>
+      Plume opens one document per window. Opening a second file while Plume is running gives it
+      its own window instantly, with no cold start.
+    </p>
+    <ul>
+      <li><b>The sidebar</b> has three tabs: <b>Files</b> (the folder around your document, or the whole vault if it is in one), <b>Outline</b> (every heading, with a reading time) and <b>Vault</b>. Toggle it with <code>Ctrl+\</code>.</li>
+      <li><b>Reading settings</b> (the <code>Aa</code> button) set the theme, text size, reading width, serif or sans, and whether a single newline is a line break.</li>
+      <li><b>Live reload:</b> save the file in any editor and Plume updates in place, keeping your scroll position. Write in your editor, read here.</li>
+      <li><b>Find in page</b> with <code>Ctrl+F</code>; <b>back and forward</b> between linked notes with <code>Alt+←</code> and <code>Alt+→</code>, or your mouse side buttons.</li>
+      <li><b>Print</b> and <b>Export as PDF</b> from the <code>⋯</code> menu. PDFs get a real outline built from your headings, and diagrams are redrawn in the light theme for paper.</li>
+    </ul>
+    <figure>
+      <img src="assets/shots/reading.png" width="1440" height="900" loading="lazy" alt="Plume's reading settings: theme, text size, width, font and line breaks">
+      <figcaption>Reading settings. Set once; Plume remembers.</figcaption>
+    </figure>
+
+    <h2 id="obsidian">Obsidian notes</h2>
+    <p>Plume reads the Obsidian dialect, so you can open a vault note without opening the vault:</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>What you write</th><th>What Plume does</th></tr></thead>
+        <tbody>
+          <tr><td><code>[[Note]]</code></td><td>Links to it anywhere in the vault, ignoring letter case</td></tr>
+          <tr><td><code>[[Note#Heading|alias]]</code></td><td>Jumps to that heading, shown as the alias</td></tr>
+          <tr><td><code>![[image.png|300]]</code></td><td>Embeds the image at that width</td></tr>
+          <tr><td><code>![[Note#Section]]</code></td><td>Pulls that section in</td></tr>
+          <tr><td><code>&gt; [!tip]</code></td><td>A callout; <code>[!warning]-</code> is foldable</td></tr>
+          <tr><td><code>==highlight==</code></td><td>Highlights it</td></tr>
+          <tr><td><code>#tag</code>, <code>%%comment%%</code>, <code>^block-id</code></td><td>Tags, hidden comments, block references</td></tr>
+          <tr><td>Front matter</td><td>Shown as Properties at the top</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      GitHub-flavoured Markdown works too: tables, task lists, footnotes, definition lists, emoji
+      shortcodes, syntax highlighting, KaTeX maths and Mermaid diagrams.
+    </p>
+    <p>
+      For a note inside a real Obsidian vault, <code>⋯ → Open in Obsidian</code> hands it over.
+    </p>
+
+    <h2 id="vault">Plume Vault</h2>
+    <p>
+      A vault is 100 MB of storage attached to an account. It is <b>free</b> — there is no card, no
+      trial and no paid tier — and it is entirely optional.
+    </p>
+    <p>To create one, either:</p>
+    <ul>
+      <li>In Plume, open the <b>Vault</b> tab in the sidebar, choose <b>Create account</b>, and enter an email and a password; or</li>
+      <li>On the web at <a href="app.html">plume-md.com/app.html</a>.</li>
+    </ul>
+    <p>
+      Either way it is the same vault. A password needs at least 10 characters with a number or a
+      symbol in it.
+    </p>
+    <div class="callout">
+      <b>What a vault holds.</b> Markdown and text documents, and images to go with them, up to
+      10&nbsp;MB each and 2000 files. It is for notes you want on more than one machine — not a
+      general file store.
+    </div>
+
+    <h2 id="sync">Syncing documents</h2>
+    <p>Syncing is per document and always deliberate. Nothing leaves your machine until you say so.</p>
+    <ol>
+      <li>Open the document you want.</li>
+      <li>Go to the <b>Vault</b> tab. Under <b>This document</b>, check the name it will have in the vault and press <b>Sync to vault</b>.</li>
+      <li>From then on that document is linked: the panel shows when it last synced, and <b>Sync now</b> sends your latest version up.</li>
+      <li>On another computer, sign in, find it under <b>In your vault</b> and press <b>Open</b>. Plume asks where to save it, then opens it — and links it there too.</li>
+    </ol>
+
+    <h3>When the same document changes in two places</h3>
+    <p>
+      Every upload carries the revision this machine last saw. If the vault copy has moved on since
+      then — because you edited it on your laptop — Plume <b>refuses the upload</b> rather than
+      flattening that work, and asks what to keep:
+    </p>
+    <ul>
+      <li><b>Save the vault copy beside mine</b> downloads the other version next to your file as <code>Note (vault copy 2026-10-07-14-30).md</code>, so you have both and can merge them yourself.</li>
+      <li><b>Replace the vault copy</b> sends yours up and overwrites the other one. Only pick this when you know yours is the one you want.</li>
+    </ul>
+
+    <h2 id="web">The web vault</h2>
+    <p>
+      <a href="app.html">plume-md.com/app.html</a> shows the same documents in a browser: read them,
+      download them, drop new ones in, and delete them. Useful on a machine where Plume is not
+      installed.
+    </p>
+
+    <h2 id="graph">The graph</h2>
+    <p>
+      The <b>Graph</b> button in the Vault tab draws how your documents link to each other —
+      wiki links, embeds and ordinary Markdown links all count; links inside code blocks do not.
+    </p>
+    <ul>
+      <li><b>Drag</b> a document to move it, <b>scroll</b> to zoom, drag the background to pan.</li>
+      <li><b>Hover</b> one to dim everything it is not connected to.</li>
+      <li><b>Double-click</b> to open it.</li>
+      <li>Bigger circles have more links. Colours group documents by folder.</li>
+    </ul>
+
+    <h2 id="tokens">API tokens</h2>
+    <p>
+      A token lets something that is not a browser reach your vault: an AI assistant, an editor
+      plugin, a script. Create one on the web vault under <b>API tokens</b>, give it a name you will
+      recognise later, and copy it — <b>it is shown once and never again</b>, because only its hash
+      is stored.
+    </p>
+    <div class="callout">
+      <b>Treat a token like a password.</b> It can read, change and delete every document in your
+      vault. Revoke one the moment you do not need it, and never paste one into a shared file or a
+      repository. Tokens cannot create or revoke other tokens — that always needs your password.
+    </div>
+    <p>Used directly, the API is ordinary HTTP:</p>
+    <pre><code>curl https://plume-md.com/api/vault/list \
+  -H "Authorization: Bearer plm_your_token"
+
+curl -X PUT "https://plume-md.com/api/vault/file?path=notes/today.md" \
+  -H "Authorization: Bearer plm_your_token" \
+  --data-binary @today.md</code></pre>
+
+    <h2 id="mcp">Claude Code, Codex and MCP</h2>
+    <p>
+      Plume Vault ships an <b>MCP server</b>, so an AI assistant can keep project memory, decisions
+      and notes somewhere that outlives the session — and that you can read in Plume on any of your
+      machines afterwards.
+    </p>
+    <p>Create a token, then add this to your MCP client's configuration:</p>
+    <pre><code>{
+  "mcpServers": {
+    "plume-vault": {
+      "command": "npx",
+      "args": ["-y", "@plume-md/vault-mcp"],
+      "env": { "PLUME_TOKEN": "plm_your_token" }
+    }
+  }
+}</code></pre>
+    <p>The assistant gets eight tools:</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tool</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td><code>list_notes</code></td><td>Lists what is in the vault, optionally under one folder</td></tr>
+          <tr><td><code>read_note</code></td><td>Reads one document</td></tr>
+          <tr><td><code>write_note</code></td><td>Creates or replaces one</td></tr>
+          <tr><td><code>append_note</code></td><td>Adds to the end — safer than replacing, for a running log</td></tr>
+          <tr><td><code>search_notes</code></td><td>Searches the text of every document and returns matching lines</td></tr>
+          <tr><td><code>delete_note</code></td><td>Removes one</td></tr>
+          <tr><td><code>vault_graph</code></td><td>Shows the links, including ones pointing at documents that do not exist yet</td></tr>
+          <tr><td><code>vault_status</code></td><td>How much storage is used</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>A shape that works well</h3>
+    <p>
+      Keep one folder per project and let the assistant write to it, exactly as you would with a
+      notes repository:
+    </p>
+    <pre><code>projects/plume/decisions.md     why things are the way they are
+projects/plume/architecture.md  how it fits together
+projects/plume/log.md           appended to as work happens
+people/notes.md                 who said what, and when</code></pre>
+    <p>
+      Write the links in <code>[[double brackets]]</code> and the vault graph draws the shape of
+      what the assistant has remembered.
+    </p>
+
+    <h2 id="keyboard">Keyboard</h2>
+    <p>On macOS, use <code>⌘</code> in place of <code>Ctrl</code> and <code>⌥</code> in place of <code>Alt</code>.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Action</th><th>Keys</th></tr></thead>
+        <tbody>
+          <tr><td>Open file</td><td><code>Ctrl+O</code></td></tr>
+          <tr><td>New window</td><td><code>Ctrl+N</code></td></tr>
+          <tr><td>Close window</td><td><code>Ctrl+W</code></td></tr>
+          <tr><td>Find / next / previous</td><td><code>Ctrl+F</code>, <code>Enter</code>, <code>Shift+Enter</code></td></tr>
+          <tr><td>Back / forward</td><td><code>Alt+←</code> / <code>Alt+→</code></td></tr>
+          <tr><td>Toggle sidebar</td><td><code>Ctrl+\</code></td></tr>
+          <tr><td>Text size</td><td><code>Ctrl+=</code> / <code>Ctrl+-</code> / <code>Ctrl+0</code></td></tr>
+          <tr><td>Reload</td><td><code>F5</code></td></tr>
+          <tr><td>Open in editor</td><td><code>Ctrl+E</code></td></tr>
+          <tr><td>Print</td><td><code>Ctrl+P</code></td></tr>
+          <tr><td>Full screen</td><td><code>F11</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="privacy">Privacy and safety</h2>
+    <ul>
+      <li><b>Without an account, nothing leaves your computer.</b> Plume has no telemetry and makes no network requests while reading a file.</li>
+      <li><b>Markdown is untrusted input.</b> Documents are rendered in a sandboxed window with a strict Content-Security-Policy, sanitised with DOMPurify. Scripts never run, external links open in your browser, and links to programs, apps and scripts are only ever revealed in your file manager — never launched. A document cannot make Plume load files from other computers on your network.</li>
+      <li><b>Account tokens never reach the window that renders your documents.</b> Every network call happens in Plume's main process, so even a flaw in the renderer could not read one.</li>
+      <li><b>Passwords</b> are hashed with scrypt and never stored or logged in the clear. Your session token is kept encrypted at rest using your system keychain.</li>
+      <li><b>Vault documents</b> sit in private storage that nobody else can list. They are not indexed, shared or sold.</li>
+      <li><b>Changing your password</b> signs out every other device.</li>
+    </ul>
+
+    <h2 id="trouble">Troubleshooting</h2>
+
+    <h3>Windows warns that it protected my PC</h3>
+    <p>The build is not code-signed yet. Choose <b>More info → Run anyway</b>. Every build is produced in public by GitHub Actions from the tagged source, so you can check what went into it.</p>
+
+    <h3>macOS will not open it</h3>
+    <p>Plume is not notarized yet. Right-click it in Applications → <b>Open</b> → <b>Open</b>. On macOS 15 and later, try once, then go to <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>. Or run <code>xattr -cr /Applications/Plume.app</code>.</p>
+
+    <h3>Making Plume the default for .md</h3>
+    <ul>
+      <li><b>Windows:</b> right-click a Markdown file → <b>Open with → Choose another app → Plume → Always</b>. Or use <code>⋯ → Make Plume the default for .md</code> inside Plume.</li>
+      <li><b>macOS:</b> select a <code>.md</code> file in Finder → <b>Get Info</b> → <b>Open with: Plume</b> → <b>Change All…</b></li>
+      <li><b>Linux:</b> choose Plume under <b>Open With</b> in your file manager and set it as the default.</li>
+    </ul>
+
+    <h3>Linux: it will not start on Ubuntu 24.04</h3>
+    <p>Use the <code>.deb</code> rather than the AppImage — it installs the AppArmor profile Electron apps need there.</p>
+
+    <h3>"Your session expired"</h3>
+    <p>Sessions last 14 days. Sign in again from the Vault tab. Changing your password ends every session on purpose.</p>
+
+    <h3>Something is wrong</h3>
+    <p>Open an issue on <a href="https://github.com/Ishan-Nim/plume/issues">GitHub</a> with your system and what you were doing. Plume is MIT-licensed and the source is all there.</p>
+
+  </article>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap foot">
+    <a class="brand" href="/">
+      <img src="assets/logo.svg" alt="" width="28" height="28">
+      Plume
+    </a>
+    <nav aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="download.html">Download</a>
+      <a href="docs.html">Docs</a>
+      <a href="app.html">Vault</a>
+      <a href="https://github.com/Ishan-Nim/plume">GitHub</a>
+      <a href="https://github.com/Ishan-Nim/plume/issues">Report a problem</a>
+    </nav>
+    <p class="foot-note">
+      Plume is free software by <a href="https://github.com/Ishan-Nim">Ishan Nim</a>, released under the MIT licence.
+      Not affiliated with Obsidian.
+    </p>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

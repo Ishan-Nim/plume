@@ -1433,3 +1433,216 @@ summary.callout-title::-webkit-details-marker { display: none; }
 .vault-conflict { display: flex; flex-direction: column; gap: 12px; }
 .vault-conflict h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--heading); }
 .vault-conflict-acts { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+
+/* ---------------------------------------------------------------------------
+   Plume Vault — sidebar panel
+   --------------------------------------------------------------------------- */
+
+.vault-panel {
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-content: start;
+  gap: 16px;
+  font-size: 13px;
+}
+/* Content sits at the top of the panel; nothing stretches to fill the gap
+   below it, which would spread a three-line form over the whole sidebar. */
+.vault-panel > * { flex: 0 0 auto; }
+
+.vault-note { margin: 0; font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
+.vault-hint { font-size: 11.5px; color: var(--text-3); line-height: 1.45; }
+.vault-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: #c23b3b;
+  background: rgba(194, 59, 59, 0.08);
+  border: 1px solid rgba(194, 59, 59, 0.26);
+  border-radius: 8px;
+  padding: 8px 10px;
+  line-height: 1.45;
+}
+[data-theme="dark"] .vault-error { color: #ff9090; }
+
+/* ---- sign in ---- */
+
+.vault-form { display: flex; flex-direction: column; gap: 9px; }
+.vault-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--chrome-2);
+  border-radius: 8px;
+}
+.vault-tabs button {
+  flex: 1;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.vault-tabs button[aria-pressed="true"] {
+  background: var(--seg-active);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.vault-label { font-size: 11.5px; font-weight: 600; color: var(--text-2); margin-top: 2px; }
+
+.vault-form input,
+.vault-name {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+  min-width: 0;
+}
+.vault-form input:focus,
+.vault-name:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+
+/* ---- buttons ---- */
+
+.vault-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.vault-btn.primary { background: var(--accent); color: #fff; }
+.vault-btn.primary:hover:not(:disabled) { background: var(--accent-strong); }
+.vault-btn.ghost { background: transparent; color: var(--text); border-color: var(--border-strong); }
+.vault-btn.ghost:hover:not(:disabled) { background: var(--chrome-2); }
+.vault-btn.small { padding: 5px 9px; font-size: 12px; border-radius: 7px; }
+.vault-btn:disabled { opacity: 0.55; cursor: default; }
+.vault-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---- account ---- */
+
+.vault-account { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.vault-who { min-width: 0; }
+.vault-who b {
+  display: block; font-size: 12.5px; font-weight: 600; color: var(--heading);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vault-who span { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
+
+.vault-meter {
+  height: 5px;
+  border-radius: 99px;
+  background: var(--chrome-2);
+  overflow: hidden;
+  margin-top: -10px;
+}
+.vault-meter i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+
+/* ---- sections ---- */
+
+.vault-section { display: flex; flex-direction: column; gap: 8px; }
+.vault-section h3 {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.vault-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.vault-current-info { min-width: 0; }
+.vault-current-info b { display: block; font-size: 12.5px; font-weight: 550; word-break: break-all; }
+.vault-current-info span { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
+
+.vault-row-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.vault-stack { display: flex; flex-direction: column; gap: 6px; }
+
+.vault-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.vault-files li { flex: 0 0 auto; }
+.vault-files li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 10px;
+}
+.vault-file-info { min-width: 0; }
+.vault-file-info b { display: block; font-size: 12.5px; font-weight: 550; word-break: break-all; }
+.vault-file-info span { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
+
+/* ---------------------------------------------------------------------------
+   The vault graph, shown over the document
+   --------------------------------------------------------------------------- */
+
+.graph-view {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.graph-view[hidden] { display: none; }
+
+.graph-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome);
+}
+.graph-view-head b { font-size: 13px; font-weight: 600; color: var(--heading); }
+.graph-view-head span { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
+.graph-view-acts { display: flex; align-items: center; gap: 6px; }
+
+.graph-view-stage { position: relative; flex: 1; min-height: 0; }
+.graph-view-stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+
+.graph-view-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.graph-view-tip {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  max-width: calc(100% - 28px);
+  background: var(--pop-bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 11px;
+  font-size: 12.5px;
+  pointer-events: none;
+  box-shadow: var(--shadow);
+  display: none;
+}
+.graph-view-tip.show { display: block; }
+.graph-view-tip b { display: block; font-weight: 600; word-break: break-all; }
+.graph-view-tip span { color: var(--text-3); font-size: 11.5px; }

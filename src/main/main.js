@@ -998,6 +998,8 @@ handle('vault:signOut', vaultResult(async () => {
 
 handle('vault:list', vaultResult(async () => vault.list()));
 
+handle('vault:graph', vaultResult(async () => vault.graph()));
+
 handle('vault:push', vaultResult(async (ctx, vaultPath, options) => {
   if (!ctx.filePath) throw new Error('Open a document first.');
   const result = await vault.push(ctx.filePath, vaultPath ? str(vaultPath, 400) : null, {

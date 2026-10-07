@@ -348,3 +348,30 @@ table.kb td:last-child { font-family: var(--mono); font-size: .86rem; color: var
   transition: top .15s ease;
 }
 .skip-link:focus { top: 12px; text-decoration: none; }
+
+/* ---------- live counters ---------- */
+
+.counters {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+  margin-top: 30px; opacity: 0; transition: opacity .4s ease;
+}
+.counters.ready { opacity: 1; }
+.counter {
+  display: flex; align-items: baseline; gap: 8px;
+  border: 1px solid var(--line); background: var(--card);
+  border-radius: 12px; padding: 11px 18px;
+}
+.counter b {
+  font-size: 1.22rem; font-weight: 680; letter-spacing: -.02em;
+  color: var(--accent-strong); font-variant-numeric: tabular-nums;
+}
+.counter span { font-size: .87rem; color: var(--text-2); }
+@media (max-width: 420px) { .counter { padding: 9px 14px; } .counter b { font-size: 1.08rem; } }
+
+.nav-links button.navlink {
+  border: 0; background: transparent; font: inherit;
+  color: var(--text-2); font-size: .94rem; font-weight: 500;
+  padding: 7px 11px; border-radius: 9px; cursor: pointer;
+}
+.nav-links button.navlink:hover { color: var(--text); background: var(--bg-3); }
+.nav-links a.navlink#nav-account { color: var(--accent-strong); font-weight: 560; }

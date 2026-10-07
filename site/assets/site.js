@@ -5,7 +5,8 @@
   // The one place the released version lives. Bump it when a release ships.
   var VERSION = '1.0.1';
   var REPO = 'https://github.com/Ishan-Nim/plume';
-  var BASE = REPO + '/releases/download/v' + VERSION + '/';
+  // Through the counter, which redirects to the release asset.
+  var BASE = '/api/download?file=';
 
   var FILES = {
     win: 'Plume-Setup-' + VERSION + '.exe',
@@ -150,4 +151,54 @@
   Array.prototype.forEach.call(document.querySelectorAll('[data-version]'), function (el) {
     el.textContent = VERSION;
   });
+
+  // ---------- live counters ----------
+  //
+  // Drawn only once the real numbers arrive, so the page never shows a made-up
+  // figure, and never a zero that is really "not loaded yet".
+
+  var counters = document.getElementById('counters');
+  if (counters) {
+    fetch('/api/stats')
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        if (!data || data.ok === false) return;
+        var any = false;
+        Array.prototype.forEach.call(counters.querySelectorAll('[data-count]'), function (el) {
+          var value = data[el.getAttribute('data-count')];
+          if (typeof value !== 'number') return;
+          el.textContent = value.toLocaleString();
+          any = true;
+        });
+        if (!any) return;
+        counters.hidden = false;
+        requestAnimationFrame(function () { counters.classList.add('ready'); });
+      })
+      .catch(function () { /* the page is fine without them */ });
+  }
+
+  // ---------- am I signed in? ----------
+  //
+  // The marketing pages do not talk to the API, but they can see whether a
+  // session exists, which is all that is needed to offer the way back in — and
+  // the way out.
+
+  var account = document.getElementById('nav-account');
+  var signout = document.getElementById('nav-signout');
+  if (account) {
+    var signedIn = false;
+    try { signedIn = Boolean(localStorage.getItem('plume-vault-token')); } catch (e) { /* private mode */ }
+
+    if (signedIn) {
+      account.textContent = 'My vault';
+      if (signout) {
+        signout.hidden = false;
+        signout.addEventListener('click', function () {
+          try { localStorage.removeItem('plume-vault-token'); } catch (e) { /* ignore */ }
+          account.textContent = 'Sign in';
+          signout.hidden = true;
+        });
+      }
+    }
+  }
 })();

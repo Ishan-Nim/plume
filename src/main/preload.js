@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('plume', {
     signIn: (email, password) => invoke('vault:signIn', email, password),
     signOut: () => invoke('vault:signOut'),
     list: () => invoke('vault:list'),
+    graph: () => invoke('vault:graph'),
     push: (vaultPath, options) => invoke('vault:push', vaultPath, options),
     pull: vaultPath => invoke('vault:pull', vaultPath),
     keepBoth: vaultPath => invoke('vault:keepBoth', vaultPath),

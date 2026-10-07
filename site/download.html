@@ -45,8 +45,10 @@
       <a class="navlink nav-hide" href="/#features">Features</a>
       <a class="navlink nav-hide" href="/#screenshots">Screenshots</a>
       <a class="navlink nav-hide" href="/#vault">Vault</a>
+      <a class="navlink nav-hide" href="docs.html">Docs</a>
       <a class="navlink nav-hide" href="https://github.com/Ishan-Nim/plume">GitHub</a>
-      <a class="btn btn-primary btn-sm" href="app.html">Sign in</a>
+      <button class="navlink" id="nav-signout" type="button" hidden>Sign out</button>
+      <a class="btn btn-primary btn-sm" id="nav-account" href="app.html">Sign in</a>
       <button class="theme-toggle" type="button" aria-label="Switch between light and dark">
         <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
         <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
@@ -64,6 +66,12 @@
         Version <span data-version>1.0.1</span> — free, open source, and about as heavy as a feather.
         Pick your system below.
       </p>
+
+      <div class="counters" id="counters" hidden>
+        <div class="counter"><b data-count="vaults">—</b><span>vaults created</span></div>
+        <div class="counter"><b data-count="documents">—</b><span>documents synced</span></div>
+        <div class="counter"><b data-count="downloads">—</b><span>downloads</span></div>
+      </div>
 
       <!-- Filled in by site.js with the build that matches the visitor's system.
            The three sections underneath always list everything, so this page
@@ -93,7 +101,7 @@
               <span>Plume-Setup-1.0.1.exe</span>
             </div>
             <a class="btn btn-primary" download
-               href="https://github.com/Ishan-Nim/plume/releases/download/v1.0.1/Plume-Setup-1.0.1.exe">
+               href="/api/download?file=Plume-Setup-1.0.1.exe">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
               Download
             </a>
@@ -124,7 +132,7 @@
               <span>Plume-1.0.1-mac-arm64.dmg</span>
             </div>
             <a class="btn btn-primary" download
-               href="https://github.com/Ishan-Nim/plume/releases/download/v1.0.1/Plume-1.0.1-mac-arm64.dmg">
+               href="/api/download?file=Plume-1.0.1-mac-arm64.dmg">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
               Download
             </a>
@@ -135,7 +143,7 @@
               <span>Plume-1.0.1-mac-x64.dmg</span>
             </div>
             <a class="btn btn-ghost" download
-               href="https://github.com/Ishan-Nim/plume/releases/download/v1.0.1/Plume-1.0.1-mac-x64.dmg">Download</a>
+               href="/api/download?file=Plume-1.0.1-mac-x64.dmg">Download</a>
           </div>
           <div class="dl-row">
             <div class="t">
@@ -143,9 +151,9 @@
               <span>Plume-1.0.1-mac-arm64.zip &middot; Plume-1.0.1-mac-x64.zip</span>
             </div>
             <a class="btn btn-ghost btn-sm" download
-               href="https://github.com/Ishan-Nim/plume/releases/download/v1.0.1/Plume-1.0.1-mac-arm64.zip">Apple silicon</a>
+               href="/api/download?file=Plume-1.0.1-mac-arm64.zip">Apple silicon</a>
             <a class="btn btn-ghost btn-sm" download
-               href="https://github.com/Ishan-Nim/plume/releases/download/v1.0.1/Plume-1.0.1-mac-x64.zip">Intel</a>
+               href="/api/download?file=Plume-1.0.1-mac-x64.zip">Intel</a>
           </div>
         </div>
 
@@ -174,7 +182,7 @@
               <span>Plume-1.0.1-linux-x86_64.AppImage</span>
             </div>
             <a class="btn btn-primary" download
-               href="https://github.com/Ishan-Nim/plume/releases/download/v1.0.1/Plume-1.0.1-linux-x86_64.AppImage">
+               href="/api/download?file=Plume-1.0.1-linux-x86_64.AppImage">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
               Download
             </a>
@@ -185,7 +193,7 @@
               <span>Plume-1.0.1-linux-amd64.deb</span>
             </div>
             <a class="btn btn-ghost" download
-               href="https://github.com/Ishan-Nim/plume/releases/download/v1.0.1/Plume-1.0.1-linux-amd64.deb">Download</a>
+               href="/api/download?file=Plume-1.0.1-linux-amd64.deb">Download</a>
           </div>
         </div>
 
@@ -242,6 +250,7 @@
     <nav aria-label="Footer">
       <a href="download.html">Download</a>
       <a href="app.html">Vault</a>
+      <a href="docs.html">Docs</a>
       <a href="https://github.com/Ishan-Nim/plume">GitHub</a>
       <a href="https://github.com/Ishan-Nim/plume/releases">Releases</a>
       <a href="https://github.com/Ishan-Nim/plume/issues">Report a problem</a>
