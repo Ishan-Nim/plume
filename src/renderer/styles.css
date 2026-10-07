@@ -139,10 +139,13 @@
 html,
 body { height: 100%; }
 
+/* minmax(0, 1fr): an auto column would grow to the min-content width of a
+   wide table or code line and push the UI past the window edge. */
 body {
   margin: 0;
   display: grid;
   grid-template-rows: var(--titlebar-h) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
@@ -207,6 +210,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   height: var(--titlebar-h);
   padding: 0 8px;
   background: var(--chrome);
@@ -255,7 +259,7 @@ kbd {
 
 /* ---------------------------------------------------------------- layout */
 
-.layout { display: flex; min-height: 0; }
+.layout { display: flex; min-width: 0; min-height: 0; }
 
 .sidebar {
   position: relative;
@@ -734,6 +738,17 @@ body:not(.is-welcome) .welcome { display: none; }
 .markdown-body > :first-child { margin-top: 0 !important; }
 .markdown-body > :last-child { margin-bottom: 0 !important; }
 
+@media screen {
+  /* The document is its own containing block and paint box: content that
+     slips position:fixed past the sanitiser (CSS escapes, Mermaid labels)
+     cannot cover Plume's chrome. All of Plume's own overlays live outside
+     #doc. Screen only, so print fragmentation is unaffected. */
+  #doc { contain: layout paint; }
+
+  /* Huge documents: skip layout and paint of off-screen blocks. */
+  .markdown-body.is-large > * { content-visibility: auto; contain-intrinsic-size: auto 3em; }
+}
+
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
@@ -823,6 +838,40 @@ body:not(.is-welcome) .welcome { display: none; }
   background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 82% no-repeat;
 }
 .markdown-body .task-list-item:has(> .task-list-item-checkbox:checked) { color: var(--text-3); }
+
+/* Obsidian task states ([/], [-], [>], …): the box carries a state glyph. */
+.markdown-body .task-list-item-checkbox[data-task] {
+  --task-color: var(--accent);
+  --task-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  border-color: var(--task-color);
+  background: var(--task-color) var(--task-glyph) center / 82% no-repeat;
+}
+.markdown-body .task-list-item-checkbox[data-task="/"] {
+  background: linear-gradient(90deg, var(--task-color) 50%, var(--bg) 50%);
+}
+.markdown-body .task-list-item-checkbox[data-task="-"] {
+  --task-color: var(--text-3);
+  --task-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8h8' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.markdown-body .task-list-item[data-task="-"] { text-decoration: line-through; }
+.markdown-body .task-list-item-checkbox[data-task=">"] {
+  --task-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8h9M8.5 4l4 4-4 4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.markdown-body .task-list-item-checkbox[data-task="<"] {
+  --task-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M12.5 8h-9M7.5 4l-4 4 4 4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.markdown-body .task-list-item-checkbox[data-task="!"] {
+  --task-color: var(--danger);
+  --task-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 3.5v5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12.3' r='1.2' fill='white'/%3E%3C/svg%3E");
+}
+.markdown-body .task-list-item-checkbox[data-task="?"] {
+  --task-color: #e8890c;
+  --task-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.8 6.1a2.3 2.3 0 1 1 3.4 2c-.8.4-1.2.9-1.2 1.6' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12.5' r='1.1' fill='white'/%3E%3C/svg%3E");
+}
+.markdown-body .task-list-item-checkbox[data-task="*"] {
+  --task-color: #e5a50a;
+  --task-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2.6l1.65 3.4 3.75.5-2.73 2.6.67 3.7L8 11l-3.34 1.8.67-3.7L2.6 6.5l3.75-.5z' fill='white'/%3E%3C/svg%3E");
+}
 
 .markdown-body blockquote {
   padding: 0.1em 0 0.1em 1.1em;
@@ -951,9 +1000,8 @@ body:not(.is-welcome) .welcome { display: none; }
   vertical-align: middle;
   cursor: zoom-in;
 }
-.markdown-body p > img:only-child,
-.markdown-body p > a:only-child > img:only-child,
-.markdown-body img.wiki-image {
+/* img-block: set by enhance.js on an image that is alone in its paragraph. */
+.markdown-body img.img-block {
   display: block;
   margin: 1.4em auto;
   border: 1px solid var(--img-border);
@@ -1058,7 +1106,7 @@ body:not(.is-welcome) .welcome { display: none; }
 }
 .properties-grid { display: grid; grid-template-columns: minmax(80px, max-content) 1fr; gap: 0.4em 1.6em; margin-top: 0.6em; }
 .prop-key { color: var(--text-3); }
-.prop-value { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.prop-value { color: var(--text); min-width: 0; overflow-wrap: anywhere; white-space: pre-line; }
 
 /* Callouts */
 .callout {
@@ -1074,12 +1122,15 @@ body:not(.is-welcome) .welcome { display: none; }
   align-items: center;
   gap: 0.5em;
   font-weight: 650;
-  color: rgb(var(--callout));
   list-style: none;
 }
+/* The callout RGB values are tuned for tints and icons; titles are pulled
+   toward the text colour so they keep ≥ 4.5:1 contrast on the tint. */
+:root:not([data-theme="dark"]) .callout-title { color: color-mix(in srgb, rgb(var(--callout)) 60%, black); }
+[data-theme="dark"] .callout-title { color: color-mix(in srgb, rgb(var(--callout)) 75%, white); }
 summary.callout-title { cursor: pointer; }
 summary.callout-title::-webkit-details-marker { display: none; }
-.callout-icon { display: inline-grid; flex: none; }
+.callout-icon { display: inline-grid; flex: none; color: rgb(var(--callout)); }
 .callout-title-text { min-width: 0; }
 .callout-fold { display: inline-grid; margin-left: auto; transition: transform 0.15s; transform: rotate(-90deg); }
 .callout[open] .callout-fold { transform: none; }
@@ -1141,8 +1192,11 @@ summary.callout-title::-webkit-details-marker { display: none; }
     --quote-border: #ccc; --zebra: #fafafc; --mark: #fff1a6; --img-border: #e2e2e8;
     --hl-comment: #6a737d; --hl-keyword: #cf222e; --hl-string: #0a3069; --hl-number: #0550ae;
     --hl-title: #8250df; --hl-builtin: #953800; --hl-name: #116329; --hl-attr: #0550ae; --hl-meta: #57606a;
+    --hl-del-bg: #ffebe9; --hl-del: #82071e; --hl-add-bg: #dafbe1; --hl-add: #116329; --danger: #d93f3f;
   }
   body { display: block; height: auto; overflow: visible; background: #fff; }
+  [data-theme] .code-block { border-color: var(--border-soft); }
+  [data-theme] .callout-title { color: color-mix(in srgb, rgb(var(--callout)) 60%, black); }
   .titlebar,
   .sidebar,
   .findbar,
@@ -1159,6 +1213,14 @@ summary.callout-title::-webkit-details-marker { display: none; }
   .markdown-body { max-width: none; padding: 0; font-size: 11pt; }
   .markdown-body pre,
   .markdown-body pre code { white-space: pre-wrap; word-break: break-word; }
+  /* Paper cannot scroll: let wide tables and maths wrap instead of clipping. */
+  .table-wrap,
+  .markdown-body .katex-display,
+  .markdown-body .math-block { overflow: visible !important; }
+  .markdown-body table { font-size: 9pt; }
+  .markdown-body th,
+  .markdown-body td { padding: 0.35em 0.5em; overflow-wrap: anywhere; }
+  .markdown-body :not(pre) > code { overflow-wrap: anywhere; }
   .code-block,
   .markdown-body img,
   .markdown-body tr,

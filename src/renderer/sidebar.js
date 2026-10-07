@@ -1,7 +1,7 @@
 // Sidebar: a lazy folder tree of Markdown files around the open document,
 // and an outline of its headings.
 
-import { el, pathKey, samePath, relativeSegments, dirname } from './util.js';
+import { el, pathKey, samePath, relativeSegments, dirname, joinPath } from './util.js';
 import { icon } from './icons.js';
 
 export class FileTree {
@@ -48,10 +48,12 @@ export class FileTree {
 
   async show(root, activePath) {
     this.active = activePath;
-    if (!this.root || !samePath(this.root, root)) {
-      await this.setRoot(root, activePath);
-    } else {
+    // A file already inside the tree (say, a click into a subfolder of a
+    // plain folder) is revealed in place rather than re-rooting the tree.
+    if (this.root && (samePath(this.root, root) || relativeSegments(this.root, dirname(activePath)))) {
       await this.reveal(activePath);
+    } else {
+      await this.setRoot(root, activePath);
     }
   }
 
@@ -143,7 +145,7 @@ export class FileTree {
     if (segs) {
       let cur = this.root;
       for (const seg of segs) {
-        cur = cur.endsWith('\\') || cur.endsWith('/') ? cur + seg : `${cur}\\${seg}`;
+        cur = joinPath(cur, seg);
         const row = this.rows.get(pathKey(cur));
         if (!row) break;
         await this.expand(row, true);

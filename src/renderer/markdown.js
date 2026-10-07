@@ -40,6 +40,12 @@ for (const [name, lang] of Object.entries({
 
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i;
 
+// Marks code blocks Plume rendered from fences. Raw HTML in a document can
+// imitate the markup but cannot know this per-session value, so Copy buttons
+// are only ever attached to genuine (fully escaped) code.
+export const CODE_MARK = [...crypto.getRandomValues(new Uint8Array(12))]
+  .map(b => b.toString(16).padStart(2, '0')).join('');
+
 const LANG_ALIASES = {
   sh: 'bash', shell: 'bash', zsh: 'bash', console: 'bash', ps: 'powershell', ps1: 'powershell',
   pwsh: 'powershell', yml: 'yaml', js: 'javascript', jsx: 'javascript', mjs: 'javascript',
@@ -161,6 +167,80 @@ function commentPlugin(md) {
     return true;
   });
   md.renderer.rules.obsidian_comment = () => '';
+
+  // A comment opened at the start of a line can span blank lines, which split
+  // it into paragraphs the inline rule never sees whole. Swallow those lines
+  // here; like Obsidian, an unclosed comment runs to the end of the document.
+  md.block.ruler.before('fence', 'obsidian_comment_block', (state, startLine, endLine, silent) => {
+    if (state.sCount[startLine] - state.blkIndent >= 4) return false;
+    const start = state.bMarks[startLine] + state.tShift[startLine];
+    const max = state.eMarks[startLine];
+    if (state.src.charCodeAt(start) !== 0x25 || state.src.charCodeAt(start + 1) !== 0x25) return false;
+    if (state.src.slice(start + 2, max).includes('%%')) return false;
+    if (silent) return true;
+
+    let line = startLine + 1;
+    let rest = '';
+    for (; line < endLine; line++) {
+      const from = state.bMarks[line] + state.tShift[line];
+      const to = state.eMarks[line];
+      if (from < to && state.sCount[line] < state.blkIndent) break;
+      const close = state.src.slice(from, to).indexOf('%%');
+      if (close >= 0) {
+        rest = state.src.slice(from + close + 2, to).trim();
+        line++;
+        break;
+      }
+    }
+    if (rest) {
+      state.push('paragraph_open', 'p', 1).map = [line - 1, line];
+      const inline = state.push('inline', '', 0);
+      inline.content = rest;
+      inline.map = [line - 1, line];
+      inline.children = [];
+      state.push('paragraph_close', 'p', -1);
+    }
+    state.line = line;
+    return true;
+  }, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
+}
+
+// Obsidian task states beyond [ ] and [x]: [/] in progress, [-] cancelled,
+// [>] forwarded, [!] important and so on. markdown-it-task-lists leaves them
+// as text; turn them into checkboxes that carry the state in data-task.
+const TASK_STATE_RE = /^\[([^\s\]])\] /u;
+const OPEN_TASK_STATES = new Set(['/', '>', '<', '!', '?', '*']);
+
+function taskStatePlugin(md) {
+  md.core.ruler.after('github-task-lists', 'obsidian_task_states', state => {
+    const tokens = state.tokens;
+    for (let i = 2; i < tokens.length; i++) {
+      const inline = tokens[i];
+      if (inline.type !== 'inline' || tokens[i - 1].type !== 'paragraph_open' ||
+        tokens[i - 2].type !== 'list_item_open') continue;
+      const m = TASK_STATE_RE.exec(inline.content);
+      const first = inline.children && inline.children[0];
+      if (!m || !first || first.type !== 'text' || !first.content.startsWith(m[0])) continue;
+
+      const task = m[1];
+      const checked = OPEN_TASK_STATES.has(task) ? '' : ' checked=""';
+      const box = new state.Token('html_inline', '', 0);
+      box.content = `<input class="task-list-item-checkbox"${checked} disabled="" type="checkbox" data-task="${escapeHtml(task)}">`;
+      first.content = first.content.slice(m[0].length - 1);
+      inline.content = inline.content.slice(m[0].length - 1);
+      inline.children.unshift(box);
+
+      const item = tokens[i - 2];
+      item.attrJoin('class', 'task-list-item');
+      item.attrSet('data-task', task);
+      for (let j = i - 3; j >= 0; j--) {
+        if (tokens[j].level === item.level - 1) {
+          if (!/\bcontains-task-list\b/.test(tokens[j].attrGet('class') || '')) tokens[j].attrJoin('class', 'contains-task-list');
+          break;
+        }
+      }
+    }
+  });
 }
 
 function highlightCode(code, lang) {
@@ -177,7 +257,7 @@ function highlightCode(code, lang) {
 
 function codeBlock(code, lang, label) {
   const cls = lang ? ` language-${escapeHtml(lang)}` : '';
-  return `<div class="code-block"><div class="code-head"><span class="code-lang">${escapeHtml(label || '')}</span></div>` +
+  return `<div class="code-block" data-plume-code="${CODE_MARK}"><div class="code-head"><span class="code-lang">${escapeHtml(label || '')}</span></div>` +
     `<pre><code class="hljs${cls}">${highlightCode(code, lang)}</code></pre></div>\n`;
 }
 
@@ -194,6 +274,7 @@ export function createMarkdown({ breaks = true } = {}) {
   md.use(frontMatter, fm => { frontMatterRaw = fm; })
     .use(footnote)
     .use(taskLists, { enabled: false })
+    .use(taskStatePlugin)
     .use(mark)
     .use(deflist)
     .use(emoji, { shortcuts: {} })
@@ -245,9 +326,11 @@ export function createMarkdown({ breaks = true } = {}) {
   };
 
   return {
-    render(src) {
+    // docId namespaces footnote ids (fn-<docId>-1) so a transcluded note's
+    // footnotes do not collide with the host's.
+    render(src, { docId } = {}) {
       frontMatterRaw = null;
-      const env = {};
+      const env = typeof docId === 'string' ? { docId } : {};
       const html = md.render(src, env);
       return { html, frontMatter: frontMatterRaw, wiki: env.wiki ? [...env.wiki] : [] };
     },

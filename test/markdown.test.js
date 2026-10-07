@@ -24,7 +24,7 @@ function load(entry) {
   return m.exports;
 }
 
-const { createMarkdown } = load('markdown.js');
+const { createMarkdown, CODE_MARK } = load('markdown.js');
 const { parseFrontMatter, extractSection } = load('enhance.js');
 const util = load('util.js');
 
@@ -61,6 +61,21 @@ test('Obsidian comments are hidden', () => {
   assert.equal(html('a %%secret%% b').trim(), '<p>a  b</p>');
 });
 
+test('Obsidian block comments spanning blank lines are hidden', () => {
+  assert.equal(html('%%\nPrivate para 1\n\nPrivate para 2\n%%\nAfter').trim(), '<p>After</p>');
+  const interrupted = html('Visible\n%%\nhidden\n\n# Hidden heading\n%% tail');
+  assert.doesNotMatch(interrupted, /hidden|Hidden|%%/);
+  assert.match(interrupted, /<p>Visible<\/p>/);
+  assert.match(interrupted, /<p>tail<\/p>/);
+  assert.equal(html('%%\nunclosed\n\nstill hidden').trim(), '');
+  assert.doesNotMatch(html('- a\n  %%\n  x\n\n  y\n  %%\n- b'), /x|y/);
+});
+
+test('block comment markers inside code stay code', () => {
+  assert.match(html('```\n%%\nkept\n```'), /%%\nkept/);
+  assert.match(html('    %%\n    indented'), /%%\nindented/);
+});
+
 test('image size syntax and lazy loading', () => {
   const out = html('![Logo|120](img/logo.png)');
   assert.match(out, /src="img\/logo.png"/);
@@ -76,6 +91,42 @@ test('code fences: highlighting, aliases, mermaid, math', () => {
   const mer = html('```mermaid\ngraph LR\nA-->B\n```');
   assert.match(mer, /<div class="mermaid-block"><pre class="mermaid-src">graph LR\nA--&gt;B\n<\/pre><\/div>/);
   assert.match(html('```math\nx^2\n```'), /class="math-block"><span class="katex-display">/);
+});
+
+test('genuine code blocks carry the session code mark', () => {
+  assert.match(CODE_MARK, /^[0-9a-f]{24}$/);
+  assert.ok(html('```sh\nls\n```').includes(`<div class="code-block" data-plume-code="${CODE_MARK}">`));
+  assert.ok(html('    indented code').includes(`data-plume-code="${CODE_MARK}"`));
+  // Raw HTML imitating a code block is passed through without the mark.
+  assert.doesNotMatch(html('<div class="code-block"><div class="code-head"></div></div>'), /data-plume-code/);
+  assert.doesNotMatch(html('```mermaid\ngraph LR\n```'), /data-plume-code/);
+});
+
+test('docId prefixes footnote ids so transclusions do not collide', () => {
+  const src = 'Text[^1]\n\n[^1]: Note.';
+  const plain = md.render(src).html;
+  assert.match(plain, /href="#fn1" id="fnref1"/);
+  assert.match(plain, /<li id="fn1"/);
+  const scoped = md.render(src, { docId: 't7' }).html;
+  assert.match(scoped, /href="#fn-t7-1" id="fnref-t7-1"/);
+  assert.match(scoped, /<li id="fn-t7-1"/);
+  assert.match(scoped, /href="#fnref-t7-1" class="footnote-backref"/);
+  assert.doesNotMatch(scoped, /id="fn1"|id="fnref1"/);
+});
+
+test('Obsidian custom task states render as styled checkboxes', () => {
+  const out = html('- [/] doing\n- [-] dropped\n- [>] later\n- [x] done\n- [ ] todo\n- [*] **star**\n- ["] quote');
+  assert.match(out, /<ul class="contains-task-list">/);
+  assert.match(out, /<li class="task-list-item" data-task="\/"><input class="task-list-item-checkbox" disabled="" type="checkbox" data-task="\/"> doing<\/li>/);
+  assert.match(out, /<li class="task-list-item" data-task="-"><input class="task-list-item-checkbox" checked="" disabled="" type="checkbox" data-task="-"> dropped<\/li>/);
+  assert.match(out, /data-task="&gt;"> later<\/li>/);
+  assert.match(out, /data-task="\*"> <strong>star<\/strong><\/li>/);
+  assert.match(out, /checked="" disabled="" type="checkbox" data-task="&quot;"> quote/);
+  assert.match(out, /<li class="task-list-item"><input class="task-list-item-checkbox" checked="" disabled="" type="checkbox"> done/);
+  assert.doesNotMatch(out, /\[\/\]|\[-\]|\[&gt;\]/);
+  // Only list items are tasks, and the marker needs a following space.
+  assert.doesNotMatch(html('[/] not a list'), /checkbox/);
+  assert.doesNotMatch(html('- [/]'), /checkbox/);
 });
 
 test('math: inline and display, but prices stay text', () => {
@@ -106,12 +157,120 @@ test('parseFrontMatter handles lists and quotes', () => {
   ]);
 });
 
+test('parseFrontMatter keeps quoted commas inside flow lists', () => {
+  assert.deepEqual(parseFrontMatter('tags: [a, "b, c", \'d\']'), [{ key: 'tags', values: ['a', 'b, c', 'd'] }]);
+});
+
+test('parseFrontMatter reads block scalars as one text value', () => {
+  const raw = [
+    'description: >-',
+    '  A folded summary that',
+    '  spans two lines.',
+    'note: |-',
+    '  Line one',
+    '    - indented, not a list item',
+    '',
+    '  # not a comment',
+    'keep: |',
+    '  kept',
+    'folded: >',
+    '  para one',
+    '  continues',
+    '',
+    '  para two',
+    'empty: |',
+    'after: x',
+  ].join('\n');
+  assert.deepEqual(parseFrontMatter(raw), [
+    { key: 'description', values: ['A folded summary that spans two lines.'] },
+    { key: 'note', values: ['Line one\n  - indented, not a list item\n\n# not a comment'] },
+    { key: 'keep', values: ['kept'] },
+    { key: 'folded', values: ['para one continues\npara two'] },
+    { key: 'empty', values: [] },
+    { key: 'after', values: ['x'] },
+  ]);
+});
+
 test('extractSection returns a heading section or a block', () => {
   const src = '# A\nintro\n## B\nb text\n### B1\nnested\n## C\nc text\nline ^blk';
   assert.equal(extractSection(src, 'B'), '## B\nb text\n### B1\nnested');
   assert.equal(extractSection(src, 'c'), '## C\nc text\nline ^blk');
-  assert.equal(extractSection(src, '^blk'), 'line ^blk');
+  assert.equal(extractSection(src, '^blk'), 'c text\nline ^blk');
   assert.equal(extractSection(src, 'Nope'), src);
+});
+
+test('extractSection ignores headings inside code fences and front matter', () => {
+  const src = [
+    '---',
+    '# yaml comment',
+    'title: T',
+    '---',
+    '## Setup',
+    'Install the tool:',
+    '```bash',
+    '# install deps',
+    'npm i',
+    '```',
+    '~~~~',
+    '## not a heading',
+    '```',
+    '~~~~',
+    'Then run it.',
+    '## Next',
+    'next text',
+  ].join('\n');
+  assert.equal(extractSection(src, 'Setup'), src.split('\n').slice(4, 15).join('\n'));
+  assert.equal(extractSection(src, 'install deps'), src);
+  assert.equal(extractSection(src, 'yaml comment'), src);
+  assert.equal(extractSection(src, 'not a heading'), src);
+  assert.equal(extractSection('## C#\nsharp\n## D ##\nd', 'C#'), '## C#\nsharp');
+  assert.equal(extractSection('## C#\nsharp\n## D ##\nd', 'D'), '## D ##\nd');
+  assert.equal(extractSection('## A\n#tag line\n##\nafter', 'A'), '## A\n#tag line');
+});
+
+test('extractSection follows Obsidian heading paths', () => {
+  const src = '# One\n## Setup\none setup\n# Two\n## Setup\ntwo setup\n# Three\nthree';
+  assert.equal(extractSection(src, 'Two#Setup'), '## Setup\ntwo setup');
+  assert.equal(extractSection(src, 'One#Setup'), '## Setup\none setup');
+  assert.equal(extractSection(src, 'Missing#Three'), '# Three\nthree');
+  assert.equal(extractSection(src, 'Two#Missing'), src);
+});
+
+test('extractSection returns whole blocks for ^ids', () => {
+  const src = [
+    '# Title',
+    'This paragraph starts here',
+    'and continues on a second line ^blk',
+    '',
+    '| a | b |',
+    '|---|---|',
+    '| 1 | 2 |',
+    '',
+    '^tbl',
+    '',
+    '- first item',
+    '- second item',
+    '  wraps here ^li',
+    '',
+    '```',
+    'not an id ^code',
+    '```',
+    '',
+    '^fence',
+  ].join('\n');
+  assert.equal(extractSection(src, '^blk'), 'This paragraph starts here\nand continues on a second line ^blk');
+  assert.equal(extractSection(src, '^tbl'), '| a | b |\n|---|---|\n| 1 | 2 |');
+  assert.equal(extractSection(src, '^li'), '- second item\n  wraps here ^li');
+  assert.equal(extractSection(src, '^code'), src);
+  assert.equal(extractSection(src, '^fence'), '```\nnot an id ^code\n```');
+  assert.equal(extractSection(src, '^missing'), src);
+});
+
+test('extractSection treats odd block ids as plain text', () => {
+  const src = 'para ^a(b\n\nother ^c++';
+  assert.equal(extractSection(src, '^a(b'), 'para ^a(b');
+  assert.equal(extractSection(src, '^c++'), 'other ^c++');
+  assert.equal(extractSection(src, '^x)'), src);
 });
 
 test('slugify matches GitHub style and keeps Unicode', () => {

@@ -131,6 +131,7 @@ export class Finder {
   }
 
   step(delta) {
+    if (!this.isOpen) return;
     if (!this.ranges.length) {
       if (this.input.value) this.search();
       return;

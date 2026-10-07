@@ -18,9 +18,28 @@ const files = require('./files');
 const APP_ID = 'app.plume.viewer';
 const PROG_ID = 'Plume.Markdown';
 const ROOT = path.join(__dirname, '..', '..');
-const RENDERER_HTML = path.join(ROOT, 'out', 'renderer', 'index.html');
+const RENDERER_DIR = path.join(ROOT, 'out', 'renderer');
+const RENDERER_HTML = path.join(RENDERER_DIR, 'index.html');
+const NOTICES = app.isPackaged ? path.join(process.resourcesPath, 'THIRD_PARTY_NOTICES.txt')
+  : path.join(RENDERER_DIR, 'THIRD_PARTY_NOTICES.txt');
 const ICON = path.join(ROOT, 'resources', 'icon.png');
 const TITLEBAR_HEIGHT = 40;
+const isWin = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
+const FILE_MANAGER = isWin ? 'File Explorer' : isMac ? 'Finder' : 'the file manager';
+
+// Explorer starts Plume in the folder of the file that was double-clicked,
+// and Windows looks in the current folder before PATH for a bare program
+// name. Start system tools by full path, and switch that lookup off for
+// anything else this process spawns.
+const SYSTEM32 = path.join(process.env.SystemRoot || process.env.windir || 'C:\\Windows', 'System32');
+if (isWin) process.env.NoDefaultCurrentDirectoryInExePath = '1';
+
+// The packaged app's fuses already refuse --inspect and NODE_OPTIONS; a
+// Chromium debugging port would give the same control over the app.
+if (app.isPackaged && ['remote-debugging-port', 'remote-debugging-pipe'].some(s => app.commandLine.hasSwitch(s))) {
+  app.exit(1);
+}
 
 // Must match --chrome / --text-2 / --bg in styles.css.
 const THEME = {
@@ -28,11 +47,11 @@ const THEME = {
   dark: { chrome: '#18181b', symbol: '#a4a4ae', bg: '#1e1e22' },
 };
 
-/** @type {Map<number, {win: BrowserWindow, filePath: string|null, initialPath: string|null, watcher: fs.FSWatcher|null, timer: any, stamp: string}>} */
+/** @type {Map<number, {win: BrowserWindow, filePath: string|null, initialPath: string|null, ready: boolean, crashes: number[], watcher: fs.FSWatcher|null, timer: any, dirTimer: any, poll: any, stamp: string}>} */
 const windows = new Map();
 const pendingOpen = [];
 
-app.setAppUserModelId(APP_ID);
+if (isWin) app.setAppUserModelId(APP_ID);
 
 // ---------------------------------------------------------------------------
 // Single instance
@@ -57,7 +76,10 @@ if (!gotLock) {
   });
 
   app.whenReady().then(onReady);
-  app.on('window-all-closed', () => app.quit());
+  // macOS apps keep running with no windows open (see 'activate' in onReady).
+  app.on('window-all-closed', () => {
+    if (!isMac) app.quit();
+  });
   app.on('before-quit', () => settings.flush());
 }
 
@@ -81,7 +103,7 @@ function pathsFromArgv(argv, cwd) {
 function onReady() {
   settings.load();
   nativeTheme.themeSource = settings.get().theme;
-  Menu.setApplicationMenu(null);
+  Menu.setApplicationMenu(isMac ? macMenu() : null);
   hardenSession();
 
   nativeTheme.on('updated', () => {
@@ -91,6 +113,27 @@ function onReady() {
   const paths = [...pathsFromArgv(process.argv, process.cwd()), ...pendingOpen];
   if (paths.length) paths.forEach(openPath);
   else createWindow(null);
+
+  // Clicking the Dock icon with no windows open.
+  app.on('activate', () => {
+    if (!liveWindows().length) createWindow(null);
+  });
+}
+
+// macOS needs an application menu for Quit, Hide and the clipboard shortcuts.
+// Elsewhere the window has no menu bar at all.
+function macMenu() {
+  return Menu.buildFromTemplate([
+    { role: 'appMenu' },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
+        { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' },
+      ],
+    },
+    { role: 'windowMenu' },
+  ]);
 }
 
 function hardenSession() {
@@ -98,6 +141,29 @@ function hardenSession() {
   ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
   ses.setPermissionCheckHandler(() => false);
   ses.on('will-download', event => event.preventDefault());
+  // A session has a single onBeforeRequest listener, so every file:// rule
+  // lives in allowFileRequest.
+  ses.webRequest.onBeforeRequest({ urls: ['file://*/*'] }, (details, callback) => {
+    callback({ cancel: !allowFileRequest(details) });
+  });
+}
+
+// The renderer runs from file://, where CSP 'self' matches every local file
+// and every \\server share. So scripts may only come from the app's own
+// renderer folder, and other loads (images, media, fonts…) must not reach
+// another computer: Windows would sign in to it with the user's credentials.
+// A document opened from a share may still load files from that same server.
+function allowFileRequest({ url, resourceType, webContentsId }) {
+  let p;
+  try {
+    p = fileURLToPath(url);
+  } catch {
+    return false;
+  }
+  if (resourceType === 'script') return files.isWithin(RENDERER_DIR, p);
+  if (files.isWithin(ROOT, p)) return true;
+  const ctx = windows.get(webContentsId);
+  return !files.isForeignUnc(p, ctx && ctx.filePath);
 }
 
 app.on('web-contents-created', (_event, contents) => {
@@ -126,7 +192,7 @@ function applyChrome(win) {
   if (!win || win.isDestroyed()) return;
   const p = palette();
   win.setBackgroundColor(p.bg);
-  if (process.platform !== 'darwin') {
+  if (!isMac) {
     try {
       win.setTitleBarOverlay({ color: p.chrome, symbolColor: p.symbol, height: TITLEBAR_HEIGHT });
     } catch { /* overlay not available */ }
@@ -180,7 +246,7 @@ function createWindow(initialPath) {
     icon: ICON,
     backgroundColor: p.bg,
     titleBarStyle: 'hidden',
-    titleBarOverlay: process.platform === 'darwin' ? undefined
+    titleBarOverlay: isMac ? undefined
       : { color: p.chrome, symbolColor: p.symbol, height: TITLEBAR_HEIGHT },
     trafficLightPosition: { x: 14, y: 13 },
     webPreferences: {
@@ -195,7 +261,10 @@ function createWindow(initialPath) {
     },
   });
 
-  const ctx = { win, filePath: null, initialPath: initialPath || null, watcher: null, timer: null, stamp: '' };
+  const ctx = {
+    win, filePath: null, initialPath: initialPath || null, ready: false, crashes: [],
+    watcher: null, timer: null, dirTimer: null, poll: null, stamp: '',
+  };
   const id = win.webContents.id;
   windows.set(id, ctx);
 
@@ -212,11 +281,37 @@ function createWindow(initialPath) {
   });
   win.webContents.on('context-menu', (_e, params) => showContextMenu(win, params));
   win.webContents.on('render-process-gone', (_e, details) => {
-    if (details.reason !== 'clean-exit' && !win.isDestroyed()) win.reload();
+    if (details.reason !== 'clean-exit' && !win.isDestroyed()) recoverFromCrash(ctx);
   });
 
   win.loadFile(RENDERER_HTML);
   return win;
+}
+
+// Reloading restores the open document (app:init hands it back). A document
+// that crashes the renderer again within 30 s is dropped rather than
+// reloaded in a loop, and a window that keeps crashing is left alone.
+function recoverFromCrash(ctx) {
+  const now = Date.now();
+  ctx.crashes = ctx.crashes.filter(t => now - t < 30_000).concat(now);
+  if (ctx.crashes.length > 3) return;
+  const culprit = ctx.crashes.length > 1 ? ctx.filePath : null;
+  if (culprit) {
+    stopWatching(ctx);
+    ctx.filePath = null;
+    ctx.initialPath = null;
+  }
+  ctx.ready = false;
+  ctx.win.reload();
+  if (culprit) {
+    dialog.showMessageBox(ctx.win, {
+      type: 'error',
+      buttons: ['OK'],
+      title: 'Plume',
+      message: `“${path.basename(culprit)}” keeps crashing the viewer, so Plume closed it.`,
+      noLink: true,
+    }).catch(() => {});
+  }
 }
 
 function focusWindow(win) {
@@ -295,6 +390,9 @@ function showContextMenu(win, params) {
 
 function stopWatching(ctx) {
   clearTimeout(ctx.timer);
+  clearTimeout(ctx.dirTimer);
+  clearInterval(ctx.poll);
+  ctx.timer = ctx.dirTimer = ctx.poll = null;
   if (ctx.watcher) {
     try { ctx.watcher.close(); } catch { /* ignore */ }
   }
@@ -308,15 +406,46 @@ function startWatching(ctx, filePath, stamp) {
   const base = path.basename(filePath).toLowerCase();
   try {
     ctx.watcher = fs.watch(dir, { persistent: false }, (_type, name) => {
-      if (!ctx.win.isDestroyed()) ctx.win.webContents.send('dir:changed', dir);
+      // When the folder itself is deleted, Windows reports the folder's own
+      // path in a tight loop, and the open watch keeps the folder from being
+      // created again until it is closed.
+      if (!name || path.isAbsolute(name) || name === path.basename(dir)) {
+        if (!fs.existsSync(dir)) {
+          folderGone(ctx, filePath);
+          return;
+        }
+      }
+      if (!ctx.dirTimer) {
+        ctx.dirTimer = setTimeout(() => {
+          ctx.dirTimer = null;
+          if (!ctx.win.isDestroyed()) ctx.win.webContents.send('dir:changed', dir);
+        }, 250);
+      }
       if (name && name.toLowerCase() !== base) return;
       clearTimeout(ctx.timer);
       ctx.timer = setTimeout(() => refresh(ctx, filePath), 140);
     });
-    ctx.watcher.on('error', () => stopWatching(ctx));
+    ctx.watcher.on('error', () => folderGone(ctx, filePath));
   } catch {
     ctx.watcher = null;
   }
+}
+
+// The document's folder vanished or can no longer be watched: report the
+// document as missing, then check now and then, without holding the folder
+// open, and resume live reload once the file is back.
+function folderGone(ctx, filePath) {
+  stopWatching(ctx);
+  refresh(ctx, filePath);
+  ctx.poll = setInterval(() => {
+    if (ctx.win.isDestroyed()) {
+      stopWatching(ctx);
+      return;
+    }
+    if (!fs.existsSync(filePath)) return;
+    startWatching(ctx, filePath, ctx.stamp);
+    refresh(ctx, filePath);
+  }, 2000);
 }
 
 async function refresh(ctx, filePath) {
@@ -366,6 +495,7 @@ function friendlyError(err) {
     case 'ENOENT': return 'The file no longer exists.';
     case 'EACCES':
     case 'EPERM': return 'Permission denied.';
+    case 'EBUSY': return 'The file is open in another app. Close it and try again.';
     case 'EISDIR':
     case 'ENOTFILE': return 'That is a folder, not a file.';
     case 'ETOOBIG': return err.message;
@@ -380,9 +510,10 @@ function broadcastSettings() {
 
 handle('app:init', ctx => {
   ctx.ready = true;
-  const initialPath = ctx.initialPath;
   return {
-    initialPath,
+    // After a renderer crash the reloaded page asks again and gets back the
+    // document it was showing.
+    initialPath: ctx.initialPath || ctx.filePath,
     settings: settings.publicView(),
     version: app.getVersion(),
     platform: process.platform,
@@ -398,7 +529,7 @@ handle('doc:load', async (ctx, p) => {
     ctx.initialPath = null;
     startWatching(ctx, doc.path, `${doc.mtimeMs}:${doc.size}`);
     settings.addRecent(doc.path);
-    app.addRecentDocument(doc.path);
+    if (isWin || isMac) app.addRecentDocument(doc.path);
     const dir = path.dirname(doc.path);
     const vaultRoot = await files.findVaultRoot(dir);
     broadcastSettings();
@@ -423,9 +554,10 @@ handle('doc:load', async (ctx, p) => {
 });
 
 // Read another note for ![[transclusion]]. Markdown files only.
-handle('doc:read', async (_ctx, p) => {
+handle('doc:read', async (ctx, p) => {
   const abs = path.resolve(str(p));
   if (!files.isMarkdown(abs)) return { error: 'Not a Markdown file' };
+  if (files.isForeignUnc(abs, ctx.filePath)) return { error: 'The note is on another computer' };
   try {
     const doc = await files.readDocument(abs);
     return { path: doc.path, content: doc.content, dirUrl: dirUrl(path.dirname(doc.path)) };
@@ -436,7 +568,7 @@ handle('doc:read', async (_ctx, p) => {
 
 // Classify a link the user clicked. The renderer passes the absolute URL the
 // browser resolved against the document's folder.
-handle('link:resolve', async (_ctx, href) => {
+handle('link:resolve', async (ctx, href) => {
   let url;
   try {
     url = new URL(str(href));
@@ -454,6 +586,8 @@ handle('link:resolve', async (_ctx, href) => {
   } catch {
     return { kind: 'invalid' };
   }
+  // Even a stat of \\server\… signs in to that server.
+  if (files.isForeignUnc(p, ctx.filePath)) return { kind: 'blocked', path: p };
   const tryStat = async q => {
     try { return await fs.promises.stat(q); } catch { return null; }
   };
@@ -473,6 +607,17 @@ handle('link:resolve', async (_ctx, href) => {
 handle('link:openFile', async (ctx, p) => {
   const abs = path.resolve(str(p));
   const name = path.basename(abs);
+  if (files.isForeignUnc(abs, ctx.filePath)) {
+    await dialog.showMessageBox(ctx.win, {
+      type: 'warning',
+      buttons: ['OK'],
+      title: 'Plume',
+      message: 'Plume will not open this link.',
+      detail: `“${abs}” is on another computer. Windows would sign in to it with your account.`,
+      noLink: true,
+    });
+    return true;
+  }
   if (files.isAmbiguousWindowsName(abs)) {
     await dialog.showMessageBox(ctx.win, {
       type: 'warning',
@@ -498,7 +643,8 @@ handle('link:openFile', async (ctx, p) => {
       cancelId: 1,
       title: 'Plume',
       message: `Plume does not open “${name}” from a link.`,
-      detail: 'Only documents, images and media open directly; programs, scripts and other files are never launched from a document. You can reveal it in File Explorer instead.',
+      detail: 'Only documents, images and media open directly; programs, scripts and other files are never launched ' +
+        `from a document. You can reveal it in ${FILE_MANAGER} instead.`,
       noLink: true,
     });
     if (response === 0) shell.showItemInFolder(abs);
@@ -526,15 +672,19 @@ handle('link:external', async (_ctx, href) => {
   return true;
 });
 
-handle('wiki:resolve', async (_ctx, fromFile, targets) => {
+handle('wiki:resolve', async (ctx, fromFile, targets) => {
   const from = path.resolve(str(fromFile));
   if (!Array.isArray(targets)) throw new Error('Invalid argument');
   const out = {};
+  // `fromFile` can come from markup in the document, so it gets the same
+  // network-path check as links.
+  if (files.isForeignUnc(from, ctx.filePath)) return out;
   for (const t of targets.slice(0, 2000)) {
     if (typeof t !== 'string' || t.length > 1024) continue;
     try {
       const hit = await files.resolveWiki(from, t);
-      out[t] = hit ? { ...hit, url: pathToFileURL(hit.path).href } : null;
+      out[t] = hit && !files.isForeignUnc(hit.path, ctx.filePath)
+        ? { ...hit, url: pathToFileURL(hit.path).href } : null;
     } catch {
       out[t] = null;
     }
@@ -576,9 +726,12 @@ handle('app:openDialog', async ctx => {
   return canceled ? [] : filePaths;
 });
 
+// Extra windows for dropped files and Ctrl+clicked links: documents only, so
+// a dropped image or PDF never opens a window of binary noise.
 handle('app:openPaths', (_ctx, paths) => {
   if (!Array.isArray(paths)) return false;
-  paths.filter(p => typeof p === 'string' && p).slice(0, 20).forEach(p => openPath(path.resolve(p)));
+  paths.filter(p => typeof p === 'string' && p && files.isViewable(p))
+    .slice(0, 20).forEach(p => openPath(path.resolve(p)));
   return true;
 });
 
@@ -588,27 +741,31 @@ handle('app:newWindow', () => {
 });
 
 handle('app:about', async ctx => {
-  await dialog.showMessageBox(ctx.win, {
+  const hasNotices = fs.existsSync(NOTICES);
+  const { response } = await dialog.showMessageBox(ctx.win, {
     type: 'none',
     icon: ICON,
     title: 'About Plume',
     message: 'Plume',
     detail: `Version ${app.getVersion()}\nA feather-light Markdown viewer.\n\n` +
       `Electron ${process.versions.electron} · Chromium ${process.versions.chrome}`,
-    buttons: ['OK'],
+    buttons: hasNotices ? ['OK', 'Third-party notices'] : ['OK'],
+    defaultId: 0,
+    cancelId: 0,
     noLink: true,
   });
+  if (response === 1) await shell.openPath(NOTICES);
   return true;
 });
 
 handle('app:defaultStatus', async () => {
-  if (process.platform !== 'win32' || !app.isPackaged) return { supported: false };
+  if (!isWin || !app.isPackaged) return { supported: false };
   const progId = await currentMdProgId();
   return { supported: true, isDefault: isPlumeProgId(progId), progId };
 });
 
 handle('app:openDefaultApps', async () => {
-  if (process.platform !== 'win32') return false;
+  if (!isWin) return false;
   // A per-machine install registers under HKLM, a per-user one under HKCU;
   // Settings needs to be told which registration to open.
   const perMachine = /\\Program Files( \(x86\))?\\/i.test(process.execPath);
@@ -642,18 +799,25 @@ handle('shell:showInFolder', (_ctx, p) => {
   return true;
 });
 
-handle('shell:openInEditor', (_ctx, p) => {
+handle('shell:openInEditor', async (_ctx, p) => {
   const abs = path.resolve(str(p));
   const editor = findEditor();
-  launchDetached(editor || 'notepad.exe', [abs]);
-  return editor ? path.basename(editor, '.exe') : 'Notepad';
+  if (editor) {
+    launchDetached(editor.cmd, [...editor.args, abs]);
+    return editor.name;
+  }
+  // No known editor: show the folder. Handing the .md itself to xdg-open
+  // could route it straight back to Plume.
+  await shell.openPath(path.dirname(abs));
+  return 'your file manager';
 });
 
 handle('shell:openWith', (_ctx, p) => {
   const abs = path.resolve(str(p));
-  if (process.platform !== 'win32') return false;
+  if (!isWin) return false;
   // OpenAs_RunDLL takes the raw remainder of the command line as the path.
-  launchDetached('rundll32.exe', [`shell32.dll,OpenAs_RunDLL ${abs}`], { windowsVerbatimArguments: true });
+  launchDetached(path.join(SYSTEM32, 'rundll32.exe'), [`shell32.dll,OpenAs_RunDLL ${abs}`],
+    { windowsVerbatimArguments: true });
   return true;
 });
 
@@ -677,35 +841,74 @@ handle('doc:exportPdf', async ctx => {
     filters: [{ name: 'PDF', extensions: ['pdf'] }],
   });
   if (canceled || !filePath) return null;
-  const data = await ctx.win.webContents.printToPDF({
-    printBackground: true,
-    pageSize: 'A4',
-    margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 },
-    generateDocumentOutline: true,
-  });
-  await fs.promises.writeFile(filePath, data);
-  return filePath;
+  try {
+    const data = await ctx.win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'A4',
+      margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 },
+      generateDocumentOutline: true,
+    });
+    await fs.promises.writeFile(filePath, data);
+    return filePath;
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
 });
 
 // ---------------------------------------------------------------------------
 // Helpers
 
+const LINUX_EDITORS = [['code', 'VS Code'], ['codium', 'VSCodium'], ['gnome-text-editor', 'Text Editor'],
+  ['gedit', 'gedit'], ['kate', 'Kate'], ['mousepad', 'Mousepad']];
+
+// The editor Ctrl+E opens a document in, as { cmd, args, name }, or null.
 function findEditor() {
-  if (process.platform !== 'win32') return null;
-  const local = process.env.LOCALAPPDATA || '';
-  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
-  const candidates = [
-    path.join(local, 'Programs', 'Microsoft VS Code', 'Code.exe'),
-    path.join(programFiles, 'Microsoft VS Code', 'Code.exe'),
-    path.join(local, 'Programs', 'cursor', 'Cursor.exe'),
-  ];
-  return candidates.find(c => c && fs.existsSync(c)) || null;
+  if (isWin) {
+    const local = process.env.LOCALAPPDATA || '';
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    const exe = [
+      path.join(local, 'Programs', 'Microsoft VS Code', 'Code.exe'),
+      path.join(programFiles, 'Microsoft VS Code', 'Code.exe'),
+      path.join(local, 'Programs', 'cursor', 'Cursor.exe'),
+    ].find(c => path.isAbsolute(c) && fs.existsSync(c));
+    return exe ? { cmd: exe, args: [], name: path.basename(exe, '.exe') }
+      : { cmd: path.join(SYSTEM32, 'notepad.exe'), args: [], name: 'Notepad' };
+  }
+  if (isMac) {
+    const dirs = ['/Applications', path.join(app.getPath('home'), 'Applications')];
+    const bundle = ['Visual Studio Code.app', 'Cursor.app']
+      .flatMap(name => dirs.map(dir => path.join(dir, name)))
+      .find(p => fs.existsSync(p));
+    return bundle ? { cmd: '/usr/bin/open', args: ['-a', bundle], name: path.basename(bundle, '.app') }
+      : { cmd: '/usr/bin/open', args: ['-t'], name: 'your text editor' };
+  }
+  for (const [bin, name] of LINUX_EDITORS) {
+    const cmd = findOnPath(bin);
+    if (cmd) return { cmd, args: [], name };
+  }
+  return null;
+}
+
+// Absolute PATH entries only: a relative one would search the current
+// folder, which is wherever the document lives.
+function findOnPath(bin) {
+  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+    if (!path.isAbsolute(dir)) continue;
+    const candidate = path.join(dir, bin);
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      if (fs.statSync(candidate).isFile()) return candidate;
+    } catch { /* not here */ }
+  }
+  return null;
 }
 
 function launchDetached(cmd, args, extra = {}) {
   const env = { ...process.env };
   for (const key of Object.keys(env)) {
-    if (key.startsWith('ELECTRON_') || key === 'NODE_OPTIONS') delete env[key];
+    if (key.startsWith('ELECTRON_') || key === 'NODE_OPTIONS' || key === 'NoDefaultCurrentDirectoryInExePath') {
+      delete env[key];
+    }
   }
   try {
     const child = spawn(cmd, args, { detached: true, stdio: 'ignore', env, ...extra });
@@ -717,17 +920,20 @@ function launchDetached(cmd, args, extra = {}) {
 function regQuery(key, value) {
   return new Promise(resolve => {
     const args = value ? ['query', key, '/v', value] : ['query', key, '/ve'];
-    execFile('reg.exe', args, { windowsHide: true, timeout: 4000 }, (err, stdout) => {
+    execFile(path.join(SYSTEM32, 'reg.exe'), args, { windowsHide: true, timeout: 4000 }, (err, stdout) => {
       if (err) return resolve(null);
       const m = /REG_SZ\s+(.+?)\s*$/m.exec(stdout || '');
-      resolve(m ? m[1].trim() : null);
+      // An unset default prints a localised "(value not set)".
+      resolve(m && !m[1].startsWith('(') ? m[1].trim() : null);
     });
   });
 }
 
 async function currentMdProgId() {
   const base = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.md';
-  return (await regQuery(`${base}\\UserChoiceLatest`, 'ProgId')) ||
+  // Windows 11 keeps the user's choice in UserChoiceLatest\ProgId, older
+  // builds in UserChoice; the Classes default applies only without either.
+  return (await regQuery(`${base}\\UserChoiceLatest\\ProgId`, 'ProgId')) ||
     (await regQuery(`${base}\\UserChoice`, 'ProgId')) ||
     (await regQuery('HKCU\\Software\\Classes\\.md', null)) ||
     (await regQuery('HKCR\\.md', null));
