@@ -5,17 +5,29 @@
 <h1 align="center">Plume</h1>
 
 <p align="center">
-  <b>A feather-light Markdown viewer for Windows, macOS and Linux.</b><br>
-  Double-click any <code>.md</code> file and it opens instantly — no vault, no project, no editor chrome. Just the document, beautifully set.
+  <b>A feather-light Markdown viewer and editor for Windows, macOS and Linux.</b><br>
+  Double-click any <code>.md</code> file and it opens instantly — no workspace to import, no project to set up. Just the document, beautifully set.
+</p>
+
+<p align="center">
+  <a href="https://plume-md.com"><b>plume-md.com</b></a>
 </p>
 
 <p align="center">
   <a href="https://plume-md.com/download.html"><b>Download</b></a> ·
   <a href="https://plume-md.com/docs.html">Documentation</a> ·
+  <a href="https://plume-md.com/app.html">Your vault</a> ·
+  <a href="RELEASE-NOTES.md">Release notes</a> ·
   <a href="#features">Features</a> ·
   <a href="#vault">Vault &amp; sync</a> ·
   <a href="#keyboard">Keyboard</a> ·
   <a href="#build-from-source">Build</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Ishan-Nim/plume/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Ishan-Nim/plume?label=release&amp;color=6d4aff"></a>
+  <a href="https://github.com/Ishan-Nim/plume/blob/master/LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-6d4aff"></a>
+  <img alt="Windows, macOS and Linux" src="https://img.shields.io/badge/Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-free-6d4aff">
 </p>
 
 ![Plume showing a note with its folder tree, a callout and a table](docs/screenshots/light.png)
@@ -34,7 +46,9 @@
 - **Reads Obsidian notes properly.** `[[wiki links]]`, `[[Note#Heading|alias]]`, `![[image.png|300]]`, `![[Note#Section]]` transclusion, callouts (`> [!tip]`, foldable `> [!warning]-`), `==highlights==`, `#tags`, `%%comments%%`, `^block` ids, front-matter Properties, and Obsidian-style line breaks (toggleable).
 - **Full GitHub-flavoured Markdown.** Tables, task lists, footnotes, definition lists, emoji shortcodes, syntax highlighting (incl. PowerShell, Dockerfile, nginx…), KaTeX math, Mermaid diagrams.
 - **Sidebar** with the folder tree around the file (the whole vault when the file is inside one) and an outline of headings with reading time.
+- **Edits when you ask it to.** Press the pencil, or `Ctrl+E`, for the raw Markdown in a plain editor — no hidden formatting model. Nothing is written until you save, an unsaved change is never dropped silently, and a file changed elsewhere cannot overwrite your work.
 - **Live reload** — save the file in any editor and Plume updates in place, keeping your scroll position.
+- **Updates that ask first.** Plume tells you when a new version is out and installs it when you say so. Every download is checked against the release's published checksum.
 - **Find in page**, back/forward between linked notes, image lightbox, copy buttons on code blocks.
 - **Light / dark / auto theme**, text size, reading width, sans/serif.
 - **Print** and **Export to PDF** (with a PDF outline from your headings).
@@ -47,8 +61,14 @@ Plume reads the files already on your disk, and that needs no account. Create a 
 one and you also get **Plume Vault**: 100 MB of storage for syncing documents between
 your computers, and a browser to read them in. It is free — there is no paid tier.
 
-- **Sync from the app.** The **Vault** tab in the sidebar signs you in and pushes the
-  open document up. Another machine pulls it down.
+- **Sync from the app.** The **Plume Vault** bar at the foot of the sidebar signs you in
+  and pushes the open document up. Another machine pulls it down.
+- **Or sync a whole folder.** Choose one folder and Plume keeps everything in it — notes,
+  images and sub-folders — in your vault by itself, watching for changes while it runs.
+  Only documents and images are ever uploaded; programs and archives are refused by an
+  allow-list and stay on your computer. That is why a 1.5 GB notebook is usually a few
+  megabytes of vault. Your folder is never moved or renamed, and folders are kept:
+  `Projects/Plume.md` arrives as `Projects/Plume.md`.
 - **Nothing is flattened.** Every upload carries the revision that machine last saw. If
   the vault copy moved on in the meantime the write is refused, and you choose which
   copy to keep — Plume can save the other one beside yours so neither is lost.
