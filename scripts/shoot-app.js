@@ -93,6 +93,13 @@ async function main(win) {
   await run(`document.querySelector('.sidebar-tab[data-tab="files"]').click();`);
   await sleep(400);
 
+  // ---- editing ----
+  await run("document.getElementById('btn-edit').click();");
+  await sleep(900);
+  await shoot(win, 'editing');
+  await run("document.getElementById('btn-edit').click();");
+  await sleep(700);
+
   // ---- the vault, signed out ----
   await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
   await until('!!document.getElementById("vault-email")');

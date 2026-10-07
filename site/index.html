@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Plume — a feather-light Markdown viewer</title>
-<meta name="description" content="Double-click any .md file and it opens instantly in a clean reading view. Obsidian-flavoured Markdown, Mermaid diagrams, KaTeX math and a folder sidebar. Free and open source for Windows, macOS and Linux.">
+<meta name="description" content="Double-click any .md file and it opens instantly — read it, edit it, and sync a folder to your free 100 MB vault. Obsidian-flavoured Markdown, Mermaid diagrams and KaTeX math. Free and open source for Windows, macOS and Linux.">
 <link rel="canonical" href="https://plume-md.com/">
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon.png">
@@ -14,11 +14,11 @@
 <meta property="og:url" content="https://plume-md.com/">
 <meta property="og:site_name" content="Plume">
 <meta property="og:title" content="Plume — a feather-light Markdown viewer">
-<meta property="og:description" content="Double-click any .md file and it opens instantly. No vault, no project, no editor chrome — just the document, beautifully set.">
+<meta property="og:description" content="Double-click any .md file and it opens instantly. Read it, edit it, and have it waiting on your other computer.">
 <meta property="og:image" content="https://plume-md.com/assets/shots/reading-light.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Plume — a feather-light Markdown viewer">
-<meta name="twitter:description" content="Double-click any .md file and it opens instantly. No vault, no project, no editor chrome.">
+<meta name="twitter:description" content="Double-click any .md file and it opens instantly. Read it, edit it, sync it.">
 <meta name="twitter:image" content="https://plume-md.com/assets/shots/reading-light.png">
 
 <link rel="alternate" hreflang="en" href="https://plume-md.com/">
@@ -124,8 +124,9 @@
       </a>
       <h1>Markdown, <em>beautifully</em> set.</h1>
       <p class="lede">
-        Double-click any <code class="inline-code">.md</code> file and it opens instantly — no vault,
-        no project, no editor chrome. Just the document, typeset the way it deserves.
+        Double-click any <code class="inline-code">.md</code> file and it opens instantly — no
+        workspace to import, no project to set up. Read it, edit it, and if you want, have it
+        waiting on your other computer.
       </p>
       <div class="hero-cta">
         <a class="btn btn-primary btn-lg" href="download.html" data-auto-download>
@@ -156,10 +157,10 @@
     <div class="wrap">
       <div class="section-head center">
         <span class="kicker">Why Plume</span>
-        <h2>A reader, not another editor.</h2>
+        <h2>It opens the file. That is the whole trick.</h2>
         <p>
-          Every Markdown app wants to own your notes. Plume just opens the file you clicked,
-          renders it properly, and gets out of the way.
+          Every Markdown app wants to own your notes first and show them second. Plume opens the
+          file you clicked, renders it properly, and gets out of the way.
         </p>
       </div>
 
@@ -168,6 +169,12 @@
           <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></div>
           <h3>Opens with one double-click</h3>
           <p>Plume registers itself for <code>.md</code>, <code>.markdown</code>, <code>.mkd</code> and five more extensions. A second file opens in a new window of the running app — no cold start.</p>
+        </article>
+
+        <article class="card">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></div>
+          <h3>Edits when you want it to</h3>
+          <p>Press the pencil and the document becomes editable — the raw Markdown, nothing between what you type and what is saved. Press it again and you are reading.</p>
         </article>
 
         <article class="card">
@@ -180,12 +187,6 @@
           <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div>
           <h3>Full GitHub-flavoured Markdown</h3>
           <p>Tables, task lists, footnotes, definition lists, emoji shortcodes, syntax highlighting, KaTeX math and Mermaid diagrams — rendered, not escaped.</p>
-        </article>
-
-        <article class="card">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18M3 12h18M3 19h18"/><path d="M8 5v14" opacity=".45"/></svg></div>
-          <h3>Sidebar and outline</h3>
-          <p>The folder tree around your file — the whole vault when the note lives in one — and an outline of every heading, with an honest reading time.</p>
         </article>
 
         <article class="card">
@@ -221,7 +222,7 @@
           <figcaption><b>Code, diagrams and outline.</b> Mermaid and KaTeX render inline.</figcaption>
         </figure>
         <figure class="shot">
-          <img src="assets/shots/vault-synced.png" width="1340" height="880" loading="lazy" alt="The Vault tab in the sidebar, showing a synced document and the vault contents">
+          <img src="assets/shots/vault-synced.png" width="1340" height="880" loading="lazy" alt="The Vault bar at the foot of the sidebar, showing a synced document">
           <figcaption><b>Plume Vault.</b> Sign in and sync, right in the sidebar.</figcaption>
         </figure>
         <figure class="shot">
@@ -232,79 +233,27 @@
     </div>
   </section>
 
-  <section id="obsidian">
+  <section id="editing">
     <div class="wrap split">
       <div>
-        <span class="kicker">For Obsidian users</span>
-        <h2>Your vault, without opening the vault.</h2>
+        <span class="kicker">Editing</span>
+        <h2>A reader first. An editor when you ask.</h2>
         <p class="lede" style="margin-left:0">
-          Share a note with someone who does not run Obsidian, or just read one note without waiting
-          for a whole workspace to load. Plume speaks the same dialect.
+          Most of the time you want to read. When you want to fix a line, press the pencil — or
+          <code class="inline-code">Ctrl+E</code> — and the raw Markdown is right there. There is no
+          hidden formatting model: what you type is what gets written.
         </p>
         <ul class="ticks">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Wiki links</b> — <code class="inline-code">[[note]]</code>, <code class="inline-code">[[Note#Heading|alias]]</code>, and they resolve across the vault.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Embeds and transclusion</b> — <code class="inline-code">![[image.png|300]]</code> and <code class="inline-code">![[Note#Section]]</code>.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Callouts</b> — <code class="inline-code">&gt; [!tip]</code>, including the foldable <code class="inline-code">&gt; [!warning]-</code> kind.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Properties</b> from front matter, <code class="inline-code">#tags</code>, <code class="inline-code">%%comments%%</code> and <code class="inline-code">^block</code> ids.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Open in Obsidian</b> for vault files, when you do want the full thing.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Nothing is written until you ask.</b> Typing changes nothing on disk.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Unsaved work is never dropped quietly.</b> A dot marks it, and leaving asks first.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>A file changed elsewhere cannot overwrite you.</b> Plume stops and lets you choose.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span>Tab indents, Enter continues a list, <code class="inline-code">Ctrl+S</code> saves, <code class="inline-code">Esc</code> goes back to reading.</span></li>
         </ul>
       </div>
       <figure class="shot" style="margin:0">
-        <img src="assets/shots/reading-light.png" width="1340" height="880" loading="lazy" alt="A vault note open in Plume with its folder tree in the sidebar">
-        <figcaption><b>A vault note in Plume.</b> The tree on the left is the real vault.</figcaption>
+        <img src="assets/shots/editing.png" width="1340" height="880" loading="lazy" alt="Plume in edit mode, showing the raw Markdown of a document">
+        <figcaption><b>The same window.</b> Reading and editing are one keystroke apart.</figcaption>
       </figure>
-    </div>
-  </section>
-
-  <section class="alt">
-    <div class="wrap">
-      <div class="section-head center">
-        <span class="kicker">Everything else</span>
-        <h2>The small things you expect.</h2>
-      </div>
-      <div class="grid grid-3">
-        <article class="card">
-          <h3>Find in page</h3>
-          <p><code>Ctrl+F</code>, with next and previous and a match count — the way a browser does it.</p>
-        </article>
-        <article class="card">
-          <h3>Back and forward</h3>
-          <p>Follow a link between notes and walk back out, with <code>Alt+←</code> or your mouse side buttons.</p>
-        </article>
-        <article class="card">
-          <h3>Print and export to PDF</h3>
-          <p>On white paper, with a real PDF outline built from your headings.</p>
-        </article>
-        <article class="card">
-          <h3>Open in your editor</h3>
-          <p>Jump into VS Code or Cursor if you have them, or the system text editor. <code>Ctrl+E</code>.</p>
-        </article>
-        <article class="card">
-          <h3>Images and code</h3>
-          <p>Click an image for a lightbox; every code block gets a copy button that copies what you can see.</p>
-        </article>
-        <article class="card">
-          <h3>Keyboard first</h3>
-          <p>Sidebar, text size, reload, new window, full screen — all on keys you already know.</p>
-        </article>
-      </div>
-
-      <div class="table-scroll">
-        <table class="kb">
-          <caption class="sr-only">Keyboard shortcuts</caption>
-          <thead><tr><th>Action</th><th>Keys</th></tr></thead>
-          <tbody>
-            <tr><td>Open file</td><td>Ctrl+O</td></tr>
-            <tr><td>Find / next / previous</td><td>Ctrl+F, Enter, Shift+Enter</td></tr>
-            <tr><td>Back / forward</td><td>Alt+← / Alt+→</td></tr>
-            <tr><td>Toggle sidebar</td><td>Ctrl+\</td></tr>
-            <tr><td>Text size</td><td>Ctrl+= / Ctrl+- / Ctrl+0</td></tr>
-            <tr><td>Open in editor</td><td>Ctrl+E</td></tr>
-            <tr><td>Print</td><td>Ctrl+P</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="hero-note" style="text-align:left">On macOS, use ⌘ in place of Ctrl and ⌥ in place of Alt.</p>
     </div>
   </section>
 
@@ -327,19 +276,9 @@
           <figcaption><b>1. Sign in.</b> The vault lives at the foot of the sidebar, under Files and Outline.</figcaption>
         </figure>
         <figure class="shot">
-          <img src="assets/shots/vault-synced.png" width="1340" height="880" loading="lazy"
-               alt="The vault panel showing a synced folder and the documents in the vault">
-          <figcaption><b>2. Choose a folder.</b> It syncs itself from then on, and says what it is doing.</figcaption>
-        </figure>
-        <figure class="shot">
           <img src="assets/shots/web-vault.png" width="1340" height="880" loading="lazy"
                alt="The Plume Vault web page listing the same documents in a browser">
-          <figcaption><b>3. Read it anywhere.</b> The same documents, in any browser.</figcaption>
-        </figure>
-        <figure class="shot">
-          <img src="assets/shots/vault-graph.png" width="1340" height="880" loading="lazy"
-               alt="The vault graph showing documents joined by their links">
-          <figcaption><b>And see the shape of it.</b> How every note connects to the others.</figcaption>
+          <figcaption><b>2. Read it anywhere.</b> The same documents, in any browser.</figcaption>
         </figure>
       </div>
 
@@ -368,39 +307,106 @@
     </div>
   </section>
 
-  <section id="vault">
+  <section id="ai">
+    <div class="wrap split">
+      <figure class="shot" style="margin:0">
+        <img src="assets/shots/vault-graph.png" width="1340" height="880" loading="lazy" alt="The vault graph, showing how remembered notes connect">
+        <figcaption><b>What an assistant remembered.</b> Every note it wrote, and how they link up.</figcaption>
+      </figure>
+      <div>
+        <span class="kicker">For Claude Code and Codex</span>
+        <h2>Give your assistant a memory that outlives the session.</h2>
+        <p class="lede" style="margin-left:0">
+          Plume Vault ships an MCP server. Create a token, point your assistant at it, and it can
+          keep project decisions, notes and running logs somewhere that is still there next week —
+          and that you can open in Plume on any of your machines.
+        </p>
+        <ul class="ticks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Eight tools</b> — list, read, write, append, search and delete documents, plus the graph and storage status.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Plain Markdown.</b> Nothing proprietary — the notes are files you can read, edit and take away.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>A token, not your password.</b> Revoke it in one click and the access is gone.</span></li>
+        </ul>
+        <div class="hero-cta" style="justify-content:flex-start">
+          <a class="btn btn-ghost" href="docs.html#mcp">Set it up</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="obsidian" class="alt">
+    <div class="wrap split">
+      <div>
+        <span class="kicker">For Obsidian users</span>
+        <h2>Your vault, without opening the vault.</h2>
+        <p class="lede" style="margin-left:0">
+          Share a note with someone who does not run Obsidian, or just read one note without waiting
+          for a whole workspace to load. Plume speaks the same dialect.
+        </p>
+        <ul class="ticks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Wiki links</b> — <code class="inline-code">[[note]]</code>, <code class="inline-code">[[Note#Heading|alias]]</code>, and they resolve across the vault.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Embeds and transclusion</b> — <code class="inline-code">![[image.png|300]]</code> and <code class="inline-code">![[Note#Section]]</code>.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Callouts</b> — <code class="inline-code">&gt; [!tip]</code>, including the foldable <code class="inline-code">&gt; [!warning]-</code> kind.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Properties</b> from front matter, <code class="inline-code">#tags</code>, <code class="inline-code">%%comments%%</code> and <code class="inline-code">^block</code> ids.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span><b>Open in Obsidian</b> for vault files, when you do want the full thing.</span></li>
+        </ul>
+      </div>
+      <figure class="shot" style="margin:0">
+        <img src="assets/shots/outline.png" width="1340" height="880" loading="lazy" alt="A vault note open in Plume with its outline in the sidebar">
+        <figcaption><b>A vault note in Plume.</b> The tree on the left is the real vault.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="everything">
     <div class="wrap">
       <div class="section-head center">
-        <span class="kicker">Plume Vault</span>
-        <h2>Your notes, on every machine.</h2>
-        <p>
-          Plume reads the files already on your disk — that part is free, forever, and needs no account.
-          Create one anyway and you get a vault: sync a document from your laptop and open it on your
-          desktop, or in any browser.
-        </p>
+        <span class="kicker">Everything else</span>
+        <h2>The small things you expect.</h2>
       </div>
-
       <div class="grid grid-3">
         <article class="card">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 16.5A3.5 3.5 0 0016.5 13H16a5 5 0 10-9.6 2M8 17l4-4 4 4M12 13v8"/></svg></div>
-          <h3>100 MB, free with an account</h3>
-          <p>Thousands of notes. Sign up with an email and a password — no card, no trial clock, no telemetry.</p>
+          <h3>Find in page</h3>
+          <p><code>Ctrl+F</code>, with next and previous and a match count — the way a browser does it.</p>
         </article>
         <article class="card">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg></div>
-          <h3>Sync from inside Plume</h3>
-          <p>Sign in once under <b>⋯ → Plume Vault</b>. Push the open document, or let every save go up by itself.</p>
+          <h3>Back and forward</h3>
+          <p>Follow a link between notes and walk back out, with <code>Alt+←</code> or your mouse side buttons.</p>
         </article>
         <article class="card">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3.5v5c0 4.6-3.2 8.6-8 9.5-4.8-.9-8-4.9-8-9.5v-5L12 3z"/><path d="M9.2 12.2l2 2 3.6-3.8"/></svg></div>
-          <h3>Yours, and private</h3>
-          <p>Documents sit in private storage no one else can list. Passwords are hashed with scrypt. Nothing is indexed, shared or sold.</p>
+          <h3>Print and export to PDF</h3>
+          <p>On white paper, with a real PDF outline built from your headings.</p>
+        </article>
+        <article class="card">
+          <h3>Open in your editor</h3>
+          <p>Jump into VS Code or Cursor if you have them, or the system text editor. <code>Ctrl+Shift+E</code>.</p>
+        </article>
+        <article class="card">
+          <h3>Updates that ask first</h3>
+          <p>Plume tells you when a new version is out and installs it when you say so. Every download is checked against the release's published checksum.</p>
+        </article>
+        <article class="card">
+          <h3>Nine languages</h3>
+          <p>This site follows your browser's language, and you can change it any time from the header.</p>
         </article>
       </div>
 
-      <div style="text-align:center;margin-top:36px">
-        <a class="btn btn-primary btn-lg" href="app.html">Create a free vault</a>
+      <div class="table-scroll">
+        <table class="kb">
+          <caption class="sr-only">Keyboard shortcuts</caption>
+          <thead><tr><th>Action</th><th>Keys</th></tr></thead>
+          <tbody>
+            <tr><td>Open file</td><td>Ctrl+O</td></tr>
+            <tr><td>Edit this document</td><td>Ctrl+E</td></tr>
+            <tr><td>Save</td><td>Ctrl+S</td></tr>
+            <tr><td>Find / next / previous</td><td>Ctrl+F, Enter, Shift+Enter</td></tr>
+            <tr><td>Back / forward</td><td>Alt+← / Alt+→</td></tr>
+            <tr><td>Toggle sidebar</td><td>Ctrl+\</td></tr>
+            <tr><td>Text size</td><td>Ctrl+= / Ctrl+- / Ctrl+0</td></tr>
+            <tr><td>Print</td><td>Ctrl+P</td></tr>
+          </tbody>
+        </table>
       </div>
+      <p class="hero-note" style="text-align:left">On macOS, use ⌘ in place of Ctrl and ⌥ in place of Alt.</p>
     </div>
   </section>
 
@@ -416,7 +422,7 @@
       </a>
       <div class="platforms">
         <span class="pill"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6l7.3-1v7.1H3V5.6zm0 12.8l7.3 1v-7H3v6zM11.4 4.4L21 3v8.7h-9.6V4.4zm0 15.2L21 21v-8.6h-9.6v7.2z"/></svg>Windows 10 &amp; 11</span>
-        <span class="pill"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.3 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.9-3.5.9s-1.8-.8-3-.8c-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .8 1.1 1.7 2.3 2.9 2.2 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.2.9-1.2 1.3-2.5 1.3-2.5s-2.5-1-2.5-3.6zM14 5.6c.6-.8 1.1-1.9 1-3-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.8-1 2.9 1.3.1 2.2-.6 2.9-1.4z"/></svg>macOS, Apple silicon &amp; Intel</span>
+        <span class="pill"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.3 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.9-3.5.9s-1.8-.8-3-.8c-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .8 1.1 1.7 2.3 2.9 2.2 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.2.9-1.2 1.3-2.5 1.3-2.5s-2.5-1-2.5-3.6zM14 5.6c.6-.8 1.1-1.9 1-3-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.2-.6 2.9-1.4z"/></svg>macOS, Apple silicon &amp; Intel</span>
         <span class="pill"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c-2.2 0-3.6 1.8-3.5 4.2.1 1.6-.1 2.4-.8 3.5C6.4 11.6 5.6 13 5.6 14.6c0 .7.2 1.3.5 1.8-.5.5-.9 1.1-.9 1.8 0 1.4 1.6 1.7 3.2 2 1 .2 1.8.6 2.4 1 .4.3.8.4 1.2.4s.8-.1 1.2-.4c.6-.4 1.4-.8 2.4-1 1.6-.3 3.2-.6 3.2-2 0-.7-.4-1.3-.9-1.8.3-.5.5-1.1.5-1.8 0-1.6-.8-3-2.1-4.9-.7-1.1-.9-1.9-.8-3.5C15.6 3.8 14.2 2 12 2z"/></svg>Linux, AppImage &amp; .deb</span>
       </div>
     </div>
