@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choose a new password — Plume Vault</title>
+<meta name="description" content="Choose a new password for your Plume Vault account.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="strict-origin">
+<link rel="canonical" href="https://plume-md.com/reset.html">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<meta name="theme-color" content="#6e56cf">
+<link rel="stylesheet" href="assets/site.css">
+<script>
+  (function () {
+    // The secret arrives in the fragment, which no server ever sees. It is
+    // taken into a variable and out of the address bar immediately, so it does
+    // not survive in history, in a screenshot, or in a shared tab.
+    window.__plumeResetToken = '';
+    try {
+      var hash = location.hash || '';
+      var match = /(?:^#|&)token=([^&]+)/.exec(hash);
+      if (match) window.__plumeResetToken = decodeURIComponent(match[1]);
+      // A query string would already have reached the access log; strip it too
+      // so it at least stops here.
+      var url = new URL(location.href);
+      ['token', 'secret', 'password', 'email'].forEach(function (k) { url.searchParams.delete(k); });
+      history.replaceState(null, '', url.pathname + (url.search || ''));
+    } catch (e) { /* nothing here is worth breaking the page over */ }
+  })();
+</script>
+<script>
+  (function () {
+    var d = document.documentElement;
+    try {
+      var t = localStorage.getItem('plume-theme');
+      if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  .reset-wrap { max-width: 460px; padding-block: clamp(48px, 10vw, 96px); }
+  .panel {
+    border: 1px solid var(--line); border-radius: 16px;
+    background: var(--card); box-shadow: var(--shadow); padding: 30px;
+  }
+  .panel h1 { font-size: 1.45rem; letter-spacing: -.02em; }
+  .panel > p { margin-top: 10px; color: var(--text-3); font-size: .94rem; line-height: 1.6; }
+  .field { margin-top: 18px; }
+  .field label { display: block; font-size: .86rem; font-weight: 550; margin-bottom: 6px; }
+  .field input {
+    width: 100%; font: inherit; padding: 11px 13px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--text);
+  }
+  .field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hint { display: block; margin-top: 6px; font-size: .82rem; color: var(--text-3); }
+  .msg { margin-top: 18px; font-size: .9rem; line-height: 1.6; border-radius: 10px; padding: 12px 14px; display: none; }
+  .msg.show { display: block; }
+  .msg.bad { background: color-mix(in srgb, #d9405a 12%, transparent); color: #d9405a; }
+  .msg.good { background: color-mix(in srgb, #1f9d63 12%, transparent); color: #1f9d63; }
+  .msg.wait { background: var(--bg-3); color: var(--text-2); }
+  .actions { margin-top: 22px; }
+  .after { margin-top: 18px; text-align: center; font-size: .9rem; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="/">
+      <img src="assets/logo.svg" alt="" width="28" height="28">
+      Plume
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="navlink nav-hide" href="/">Home</a>
+      <a class="navlink" href="app.html">Sign in</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap reset-wrap" id="main">
+  <div class="panel">
+    <h1>Choose a new password</h1>
+    <p id="intro">Checking your link…</p>
+
+    <form id="form" autocomplete="on" novalidate hidden>
+      <div class="field">
+        <label for="password">New password</label>
+        <input type="password" id="password" autocomplete="new-password" required
+               placeholder="••••••••••" minlength="10" maxlength="200">
+        <span class="hint">At least 10 characters, with a number or symbol.</span>
+      </div>
+      <div class="field">
+        <label for="confirm">Type it again</label>
+        <input type="password" id="confirm" autocomplete="new-password" required
+               placeholder="••••••••••" minlength="10" maxlength="200">
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="submit">Set my password</button>
+      </div>
+    </form>
+
+    <div class="msg" id="msg" role="alert"></div>
+
+    <p class="after" id="after" hidden>
+      <a href="app.html">Go to your vault</a>
+    </p>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="foot-bottom" style="border-top:0;margin-top:0;padding-top:0">
+      <p class="foot-note">
+        Plume is free software by <a href="https://github.com/Ishan-Nim">Ishan Nim</a>, released under the MIT licence.
+      </p>
+      <div class="foot-controls" id="foot-controls">
+        <button class="theme-toggle" type="button" aria-label="Switch between light and dark">
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var API = '/api';
+  var TOKEN_KEY = 'plume-vault-token';
+  var secret = window.__plumeResetToken || '';
+  try { delete window.__plumeResetToken; } catch (e) { window.__plumeResetToken = ''; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var intro = $('intro'), form = $('form'), msg = $('msg'), after = $('after'), submit = $('submit');
+
+  function say(text, kind) {
+    msg.textContent = text;
+    msg.className = 'msg show ' + (kind || 'wait');
+  }
+
+  function dead(text) {
+    intro.textContent = text;
+    form.hidden = true;
+    msg.className = 'msg';
+    after.hidden = false;
+    after.innerHTML = '<a href="app.html">Ask for a new link</a>';
+  }
+
+  async function post(path, body) {
+    var res = await fetch(API + path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    var data = null;
+    try { data = await res.json(); } catch (e) { /* a proxy error page */ }
+    if (!data) throw new Error('The server did not answer properly. Try again in a moment.');
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'That did not work.');
+    return data;
+  }
+
+  // ---- is this link still good? ----
+  (async function () {
+    if (!secret) {
+      dead('This page needs the link from your email. Open that link again, or ask for a new one.');
+      return;
+    }
+    try {
+      var check = await post('/auth/reset/check', { token: secret });
+      if (!check.valid) {
+        dead('That link has expired or has already been used. Links last an hour and work once.');
+        return;
+      }
+      intro.textContent = 'Pick something you have not used here before. Setting it signs out every other device, and retires every API token.';
+      form.hidden = false;
+      $('password').focus();
+    } catch (err) {
+      dead(err.message);
+    }
+  })();
+
+  // ---- set it ----
+  form.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var password = $('password').value;
+    var confirm = $('confirm').value;
+
+    if (password !== confirm) { say('Those two do not match.', 'bad'); return; }
+    if (password.length < 10) { say('Use at least 10 characters.', 'bad'); return; }
+    if (!/[a-zA-Z]/.test(password) || !/[0-9\W]/.test(password)) {
+      say('Mix letters with a number or a symbol.', 'bad');
+      return;
+    }
+
+    submit.disabled = true;
+    say('Setting your password…', 'wait');
+    try {
+      var done = await post('/auth/reset', { token: secret, password: password });
+      secret = '';
+      // Signed in straight away, so the next thing is the vault, not the form.
+      try { if (done.token) localStorage.setItem(TOKEN_KEY, done.token); } catch (e) { /* private mode */ }
+      form.hidden = true;
+      intro.textContent = 'Your password is set.';
+      say(done.note || 'Every other device has been signed out.', 'good');
+      after.hidden = false;
+      setTimeout(function () { location.href = 'app.html'; }, 1600);
+    } catch (err) {
+      submit.disabled = false;
+      say(err.message, 'bad');
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

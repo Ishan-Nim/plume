@@ -93,6 +93,14 @@
   }
   .tabs button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
 
+  .forgot { margin-top: 14px; text-align: center; }
+  .linkish {
+    border: 0; background: none; padding: 0; cursor: pointer;
+    font: inherit; font-size: .88rem; color: var(--text-3); text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .linkish:hover { color: var(--accent); }
+
   .field { display: grid; gap: 7px; margin-bottom: 16px; }
   .field label { font-size: .89rem; font-weight: 580; color: var(--text-2); }
   .field input {
@@ -216,16 +224,6 @@
     font-family: var(--mono); font-size: .82rem; line-height: 1.6;
   }
 </style>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-24LZQCCRJH"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  // anonymize_ip is on by default in GA4; this says so out loud, and keeps
-  // Google from using these hits to build ad audiences.
-  gtag('config', 'G-24LZQCCRJH', { anonymize_ip: true, allow_google_signals: false });
-</script>
 </head>
 <body>
 
@@ -266,15 +264,18 @@
       <form id="auth-form" autocomplete="on" novalidate onsubmit="return false">
         <div class="field">
           <label for="email">Email</label>
-          <input type="email" id="email" name="email" autocomplete="email" required placeholder="you@example.com">
+          <input type="email" id="email" autocomplete="email" required placeholder="you@example.com">
         </div>
         <div class="field">
           <label for="password">Password</label>
-          <input type="password" id="password" name="password" autocomplete="current-password" required
+          <input type="password" id="password" autocomplete="current-password" required
                  aria-describedby="pw-hint" placeholder="••••••••••">
           <span class="hint" id="pw-hint">At least 10 characters, with a number or symbol.</span>
         </div>
         <button class="btn btn-primary btn-lg btn-block" type="submit" id="auth-submit">Create my vault</button>
+        <p class="forgot" id="forgot-row" hidden>
+          <button type="button" class="linkish" id="forgot">Forgot your password?</button>
+        </p>
       </form>
 
       <p class="hint" style="margin-top:16px;font-size:.84rem;color:var(--text-3)">

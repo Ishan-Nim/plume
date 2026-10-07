@@ -95,11 +95,47 @@
     $('auth-submit').textContent = next === 'signup' ? 'Create my vault' : 'Sign in';
     $('password').setAttribute('autocomplete', next === 'signup' ? 'new-password' : 'current-password');
     $('pw-hint').hidden = next !== 'signup';
+    // Only offered where it makes sense: there is nothing to reset until there
+    // is an account.
+    $('forgot-row').hidden = next !== 'login';
     clearNote(gateMsg);
   }
 
   $('tab-signup').addEventListener('click', function () { setMode('signup'); });
   $('tab-login').addEventListener('click', function () { setMode('login'); });
+
+  // ---------- forgotten password ----------
+  //
+  // The answer is deliberately the same whether or not the address has an
+  // account, so this says what it says regardless, and the only error it can
+  // show is one about the service itself.
+  $('forgot').addEventListener('click', async function () {
+    var email = $('email').value.trim();
+    if (!email) {
+      note(gateMsg, 'Type your email address first, then press this again.');
+      $('email').focus();
+      return;
+    }
+
+    var btn = $('forgot');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    clearNote(gateMsg);
+
+    try {
+      var data = await apiJson('/auth/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email }),
+      });
+      note(gateMsg, data.note || 'If there is an account for that address, a link is on its way.', 'ok');
+    } catch (err) {
+      note(gateMsg, err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Forgot your password?';
+    }
+  });
 
   $('auth-form').addEventListener('submit', async function (ev) {
     ev.preventDefault();
