@@ -308,12 +308,18 @@ curl -X PUT "https://plume-md.com/api/vault/file?path=notes/today.md" \
     <pre><code>{
   "mcpServers": {
     "plume-vault": {
-      "command": "npx",
-      "args": ["-y", "@plume-md/vault-mcp"],
+      "command": "node",
+      "args": ["/path/to/plume/mcp/index.js"],
       "env": { "PLUME_TOKEN": "plm_your_token" }
     }
   }
 }</code></pre>
+    <p>
+      Clone <a href="https://github.com/Ishan-Nim/plume">the repository</a> and point
+      <code>args</code> at <code>mcp/index.js</code> inside it. There is nothing to install:
+      the server has no dependencies. Once it is published to npm you will be able to use
+      <code>npx -y @plume-md/vault-mcp</code> instead.
+    </p>
     <p>The assistant gets eight tools:</p>
     <div class="table-wrap">
       <table>

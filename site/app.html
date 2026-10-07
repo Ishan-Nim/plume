@@ -288,12 +288,16 @@
       <pre class="snippet">{
   "mcpServers": {
     "plume-vault": {
-      "command": "npx",
-      "args": ["-y", "@plume-md/vault-mcp"],
+      "command": "node",
+      "args": ["/path/to/plume/mcp/index.js"],
       "env": { "PLUME_TOKEN": "your-token-here" }
     }
   }
 }</pre>
+      <p class="hint" style="font-size:.86rem;color:var(--text-3);margin-top:10px">
+        Clone <a href="https://github.com/Ishan-Nim/plume">the repository</a> and point at
+        <code>mcp/index.js</code> — the server has no dependencies to install.
+      </p>
       <p class="hint" style="font-size:.86rem;color:var(--text-3);margin-top:10px">
         It gives the assistant eight tools: list, read, write, append, search and delete documents,
         plus the vault graph and its storage status.

@@ -15,13 +15,17 @@ read in the app or in a browser afterwards.
 {
   "mcpServers": {
     "plume-vault": {
-      "command": "npx",
-      "args": ["-y", "@plume-md/vault-mcp"],
+      "command": "node",
+      "args": ["/path/to/plume/mcp/index.js"],
       "env": { "PLUME_TOKEN": "plm_your_token" }
     }
   }
 }
 ```
+
+Clone this repository and point `args` at `mcp/index.js` inside it — there is
+nothing to install, the server has no dependencies. Once it is published to npm,
+`npx -y @plume-md/vault-mcp` will work in its place.
 
 In Claude Code that file is `~/.claude.json` (or a project `.mcp.json`).
 

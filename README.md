@@ -65,8 +65,8 @@ in Plume afterwards.
 {
   "mcpServers": {
     "plume-vault": {
-      "command": "npx",
-      "args": ["-y", "@plume-md/vault-mcp"],
+      "command": "node",
+      "args": ["/path/to/plume/mcp/index.js"],
       "env": { "PLUME_TOKEN": "plm_your_token" }
     }
   }
