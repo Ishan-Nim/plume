@@ -1,8 +1,8 @@
 // Plume renderer: wires the UI, renders documents and handles navigation.
 
 import DOMPurify from 'dompurify';
-import { createMarkdown, splitWiki, wikiLabel } from './markdown.js';
-import { enhance, rebaseUrls, extractSection } from './enhance.js';
+import { createMarkdown, splitWiki, wikiLabel, CODE_MARK } from './markdown.js';
+import { enhance, rebaseUrls, extractSection, plainText } from './enhance.js';
 import { Finder } from './find.js';
 import { FileTree, Outline } from './sidebar.js';
 import { icon, LOGO } from './icons.js';
@@ -19,6 +19,12 @@ const MERMAID_URL = new URL('vendor/mermaid.min.js', location.href).href;
 const FONT_MIN = 12;
 const FONT_MAX = 28;
 
+// Above this many characters the document is laid out lazily (see .is-large).
+const LARGE_DOC_CHARS = 250000;
+
+// What a drop is allowed to open: Markdown plus the text types of the Open dialog.
+const DROP_DOC_RE = /\.(md|markdown|mdown|mkd|mkdn|mdwn|mdtxt|mdtext|txt|text|log)$/i;
+
 const state = {
   settings: null,
   info: null,
@@ -28,6 +34,7 @@ const state = {
   renderSeq: 0,
   wikiMap: {},
   outline: [],
+  headingEls: new Map(),
   mdCache: new Map(),
   defaultStatus: null,
 };
@@ -59,10 +66,21 @@ DOMPurify.addHook('afterSanitizeAttributes', node => {
     node.removeAttribute('name');
   }
   if (node.nodeName === 'A') node.removeAttribute('target');
-  if (node.hasAttribute && node.hasAttribute('style') && /position\s*:\s*(fixed|sticky)/i.test(node.getAttribute('style'))) {
-    node.removeAttribute('style');
-  }
+  // Plume sets data-from on transcluded links itself, after sanitising.
+  node.removeAttribute('data-from');
+  if (node.style && node.hasAttribute('style')) confineStyle(node.style);
 });
+
+// Inline styles must not escape the reading pane (fake title bars, overlays)
+// or turn it into a window drag region. The parsed declaration is checked,
+// not the raw text, so comments, escapes and var() cannot sneak past.
+const SAFE_POSITIONS = new Set(['', 'static', 'relative', 'absolute']);
+
+function confineStyle(style) {
+  if (!SAFE_POSITIONS.has(style.position)) style.removeProperty('position');
+  style.removeProperty('-webkit-app-region');
+  style.removeProperty('app-region');
+}
 
 const PURIFY_CONFIG = {
   FORBID_TAGS: ['style', 'script', 'form', 'button', 'textarea', 'select', 'option', 'iframe', 'frame',
@@ -111,7 +129,7 @@ function applySettings(s) {
   showSidebarTab(s.sidebarTab);
   syncReadingControls();
   renderRecent();
-  if (prev && prev.lineBreaks !== s.lineBreaks && state.doc) renderDoc({ keepScroll: true });
+  if (prev && prev.lineBreaks !== s.lineBreaks && state.doc) renderDoc({ keepScroll: true }).catch(console.error);
 }
 
 async function updateSettings(patch) {
@@ -139,9 +157,7 @@ async function openDoc(p, { push = true, hash = '', scroll = null } = {}) {
     return false;
   }
   if (push && state.doc && !samePath(state.doc.path, res.path)) {
-    state.back.push({ path: state.doc.path, scroll: ui.viewer.scrollTop });
-    if (state.back.length > 100) state.back.shift();
-    state.forward = [];
+    pushHistory({ path: state.doc.path, scroll: ui.viewer.scrollTop });
   }
   state.doc = res;
   hideBanner();
@@ -150,8 +166,14 @@ async function openDoc(p, { push = true, hash = '', scroll = null } = {}) {
   document.title = `${res.name} — Plume`;
   updateTitlebar();
   updateNavButtons();
-  await renderDoc({ scroll: hash ? null : (scroll ?? 0) });
-  if (hash) scrollToTarget(hash, { flash: true });
+  try {
+    // Start at the top even when a hash is given: a missing target must not
+    // leave the previous document's scroll offset behind.
+    await renderDoc({ scroll: scroll ?? 0 });
+    if (hash) scrollToTarget(hash, { flash: true });
+  } catch (err) {
+    console.error(err);
+  }
   fileTree.show(res.vaultRoot || res.dir, res.path).catch(() => {});
   ui.viewer.focus({ preventScroll: true });
   return true;
@@ -184,62 +206,95 @@ async function renderDoc({ scroll = null, keepScroll = false } = {}) {
   const frag = sanitize(out.html);
   const usedIds = new Map();
   const { outline } = enhance(frag, { wikiMap, frontMatter: out.frontMatter, usedIds });
+  useCachedMermaid(frag);
+  ui.article.classList.toggle('is-large', doc.content.length > LARGE_DOC_CHARS);
   ui.article.replaceChildren(frag);
   state.wikiMap = wikiMap;
   state.outline = outline;
+  state.headingEls = headingElements(ui.article);
   state.usedIds = usedIds;
 
-  outlineView.set(outline, readingStats(ui.article.textContent));
+  outlineView.set(outline, readingStats(plainText(ui.article)));
   if (keepScroll) ui.viewer.scrollTop = previousScroll;
   else if (scroll != null) ui.viewer.scrollTop = scroll;
   trackActiveHeading();
   if (finder.isOpen) finder.search({ keepPosition: true });
 
   await Promise.all([renderTransclusions(ui.article, doc, seq, 0), renderMermaid(seq)]);
-  if (keepScroll && seq === state.renderSeq) ui.viewer.scrollTop = previousScroll;
+  if (seq !== state.renderSeq) return;
+  // The first Mermaid pass collected its blocks before any transcluded note
+  // arrived; this one picks up the diagrams inside them.
+  await renderMermaid(seq);
+  if (seq !== state.renderSeq) return;
+  if (finder.isOpen && ui.article.querySelector('.wiki-transclude.loaded')) finder.search({ keepPosition: true });
+  if (keepScroll) ui.viewer.scrollTop = previousScroll;
 }
+
+// Map heading ids to the document's own heading elements, so an id shared
+// with the app chrome (a heading called "Outline") never resolves to it.
+function headingElements(container) {
+  const map = new Map();
+  for (const h of container.querySelectorAll('h1, h2, h3, h4, h5, h6')) {
+    if (h.id && !map.has(h.id)) map.set(h.id, h);
+  }
+  return map;
+}
+
+let transclusionCounter = 0;
 
 async function renderTransclusions(container, fromDoc, seq, depth) {
   const spans = [...container.querySelectorAll('.wiki-transclude[data-wiki-embed]:not([data-done])')];
   for (const span of spans) {
     span.dataset.done = '1';
     if (depth >= 2 || seq !== state.renderSeq) continue;
-    const target = span.dataset.wikiEmbed;
-    let hit = depth === 0 ? state.wikiMap[target] : null;
-    if (depth > 0) {
-      try {
-        hit = (await api.resolveWiki(fromDoc.path, [target]))[target];
-      } catch {
-        hit = null;
-      }
+    // One broken embed must not stop the others, the file tree or boot.
+    try {
+      await renderTransclusion(span, fromDoc, seq, depth);
+    } catch (err) {
+      console.error(err);
     }
-    if (!hit || !hit.isMarkdown || samePath(hit.path, state.doc.path) && !hit.hash) continue;
-    const note = await api.readNote(hit.path);
-    if (note.error || seq !== state.renderSeq) continue;
-    const out = getMarkdown().render(extractSection(note.content, hit.hash));
-    const frag = sanitize(out.html);
-    let innerMap = {};
-    if (out.wiki.length) {
-      try {
-        innerMap = await api.resolveWiki(note.path, out.wiki);
-      } catch {
-        innerMap = {};
-      }
-    }
-    enhance(frag, { wikiMap: innerMap, usedIds: state.usedIds });
-    rebaseUrls(frag, note.dirUrl);
-    const wikiTarget = splitWiki(target).target;
-    const header = el('div', { class: 'transclusion-head' });
-    header.innerHTML = icon('file', 14);
-    header.append(el('a', { href: '#', class: 'wikilink', dataset: { wiki: wikiTarget, from: fromDoc.path } }, wikiLabel(wikiTarget)));
-    const box = el('div', { class: 'transclusion' }, header, el('div', { class: 'transclusion-body' }, frag));
-    span.replaceChildren(box);
-    span.classList.add('loaded');
-    for (const a of box.querySelectorAll('a.wikilink[data-wiki]')) {
-      if (!a.dataset.from) a.dataset.from = note.path;
-    }
-    await renderTransclusions(box, note, seq, depth + 1);
   }
+}
+
+async function renderTransclusion(span, fromDoc, seq, depth) {
+  const target = span.dataset.wikiEmbed;
+  let hit = depth === 0 ? state.wikiMap[target] : null;
+  if (depth > 0) {
+    try {
+      hit = (await api.resolveWiki(fromDoc.path, [target]))[target];
+    } catch {
+      hit = null;
+    }
+  }
+  if (!hit || !hit.isMarkdown || samePath(hit.path, state.doc.path) && !hit.hash) return;
+  const note = await api.readNote(hit.path);
+  if (note.error || seq !== state.renderSeq) return;
+  // A docId per embed keeps its footnote ids apart from the host's.
+  const out = getMarkdown().render(extractSection(note.content, hit.hash), { docId: `t${++transclusionCounter}` });
+  const frag = sanitize(out.html);
+  let innerMap = {};
+  if (out.wiki.length) {
+    try {
+      innerMap = await api.resolveWiki(note.path, out.wiki);
+    } catch {
+      innerMap = {};
+    }
+  }
+  if (seq !== state.renderSeq) return;
+  enhance(frag, { wikiMap: innerMap, usedIds: state.usedIds });
+  rebaseUrls(frag, note.dirUrl);
+  useCachedMermaid(frag);
+  const wikiTarget = splitWiki(target).target;
+  const header = el('div', { class: 'transclusion-head' });
+  header.innerHTML = icon('file', 14);
+  header.append(el('a', { href: '#', class: 'wikilink', dataset: { wiki: wikiTarget, from: fromDoc.path } }, wikiLabel(wikiTarget)));
+  const box = el('div', { class: 'transclusion' }, header, el('div', { class: 'transclusion-body' }, frag));
+  span.replaceChildren(box);
+  span.classList.add('loaded');
+  for (const a of box.querySelectorAll('a.wikilink[data-wiki]')) {
+    if (!a.dataset.from) a.dataset.from = note.path;
+  }
+  await renderTransclusions(box, note, seq, depth + 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -269,10 +324,54 @@ function loadMermaid() {
 }
 
 let mermaidCounter = 0;
+let mermaidRun = 0;
+
+// Rendered diagrams by theme, font and source. Live reload reuses them, so
+// unchanged diagrams do not collapse and shift the reading position.
+const MERMAID_CACHE_MAX = 100;
+const mermaidCache = new Map();
+
+function mermaidConfig() {
+  return `${root.dataset.theme}|${root.dataset.font}`;
+}
+
+function mermaidKey(block, config = mermaidConfig()) {
+  const src = block.querySelector('.mermaid-src');
+  return src ? `${config}\n${src.textContent}` : '';
+}
+
+function rememberMermaid(key, id, svg) {
+  mermaidCache.delete(key);
+  mermaidCache.set(key, { id, svg });
+  if (mermaidCache.size > MERMAID_CACHE_MAX) mermaidCache.delete(mermaidCache.keys().next().value);
+}
+
+function setMermaidSvg(block, svg) {
+  block.querySelector('.mermaid-svg')?.remove();
+  block.querySelector('.mermaid-msg')?.remove();
+  const holder = el('div', { class: 'mermaid-svg' });
+  holder.innerHTML = svg;
+  block.append(holder);
+  block.classList.remove('has-error');
+  block.dataset.done = '1';
+}
+
+function useCachedMermaid(container) {
+  for (const block of container.querySelectorAll('.mermaid-block:not([data-done])')) {
+    const hit = mermaidCache.get(mermaidKey(block));
+    if (!hit) continue;
+    // Fresh ids, so the same diagram can appear twice on one page.
+    const id = `plume-mermaid-${++mermaidCounter}`;
+    setMermaidSvg(block, hit.svg.replace(new RegExp(`${hit.id}(?!\\d)`, 'g'), id));
+  }
+}
 
 async function renderMermaid(seq) {
+  useCachedMermaid(ui.article);
   const blocks = [...ui.article.querySelectorAll('.mermaid-block:not([data-done])')];
   if (!blocks.length) return;
+  // A newer pass (theme change) takes over every block not yet rendered.
+  const run = ++mermaidRun;
   let mermaid;
   try {
     mermaid = await loadMermaid();
@@ -280,6 +379,8 @@ async function renderMermaid(seq) {
     for (const b of blocks) showMermaidError(b, err);
     return;
   }
+  if (run !== mermaidRun) return;
+  const config = mermaidConfig();
   const dark = root.dataset.theme === 'dark';
   mermaid.initialize({
     startOnLoad: false,
@@ -288,20 +389,16 @@ async function renderMermaid(seq) {
     fontFamily: getComputedStyle(ui.article).fontFamily,
   });
   for (const block of blocks) {
-    if (seq !== state.renderSeq) return;
+    if (seq !== state.renderSeq || run !== mermaidRun) return;
     const src = block.querySelector('.mermaid-src');
     if (!src) continue;
+    const key = mermaidKey(block, config);
     const id = `plume-mermaid-${++mermaidCounter}`;
     try {
       const { svg } = await mermaid.render(id, src.textContent);
-      if (seq !== state.renderSeq) return;
-      block.querySelector('.mermaid-svg')?.remove();
-      block.querySelector('.mermaid-msg')?.remove();
-      const holder = el('div', { class: 'mermaid-svg' });
-      holder.innerHTML = svg;
-      block.append(holder);
-      block.classList.remove('has-error');
-      block.dataset.done = '1';
+      if (seq !== state.renderSeq || run !== mermaidRun) return;
+      setMermaidSvg(block, svg);
+      rememberMermaid(key, id, svg);
     } catch (err) {
       showMermaidError(block, err);
     } finally {
@@ -324,7 +421,8 @@ function showMermaidError(block, err) {
 
 function rerenderMermaid() {
   if (!state.doc || !mermaidApi) return;
-  const blocks = ui.article.querySelectorAll('.mermaid-block[data-done]');
+  // Includes blocks still waiting in a running pass, which then hands over.
+  const blocks = ui.article.querySelectorAll('.mermaid-block');
   if (!blocks.length) return;
   for (const b of blocks) delete b.dataset.done;
   renderMermaid(state.renderSeq);
@@ -338,46 +436,88 @@ function updateNavButtons() {
   ui.forward.disabled = !state.forward.length;
 }
 
+function pushHistory(entry) {
+  state.back.push(entry);
+  if (state.back.length > 100) state.back.shift();
+  state.forward = [];
+}
+
+// Jumps inside the open document are recorded too, so Back returns to the
+// reading position as it does in a browser.
+function jumpInPage(hash) {
+  const scroll = ui.viewer.scrollTop;
+  if (!scrollToTarget(hash, { flash: true })) return;
+  pushHistory({ path: state.doc.path, scroll });
+  updateNavButtons();
+}
+
 async function goBack() {
   const prev = state.back.pop();
   if (!prev) return;
-  if (state.doc) state.forward.push({ path: state.doc.path, scroll: ui.viewer.scrollTop });
-  const ok = await openDoc(prev.path, { push: false, scroll: prev.scroll });
-  if (!ok && state.doc) state.forward.pop();
+  const here = state.doc && { path: state.doc.path, scroll: ui.viewer.scrollTop };
+  if (here) state.forward.push(here);
+  if (here && samePath(prev.path, here.path)) {
+    ui.viewer.scrollTop = prev.scroll;
+  } else {
+    const ok = await openDoc(prev.path, { push: false, scroll: prev.scroll });
+    if (!ok && here) state.forward.pop();
+  }
   updateNavButtons();
 }
 
 async function goForward() {
   const next = state.forward.pop();
   if (!next) return;
-  if (state.doc) state.back.push({ path: state.doc.path, scroll: ui.viewer.scrollTop });
-  const ok = await openDoc(next.path, { push: false, scroll: next.scroll });
-  if (!ok && state.doc) state.back.pop();
+  const here = state.doc && { path: state.doc.path, scroll: ui.viewer.scrollTop };
+  if (here) state.back.push(here);
+  if (here && samePath(next.path, here.path)) {
+    ui.viewer.scrollTop = next.scroll;
+  } else {
+    const ok = await openDoc(next.path, { push: false, scroll: next.scroll });
+    if (!ok && here) state.back.pop();
+  }
   updateNavButtons();
 }
 
+// The element with this id inside the document. A heading can share an id
+// with the app chrome (say "Outline"), so the window-wide lookup alone is not enough.
+function docElementById(id) {
+  const node = document.getElementById(id);
+  if (node && ui.article.contains(node)) return node;
+  return ui.article.querySelector(`[id="${CSS.escape(id)}"]`);
+}
+
 function findTarget(hash) {
-  if (!hash) return null;
-  let id = hash;
-  try {
-    id = decodeURIComponent(hash);
-  } catch {
-    /* keep raw */
-  }
-  const byId = document.getElementById(id);
-  if (byId && ui.article.contains(byId)) return byId;
+  return hash ? findDecodedTarget(decodeSafe(hash)) : null;
+}
+
+function findDecodedTarget(id) {
+  const byId = docElementById(id);
+  if (byId) return byId;
   if (id.startsWith('^')) return null;
+  const named = ui.article.querySelector(`a[name="${CSS.escape(id)}"]`);
+  if (named) return named;
   const slug = slugify(id);
-  const bySlug = slug && ui.article.querySelector(`[id="${CSS.escape(slug)}"]`);
+  const bySlug = slug && docElementById(slug);
   if (bySlug) return bySlug;
   const want = id.trim().toLowerCase();
-  return [...ui.article.querySelectorAll('h1, h2, h3, h4, h5, h6')]
-    .find(h => h.textContent.trim().toLowerCase() === want) || null;
+  const byText = [...ui.article.querySelectorAll('h1, h2, h3, h4, h5, h6')]
+    .find(h => plainText(h).trim().toLowerCase() === want);
+  if (byText) return byText;
+  // Obsidian heading paths, [[Note#Heading#Subheading]], name the last heading.
+  const segs = id.split('#').filter(Boolean);
+  return segs.length > 1 ? findDecodedTarget(segs[segs.length - 1]) : null;
 }
 
 function scrollToTarget(hash, { flash = false } = {}) {
   const target = findTarget(hash);
   if (!target) {
+    // '#' and '#top' mean the top of the page unless something has that id.
+    const id = decodeSafe(hash || '');
+    if (id === '' || id.toLowerCase() === 'top') {
+      ui.viewer.scrollTop = 0;
+      return true;
+    }
     toast(`Section not found: ${hash}`);
     return false;
   }
@@ -410,7 +550,7 @@ async function followWiki(target, fromPath) {
     return;
   }
   if (hit.isMarkdown) {
-    if (samePath(hit.path, state.doc.path)) scrollToTarget(hit.hash, { flash: true });
+    if (samePath(hit.path, state.doc.path)) jumpInPage(hit.hash);
     else openDoc(hit.path, { hash: hit.hash });
   } else {
     api.openFile(hit.path);
@@ -431,7 +571,7 @@ async function followLink(a, { newWindow = false } = {}) {
   const raw = a.getAttribute('href') || '';
   if (!raw) return;
   if (raw.startsWith('#')) {
-    scrollToTarget(raw.slice(1), { flash: true });
+    jumpInPage(raw.slice(1));
     return;
   }
   const url = a.href;
@@ -447,12 +587,14 @@ async function followLink(a, { newWindow = false } = {}) {
   if (r.kind === 'md') {
     if (newWindow) api.openPaths([r.path]);
     else if (state.doc && samePath(r.path, state.doc.path)) {
-      if (r.hash) scrollToTarget(r.hash, { flash: true });
+      if (r.hash) jumpInPage(r.hash);
     } else openDoc(r.path, { hash: r.hash });
   } else if (r.kind === 'file' || r.kind === 'dir') {
     api.openFile(r.path);
   } else if (r.kind === 'missing') {
     toast(`Not found: ${basename(r.path)}`, 'error');
+  } else if (r.kind === 'blocked') {
+    toast('Plume does not open links to other computers', 'error');
   }
 }
 
@@ -470,7 +612,7 @@ function trackActiveHeading() {
     const top = ui.viewer.getBoundingClientRect().top + 90;
     let active = state.outline[0].id;
     for (const h of state.outline) {
-      const node = document.getElementById(h.id);
+      const node = state.headingEls.get(h.id);
       if (!node) continue;
       if (node.getBoundingClientRect().top <= top) active = h.id;
       else break;
@@ -610,11 +752,32 @@ function setFontSize(size) {
   if (next !== state.settings.fontSize) updateSettings({ fontSize: next });
 }
 
+function isMac() {
+  return !!state.info && state.info.platform === 'darwin';
+}
+
+// 'Ctrl+O' → '⌘O' on macOS, where the key handler also accepts Cmd.
+function shortcutLabel(text) {
+  return isMac() ? text.replace(/Ctrl\+/g, '⌘').replace(/Alt\+/g, '⌥') : text;
+}
+
+// index.html is written for Windows; adjust its hints elsewhere.
+function localiseChrome() {
+  if (!state.info || state.info.platform === 'win32') return;
+  const auto = document.querySelector('[data-set="theme:system"]');
+  if (auto) auto.title = isMac() ? 'Follow macOS' : 'Follow the system theme';
+  if (!isMac()) return;
+  for (const node of document.querySelectorAll('[title*="Ctrl+"], [title*="Alt+"]')) {
+    node.title = shortcutLabel(node.title);
+  }
+  for (const kbd of document.querySelectorAll('#welcome kbd')) kbd.textContent = kbd.textContent.replace(/^Ctrl\s+/, '⌘');
+}
+
 function menuItem(label, iconName, action, { shortcut = '', disabled = false } = {}) {
   const btn = el('button', { class: 'menu-item', type: 'button', role: 'menuitem', disabled });
   btn.innerHTML = icon(iconName, 16);
   btn.append(el('span', { class: 'menu-label', text: label }));
-  if (shortcut) btn.append(el('kbd', { text: shortcut }));
+  if (shortcut) btn.append(el('kbd', { text: shortcutLabel(shortcut) }));
   btn.addEventListener('click', () => {
     closePopover();
     action();
@@ -635,9 +798,12 @@ function buildMoreMenu() {
   if (hasDoc && state.doc.vaultRoot) {
     items.push(menuItem('Open in Obsidian', 'gem', () => api.openInObsidian(state.doc.path)));
   }
+  const win = !!state.info && state.info.platform === 'win32';
+  if (win) {
+    items.push(menuItem('Open with…', 'openWith', () => api.openWith(state.doc.path), { disabled: !hasDoc }));
+  }
   items.push(
-    menuItem('Open with…', 'openWith', () => api.openWith(state.doc.path), { disabled: !hasDoc }),
-    menuItem('Show in folder', 'folder', () => api.showInFolder(state.doc.path), { disabled: !hasDoc }),
+    menuItem(isMac() ? 'Show in Finder' : 'Show in folder', 'folder', () => api.showInFolder(state.doc.path), { disabled: !hasDoc }),
     menuItem('Copy file path', 'link', copyPath, { disabled: !hasDoc }),
     sep(),
     menuItem('Print…', 'printer', () => api.print(), { shortcut: 'Ctrl+P', disabled: !hasDoc }),
@@ -645,7 +811,7 @@ function buildMoreMenu() {
     sep(),
     menuItem('Full screen', 'maximize', () => api.toggleFullscreen(), { shortcut: 'F11' }),
   );
-  if (state.info && state.info.packaged && state.info.platform === 'win32') {
+  if (win && state.info.packaged) {
     items.push(menuItem('Make Plume the default for .md', 'star', () => api.openDefaultApps()));
   }
   items.push(menuItem('About Plume', 'info', () => api.about()));
@@ -690,8 +856,15 @@ async function copyPath() {
 
 async function exportPdf() {
   if (!state.doc) return;
-  const out = await api.exportPdf();
-  if (out) toast(`Saved ${basename(out)}`);
+  let out;
+  try {
+    out = await api.exportPdf();
+  } catch (err) {
+    console.error(err);
+    return toast('Couldn’t export the PDF', 'error');
+  }
+  if (typeof out === 'string') toast(`Saved ${basename(out)}`);
+  else if (out && out.error) toast(`Couldn’t export the PDF: ${out.error}`, 'error');
 }
 
 // ---------------------------------------------------------------------------
@@ -811,8 +984,10 @@ function wireUi() {
 
   // Document interactions.
   ui.article.addEventListener('click', async e => {
+    // Only Plume's own button on a block Plume rendered (DOMPurify forbids
+    // <button>, and the mark is secret), never a look-alike built in raw HTML.
     const copy = e.target.closest('.code-copy');
-    if (copy) {
+    if (copy && copy.tagName === 'BUTTON' && copy.closest('.code-block')?.dataset.plumeCode === CODE_MARK) {
       const code = copy.closest('.code-block').querySelector('pre code');
       await api.copyText(code ? code.textContent : '');
       copy.classList.add('copied');
@@ -947,7 +1122,7 @@ function wireKeys() {
     }
     if (ctrl && e.shiftKey && lower === 'g') {
       e.preventDefault();
-      return finder.step(-1);
+      return finder.isOpen ? finder.step(-1) : finder.open();
     }
     if (key === 'F3') {
       e.preventDefault();
@@ -1006,7 +1181,12 @@ function wireDragDrop() {
     body.classList.remove('dragging');
     const paths = [...(e.dataTransfer ? e.dataTransfer.files : [])].map(f => api.pathForFile(f)).filter(Boolean);
     if (!paths.length) return;
-    const [first, ...rest] = paths;
+    const docs = paths.filter(p => DROP_DOC_RE.test(p));
+    if (!docs.length) {
+      toast('Plume opens Markdown files');
+      return;
+    }
+    const [first, ...rest] = docs;
     await openDoc(first);
     if (rest.length) api.openPaths(rest);
   });
@@ -1025,7 +1205,7 @@ function wireIpc() {
     if (!state.doc || !samePath(path, state.doc.path)) return;
     state.doc = { ...state.doc, content };
     hideBanner();
-    renderDoc({ keepScroll: true });
+    renderDoc({ keepScroll: true }).catch(console.error);
     body.classList.remove('just-updated');
     void body.offsetWidth;
     body.classList.add('just-updated');
@@ -1050,6 +1230,7 @@ async function boot() {
   state.info = info;
   body.classList.toggle('platform-win', info.platform === 'win32');
   body.classList.toggle('platform-mac', info.platform === 'darwin');
+  localiseChrome();
   applySettings(info.settings);
   if (info.initialPath) {
     const ok = await openDoc(info.initialPath, { push: false });

@@ -9,6 +9,7 @@ const fsp = fs.promises;
 const path = require('node:path');
 
 const MD_EXTS = new Set(['.md', '.markdown', '.mdown', '.mkd', '.mkdn', '.mdwn', '.mdtxt', '.mdtext']);
+const TEXT_EXTS = new Set(['.txt', '.text', '.log']);
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif', '.ico']);
 const SKIP_DIRS = new Set(['node_modules', '$recycle.bin', 'system volume information', '__pycache__']);
 
@@ -31,17 +32,44 @@ const OPENABLE_EXTS = new Set(['.pdf', '.txt', '.log', '.csv', '.tsv', '.json', 
 // Windows drops trailing dots/spaces and reads "name:stream" as an NTFS
 // alternate data stream, so "run.cmd." or "run.cmd::$DATA" would get past an
 // extension check yet still launch run.cmd. Such names are never opened.
-function isAmbiguousWindowsName(abs) {
+// Elsewhere ':' and trailing dots are ordinary file-name characters.
+function isAmbiguousWindowsName(abs, platform = process.platform) {
+  if (platform !== 'win32') return false;
   const rest = abs.slice(path.win32.parse(abs).root.length);
   return rest.includes(':') || /[. ]$/.test(path.win32.basename(abs));
 }
 
-function isOpenableFromLink(abs) {
-  return !isAmbiguousWindowsName(abs) && OPENABLE_EXTS.has(path.extname(abs).toLowerCase());
+function isOpenableFromLink(abs, platform = process.platform) {
+  return !isAmbiguousWindowsName(abs, platform) && OPENABLE_EXTS.has(path.extname(abs).toLowerCase());
+}
+
+// The lower-case server of a Windows network path (\\server\share\…), '' for
+// another device-namespace path (\\.\pipe\…), or null for a local path.
+function uncHost(p, platform = process.platform) {
+  if (platform !== 'win32' || typeof p !== 'string' || !/^[\\/]{2}/.test(p)) return null;
+  const [first, second = '', third = ''] = p.slice(2).split(/[\\/]+/);
+  if (first !== '?' && first !== '.') return first.toLowerCase();
+  if (/^[a-z]:$/i.test(second)) return null;
+  return second.toUpperCase() === 'UNC' ? third.toLowerCase() : '';
+}
+
+// True when `p` is on another computer than the open document. Windows signs
+// in to any \\server it touches with the user's NTLM credentials, so paths a
+// document points at must stay local or on the document's own server.
+function isForeignUnc(p, docPath, platform = process.platform) {
+  const host = uncHost(p, platform);
+  if (host === null) return false;
+  return !host || host !== uncHost(docPath, platform);
 }
 
 function isMarkdown(p) {
   return MD_EXTS.has(path.extname(p).toLowerCase());
+}
+
+// Files Plume displays as documents: Markdown plus plain text.
+function isViewable(p) {
+  const ext = path.extname(p).toLowerCase();
+  return MD_EXTS.has(ext) || TEXT_EXTS.has(ext);
 }
 
 function isImage(p) {
@@ -63,8 +91,12 @@ function isWithin(parent, child) {
 }
 
 // Decode a document buffer. Handles UTF-8 (with or without BOM) and UTF-16
-// BOMs, and falls back to Shift_JIS for legacy Japanese files that are not
-// valid UTF-8.
+// BOMs. Legacy files that are not valid UTF-8 are tried as Shift_JIS (old
+// Japanese files), then read as Windows-1252, which accepts any byte. A
+// lenient Shift_JIS decode would swallow the ASCII letter after each accented
+// Windows-1252 character.
+const LEGACY_DECODERS = [['utf-8', true], ['shift_jis', true], ['windows-1252', false]];
+
 function decode(buf) {
   if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) {
     return buf.toString('utf8', 3);
@@ -75,15 +107,12 @@ function decode(buf) {
   if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
     return new TextDecoder('utf-16be').decode(buf.subarray(2));
   }
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
-  } catch {
+  for (const [encoding, fatal] of LEGACY_DECODERS) {
     try {
-      return new TextDecoder('shift_jis').decode(buf);
-    } catch {
-      return buf.toString('utf8');
-    }
+      return new TextDecoder(encoding, { fatal }).decode(buf);
+    } catch { /* not this encoding */ }
   }
+  return buf.toString('latin1');
 }
 
 async function readDocument(p) {
@@ -179,7 +208,8 @@ async function findVaultRoot(dir) {
 // ---------------------------------------------------------------------------
 // Wiki link resolution
 
-const indexCache = new Map(); // norm(root) -> { at, map: Map<lowerBasename, string[]> }
+// `${norm(root)}|${maxDepth}` -> { at, map: Map<lowerBasename, string[]>|null, building: Promise|null }
+const indexCache = new Map();
 
 async function buildIndex(root, maxDepth) {
   const map = new Map();
@@ -210,13 +240,27 @@ async function buildIndex(root, maxDepth) {
   return map;
 }
 
-async function getIndex(root, maxDepth) {
+// The file-name index of a folder tree. Walking a large vault takes a while,
+// and wiki links resolve on every render, so an expired index is still served
+// while a fresh one is built in the background. Concurrent callers share one
+// walk, and only the very first lookup waits for it.
+function getIndex(root, maxDepth) {
   const key = `${norm(root)}|${maxDepth}`;
-  const hit = indexCache.get(key);
-  if (hit && Date.now() - hit.at < INDEX_TTL_MS) return hit.map;
-  const map = await buildIndex(root, maxDepth);
-  indexCache.set(key, { at: Date.now(), map });
-  return map;
+  let entry = indexCache.get(key);
+  if (!entry) {
+    entry = { at: 0, map: null, building: null };
+    indexCache.set(key, entry);
+  }
+  if (!entry.building && Date.now() - entry.at >= INDEX_TTL_MS) {
+    entry.building = buildIndex(root, maxDepth)
+      .then(map => {
+        entry.map = map;
+        entry.at = Date.now();
+        return map;
+      }, () => entry.map || new Map())
+      .finally(() => { entry.building = null; });
+  }
+  return entry.map ? Promise.resolve(entry.map) : entry.building;
 }
 
 // Split "Note#Heading|Alias" into its parts.
@@ -283,9 +327,12 @@ module.exports = {
   OPENABLE_EXTS,
   isAmbiguousWindowsName,
   isOpenableFromLink,
+  uncHost,
+  isForeignUnc,
   IMAGE_EXTS,
   MAX_DOC_BYTES,
   isMarkdown,
+  isViewable,
   isImage,
   isWithin,
   samePath,

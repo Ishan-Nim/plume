@@ -18,11 +18,28 @@ test('decode handles UTF-8, BOMs and Shift_JIS', () => {
   assert.equal(files.decode(utf16), '# UTF16 ✓');
   // "日本語" in Shift_JIS — not valid UTF-8.
   assert.equal(files.decode(Buffer.from([0x93, 0xfa, 0x96, 0x7b, 0x8c, 0xea])), '日本語');
+  // "# 日本語" + newline + half-width "ｱｲ": ASCII and single-byte kana survive.
+  const sjis = Buffer.from([0x23, 0x20, 0x93, 0xfa, 0x96, 0x7b, 0x8c, 0xea, 0x0a, 0xb1, 0xb2]);
+  assert.equal(files.decode(sjis), '# 日本語\nｱｲ');
+});
+
+test('decode reads Windows-1252 files that are not Shift_JIS without losing letters', () => {
+  const text = 'Café naïve résumé “quoted” – 50€';
+  const cp1252 = Buffer.from([
+    0x43, 0x61, 0x66, 0xe9, 0x20, 0x6e, 0x61, 0xef, 0x76, 0x65, 0x20, 0x72, 0xe9, 0x73, 0x75, 0x6d, 0xe9, 0x20,
+    0x93, 0x71, 0x75, 0x6f, 0x74, 0x65, 0x64, 0x94, 0x20, 0x96, 0x20, 0x35, 0x30, 0x80,
+  ]);
+  assert.equal(files.decode(cp1252), text);
 });
 
 test('isMarkdown recognises common extensions case-insensitively', () => {
   for (const f of ['a.md', 'b.MD', 'c.markdown', 'd.mdown', 'e.mkd']) assert.ok(files.isMarkdown(f), f);
   for (const f of ['a.txt', 'b.mdx.bak', 'c', 'd.html']) assert.ok(!files.isMarkdown(f), f);
+});
+
+test('isViewable accepts Markdown and plain text only', () => {
+  for (const f of ['a.md', 'b.MARKDOWN', 'c.txt', 'd.log']) assert.ok(files.isViewable(f), f);
+  for (const f of ['a.png', 'b.pdf', 'c.exe', 'd', 'e.html']) assert.ok(!files.isViewable(f), f);
 });
 
 test('isWithin', () => {
@@ -91,20 +108,59 @@ test('resolveWiki finds notes and attachments across the vault', async () => {
   assert.equal(await files.resolveWiki(SINK, 'Missing note'), null);
 });
 
+test('concurrent wiki lookups share one index build', async () => {
+  files.clearCaches();
+  const hits = await Promise.all(['Other Note', 'plume.png', 'kitchen-sink', 'Missing note']
+    .map(t => files.resolveWiki(SINK, t)));
+  assert.deepEqual(hits.map(h => h && h.path), [OTHER, path.join(VAULT, 'img', 'plume.png'), SINK, null]);
+});
+
 test('links never open disguised or non-document files', () => {
   const win = String.raw;
   const refused = [win`C:\T\hello.cmd::$DATA`, win`C:\T\hello.cmd:evil`, win`C:\T\hello.cmd.`, win`C:\T\hello.cmd `];
   for (const p of refused) {
-    assert.ok(files.isAmbiguousWindowsName(p), `ambiguous: ${p}`);
-    assert.ok(!files.isOpenableFromLink(p), `not openable: ${p}`);
+    assert.ok(files.isAmbiguousWindowsName(p, 'win32'), `ambiguous: ${p}`);
+    assert.ok(!files.isOpenableFromLink(p, 'win32'), `not openable: ${p}`);
   }
   const openable = [win`C:\T\report.pdf`, win`C:\T\a.b.c.PNG`, win`\\server\share\doc.pdf`, win`C:\T\notes.txt`];
   for (const p of openable) {
-    assert.ok(!files.isAmbiguousWindowsName(p), `plain: ${p}`);
-    assert.ok(files.isOpenableFromLink(p), `openable: ${p}`);
+    assert.ok(!files.isAmbiguousWindowsName(p, 'win32'), `plain: ${p}`);
+    assert.ok(files.isOpenableFromLink(p, 'win32'), `openable: ${p}`);
   }
   const folderOnly = [win`C:\T\run.exe`, win`C:\T\HELLO~1.CMD`, win`C:\T\page.html`, win`C:\T\pic.svg`, win`C:\T\x.lnk`, win`C:\T\noext`];
   for (const p of folderOnly) {
-    assert.ok(!files.isOpenableFromLink(p), `folder only: ${p}`);
+    assert.ok(!files.isOpenableFromLink(p, 'win32'), `folder only: ${p}`);
   }
+});
+
+test('colons and trailing dots are ordinary file names outside Windows', () => {
+  for (const platform of ['darwin', 'linux']) {
+    assert.ok(!files.isAmbiguousWindowsName('/notes/10:30 meeting.pdf', platform));
+    assert.ok(files.isOpenableFromLink('/notes/10:30 meeting.pdf', platform));
+    assert.ok(!files.isOpenableFromLink('/notes/run.sh', platform));
+  }
+});
+
+test('uncHost finds the server of Windows network paths', () => {
+  const win = String.raw;
+  assert.equal(files.uncHost(win`\\Server\share\a.md`, 'win32'), 'server');
+  assert.equal(files.uncHost('//attacker.example/share/x.png', 'win32'), 'attacker.example');
+  assert.equal(files.uncHost(win`\\?\UNC\Host\share\a.md`, 'win32'), 'host');
+  assert.equal(files.uncHost(win`\\.\pipe\x`, 'win32'), '');
+  assert.equal(files.uncHost(win`\\?\C:\notes\a.md`, 'win32'), null);
+  assert.equal(files.uncHost(win`C:\notes\a.md`, 'win32'), null);
+  assert.equal(files.uncHost('//host/share/a.md', 'linux'), null);
+});
+
+test('isForeignUnc keeps document-derived paths off other computers', () => {
+  const win = String.raw;
+  const local = win`C:\notes\a.md`;
+  const shared = win`\\nas\notes\a.md`;
+  assert.ok(!files.isForeignUnc(win`C:\notes\b.png`, local, 'win32'));
+  assert.ok(files.isForeignUnc(win`\\attacker\share\x.png`, local, 'win32'));
+  assert.ok(files.isForeignUnc(win`\\attacker\share\x.png`, null, 'win32'));
+  assert.ok(!files.isForeignUnc(win`\\NAS\notes\img\b.png`, shared, 'win32'));
+  assert.ok(files.isForeignUnc(win`\\other\notes\b.png`, shared, 'win32'));
+  assert.ok(files.isForeignUnc(win`\\.\pipe\x`, shared, 'win32'));
+  assert.ok(!files.isForeignUnc('//host/share/x.png', '/home/me/a.md', 'linux'));
 });

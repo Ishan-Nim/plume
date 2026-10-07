@@ -55,9 +55,15 @@ export function basename(p) {
 export function dirname(p) {
   const s = String(p);
   const i = Math.max(s.lastIndexOf('\\'), s.lastIndexOf('/'));
-  if (i <= 0) return s;
+  if (i < 0) return s;
+  if (i === 0) return s.slice(0, 1);
   const d = s.slice(0, i);
   return /^[A-Za-z]:$/.test(d) ? `${d}\\` : d;
+}
+
+// Absolute POSIX paths start with '/', Windows ones with a drive or '\\'.
+export function pathSep(p) {
+  return String(p).startsWith('/') ? '/' : '\\';
 }
 
 const caseInsensitive = navigator.userAgent.includes('Windows');
@@ -84,8 +90,8 @@ export function relativeSegments(parent, child) {
   return c.slice(p.length);
 }
 
-export function joinPath(dir, name, sep = '\\') {
-  return dir.endsWith('\\') || dir.endsWith('/') ? `${dir}${name}` : `${dir}${sep}${name}`;
+export function joinPath(dir, name, sep = pathSep(dir)) {
+  return dir.endsWith(sep) || dir.endsWith('/') ? `${dir}${name}` : `${dir}${sep}${name}`;
 }
 
 // Reading statistics: Latin words + CJK characters, for an honest estimate

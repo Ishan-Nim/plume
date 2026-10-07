@@ -5,6 +5,7 @@
   "description": "Plume — a feather-light Markdown viewer",
   "author": "Ishan Nim",
   "license": "MIT",
+  "homepage": "https://github.com/Ishan-Nim/plume",
   "private": true,
   "main": "src/main/main.js",
   "scripts": {
@@ -12,7 +13,9 @@
     "icons": "electron scripts/make-icons.js",
     "start": "node scripts/build.js && electron .",
     "test": "node --test test/*.test.js",
-    "dist": "node scripts/build.js --release && electron-builder --win nsis --x64"
+    "dist": "node scripts/build.js --release && electron-builder --win nsis --x64",
+    "dist:mac": "node scripts/build.js --release && electron-builder --mac",
+    "dist:linux": "node scripts/build.js --release && electron-builder --linux"
   },
   "devDependencies": {
     "dompurify": "^3.4.16",
@@ -45,11 +48,24 @@
       "resources/icon.png",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "out/renderer/THIRD_PARTY_NOTICES.txt",
+        "to": "THIRD_PARTY_NOTICES.txt"
+      }
+    ],
     "asar": true,
     "electronLanguages": [
       "en-US",
       "ja"
     ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
     "win": {
       "target": [
         {
@@ -60,7 +76,25 @@
         }
       ],
       "icon": "resources/icon.ico",
-      "executableName": "Plume"
+      "executableName": "Plume",
+      "fileAssociations": [
+        {
+          "ext": [
+            "md",
+            "markdown",
+            "mdown",
+            "mkd",
+            "mkdn",
+            "mdwn",
+            "mdtxt",
+            "mdtext"
+          ],
+          "name": "Plume.Markdown",
+          "description": "Markdown Document",
+          "role": "Viewer",
+          "icon": "resources/md-file.ico"
+        }
+      ]
     },
     "nsis": {
       "oneClick": true,
@@ -72,23 +106,73 @@
       "include": "resources/installer.nsh",
       "artifactName": "Plume-Setup-${version}.${ext}"
     },
-    "fileAssociations": [
-      {
-        "ext": [
-          "md",
-          "markdown",
-          "mdown",
-          "mkd",
-          "mkdn",
-          "mdwn",
-          "mdtxt",
-          "mdtext"
-        ],
-        "name": "Plume.Markdown",
-        "description": "Markdown Document",
-        "role": "Viewer",
-        "icon": "resources/md-file.ico"
-      }
-    ]
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "Plume-${version}-mac-${arch}.${ext}",
+      "fileAssociations": [
+        {
+          "ext": [
+            "md",
+            "markdown",
+            "mdown",
+            "mkd",
+            "mkdn",
+            "mdwn",
+            "mdtxt",
+            "mdtext"
+          ],
+          "name": "Markdown Document",
+          "description": "Markdown Document",
+          "role": "Viewer"
+        }
+      ]
+    },
+    "dmg": {
+      "artifactName": "Plume-${version}-mac-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Office",
+      "icon": "resources/icon.png",
+      "maintainer": "Ishan Nim <ishan.nim@security-pool.io>",
+      "synopsis": "A feather-light Markdown viewer",
+      "artifactName": "Plume-${version}-linux-${arch}.${ext}",
+      "mimeTypes": [
+        "text/markdown"
+      ]
+    }
   }
 }
