@@ -1,0 +1,65 @@
+'use strict';
+
+// The only bridge between the sandboxed renderer and the main process.
+// Exposes a small, explicit API — no raw ipcRenderer, no Node.
+
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
+
+const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
+
+function subscribe(channel) {
+  return callback => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  };
+}
+
+contextBridge.exposeInMainWorld('plume', {
+  init: () => invoke('app:init'),
+
+  loadDoc: p => invoke('doc:load', p),
+  readNote: p => invoke('doc:read', p),
+  resolveLink: href => invoke('link:resolve', href),
+  openFile: p => invoke('link:openFile', p),
+  openExternal: url => invoke('link:external', url),
+  resolveWiki: (fromFile, targets) => invoke('wiki:resolve', fromFile, targets),
+  listDir: dir => invoke('dir:list', dir),
+
+  setSettings: patch => invoke('settings:set', patch),
+  removeRecent: p => invoke('recent:remove', p),
+
+  openDialog: () => invoke('app:openDialog'),
+  openPaths: paths => invoke('app:openPaths', paths),
+  newWindow: () => invoke('app:newWindow'),
+  about: () => invoke('app:about'),
+  defaultStatus: () => invoke('app:defaultStatus'),
+  openDefaultApps: () => invoke('app:openDefaultApps'),
+
+  closeWindow: () => invoke('win:close'),
+  toggleFullscreen: () => invoke('win:fullscreen'),
+  toggleDevTools: () => invoke('win:devtools'),
+
+  copyText: text => invoke('clipboard:write', text),
+  showInFolder: p => invoke('shell:showInFolder', p),
+  openInEditor: p => invoke('shell:openInEditor', p),
+  openWith: p => invoke('shell:openWith', p),
+  openInObsidian: p => invoke('shell:openInObsidian', p),
+  print: () => invoke('doc:print'),
+  exportPdf: () => invoke('doc:exportPdf'),
+
+  pathForFile: file => {
+    try {
+      return webUtils.getPathForFile(file) || null;
+    } catch {
+      return null;
+    }
+  },
+
+  onSettings: subscribe('settings:changed'),
+  onDocChanged: subscribe('doc:changed'),
+  onDocMissing: subscribe('doc:missing'),
+  onDirChanged: subscribe('dir:changed'),
+  onOpenPath: subscribe('open-path'),
+  onCommand: subscribe('command'),
+});

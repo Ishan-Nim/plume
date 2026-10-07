@@ -1,0 +1,94 @@
+{
+  "name": "plume",
+  "productName": "Plume",
+  "version": "1.0.0",
+  "description": "Plume — a feather-light Markdown viewer",
+  "author": "Ishan Nim",
+  "license": "MIT",
+  "private": true,
+  "main": "src/main/main.js",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "icons": "electron scripts/make-icons.js",
+    "start": "node scripts/build.js && electron .",
+    "test": "node --test test/*.test.js",
+    "dist": "node scripts/build.js --release && electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "dompurify": "^3.4.16",
+    "electron": "^44.6.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "highlight.js": "^11.12.0",
+    "katex": "^0.19.0",
+    "markdown-it": "^15.0.2",
+    "markdown-it-deflist": "^4.0.0",
+    "markdown-it-emoji": "^3.1.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-front-matter": "^0.2.4",
+    "markdown-it-mark": "^4.0.0",
+    "markdown-it-task-lists": "^2.1.1",
+    "markdown-it-texmath": "^1.0.0",
+    "mermaid": "^12.1.0"
+  },
+  "build": {
+    "appId": "app.plume.viewer",
+    "productName": "Plume",
+    "copyright": "Copyright © 2026 Ishan Nim",
+    "directories": {
+      "buildResources": "resources",
+      "output": "release"
+    },
+    "files": [
+      "src/main/**/*",
+      "out/**/*",
+      "resources/icon.png",
+      "package.json"
+    ],
+    "asar": true,
+    "electronLanguages": [
+      "en-US",
+      "ja"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico",
+      "executableName": "Plume"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Plume",
+      "deleteAppDataOnUninstall": false,
+      "include": "resources/installer.nsh",
+      "artifactName": "Plume-Setup-${version}.${ext}"
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown",
+          "mdown",
+          "mkd",
+          "mkdn",
+          "mdwn",
+          "mdtxt",
+          "mdtext"
+        ],
+        "name": "Plume.Markdown",
+        "description": "Markdown Document",
+        "role": "Viewer",
+        "icon": "resources/md-file.ico"
+      }
+    ]
+  }
+}

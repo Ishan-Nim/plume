@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-width="normal" data-font="sans">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src file: data: blob: https: http:; media-src file: https: http:; font-src 'self' data:; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri file:">
+  <meta name="color-scheme" content="light dark">
+  <title>Plume</title>
+  <link rel="stylesheet" href="vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="renderer.js" defer></script>
+</head>
+<body class="booting is-welcome no-doc">
+  <header class="titlebar">
+    <div class="tb-group tb-left">
+      <button id="btn-sidebar" class="icon-btn" type="button" title="Toggle sidebar (Ctrl+\)" aria-label="Toggle sidebar" data-icon="sidebar"></button>
+      <button id="btn-back" class="icon-btn" type="button" title="Back (Alt+←)" aria-label="Back" data-icon="back" disabled></button>
+      <button id="btn-forward" class="icon-btn" type="button" title="Forward (Alt+→)" aria-label="Forward" data-icon="forward" disabled></button>
+    </div>
+    <div id="title" class="tb-title">
+      <span id="crumb-dir" class="crumb-dir"></span>
+      <span class="crumb-sep">/</span>
+      <span id="crumb-file" class="crumb-file">Plume</span>
+    </div>
+    <div class="tb-group tb-right">
+      <button id="btn-find" class="icon-btn needs-doc" type="button" title="Find (Ctrl+F)" aria-label="Find" data-icon="search"></button>
+      <button id="btn-reading" class="icon-btn" type="button" title="Reading settings" aria-label="Reading settings" aria-haspopup="true" aria-expanded="false" data-icon="type" data-size="18"></button>
+      <button id="btn-more" class="icon-btn" type="button" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false" data-icon="more" data-size="18"></button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar" aria-label="Sidebar">
+      <div class="sidebar-tabs" role="tablist">
+        <button class="sidebar-tab active" type="button" role="tab" data-tab="files" data-icon="folder" data-size="15">Files</button>
+        <button class="sidebar-tab" type="button" role="tab" data-tab="outline" data-icon="outline" data-size="15">Outline</button>
+      </div>
+      <section class="sidebar-panel" data-panel="files">
+        <div class="panel-head">
+          <span id="tree-title" class="panel-title"></span>
+          <button id="btn-tree-up" class="icon-btn small" type="button" title="Parent folder" aria-label="Parent folder" data-icon="folderUp" data-size="15" disabled></button>
+          <button id="btn-tree-refresh" class="icon-btn small" type="button" title="Refresh" aria-label="Refresh" data-icon="refresh" data-size="14"></button>
+        </div>
+        <div id="tree" class="tree" role="tree"></div>
+      </section>
+      <section class="sidebar-panel" data-panel="outline" hidden>
+        <nav id="outline" class="outline" aria-label="Outline"></nav>
+        <div id="outline-footer" class="panel-footer"></div>
+      </section>
+      <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize"></div>
+    </aside>
+
+    <main id="viewer" class="viewer" tabindex="-1">
+      <div id="findbar" class="findbar" hidden>
+        <span class="find-icon" data-icon="search" data-size="15"></span>
+        <input id="find-input" type="text" placeholder="Find in document" spellcheck="false" autocomplete="off" aria-label="Find in document">
+        <span id="find-count" class="find-count"></span>
+        <button id="find-prev" class="icon-btn small" type="button" title="Previous (Shift+Enter)" aria-label="Previous match" data-icon="up"></button>
+        <button id="find-next" class="icon-btn small" type="button" title="Next (Enter)" aria-label="Next match" data-icon="down"></button>
+        <button id="find-close" class="icon-btn small" type="button" title="Close (Esc)" aria-label="Close find" data-icon="close"></button>
+      </div>
+
+      <div id="banner" class="banner" hidden>
+        <span class="banner-text"></span>
+        <button id="banner-close" class="icon-btn small" type="button" aria-label="Dismiss" data-icon="close"></button>
+      </div>
+
+      <article id="doc" class="markdown-body"></article>
+
+      <section id="welcome" class="welcome">
+        <div class="welcome-inner">
+          <div class="welcome-logo" data-logo></div>
+          <h1>Plume</h1>
+          <p class="tagline">A feather-light Markdown viewer.</p>
+          <button id="btn-welcome-open" class="primary-btn" type="button" data-icon="folderOpen">Open file <kbd>Ctrl O</kbd></button>
+          <p class="hint">or drop a Markdown file anywhere in this window</p>
+          <div id="default-banner" class="default-banner" hidden>
+            <span>Open <b>.md</b> files with a double-click — make Plume your default viewer.</span>
+            <button id="btn-default" class="ghost-btn" type="button">Set as default…</button>
+          </div>
+          <div id="recent" class="recent" hidden>
+            <h2>Recent</h2>
+            <ul id="recent-list" class="recent-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="pop-reading" class="popover reading" role="dialog" aria-label="Reading settings" hidden>
+    <div class="pop-row">
+      <span class="pop-label">Theme</span>
+      <div class="segmented">
+        <button type="button" data-set="theme:system" data-icon="monitor" data-size="15" title="Follow Windows">Auto</button>
+        <button type="button" data-set="theme:light" data-icon="sun" data-size="15">Light</button>
+        <button type="button" data-set="theme:dark" data-icon="moon" data-size="15">Dark</button>
+      </div>
+    </div>
+    <div class="pop-row">
+      <span class="pop-label">Text size</span>
+      <div class="stepper">
+        <button id="font-smaller" type="button" class="icon-btn small" aria-label="Smaller text" data-icon="minus"></button>
+        <button id="font-size-value" type="button" class="stepper-value" title="Reset to 16px">16px</button>
+        <button id="font-larger" type="button" class="icon-btn small" aria-label="Larger text" data-icon="plus"></button>
+      </div>
+    </div>
+    <div class="pop-row">
+      <span class="pop-label">Width</span>
+      <div class="segmented">
+        <button type="button" data-set="width:narrow">Narrow</button>
+        <button type="button" data-set="width:normal">Normal</button>
+        <button type="button" data-set="width:wide">Wide</button>
+        <button type="button" data-set="width:full">Full</button>
+      </div>
+    </div>
+    <div class="pop-row">
+      <span class="pop-label">Font</span>
+      <div class="segmented">
+        <button type="button" data-set="font:sans">Sans</button>
+        <button type="button" data-set="font:serif" class="serif">Serif</button>
+      </div>
+    </div>
+    <div class="pop-row">
+      <span class="pop-label" title="When on, a single newline starts a new line — like Obsidian. When off, it follows strict CommonMark.">Line breaks</span>
+      <button id="toggle-linebreaks" type="button" class="switch" role="switch" aria-checked="true">
+        <span class="switch-text">Obsidian style</span><span class="switch-track"><span class="switch-thumb"></span></span>
+      </button>
+    </div>
+  </div>
+
+  <div id="menu-more" class="popover menu" role="menu" hidden></div>
+
+  <div id="lightbox" class="lightbox" hidden>
+    <img alt="">
+    <div class="lightbox-caption"></div>
+  </div>
+  <div id="link-status" class="link-status"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div class="drop-overlay"><div class="drop-card" data-icon="file" data-size="28"><span>Drop to open</span></div></div>
+</body>
+</html>

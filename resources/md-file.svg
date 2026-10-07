@@ -1,0 +1,7 @@
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+<path d="M56 16h104l56 56v156a12 12 0 0 1-12 12H56a12 12 0 0 1-12-12V28a12 12 0 0 1 12-12Z" fill="#fff" stroke="#c9c6d6" stroke-width="6"/>
+<path d="M160 16v44a12 12 0 0 0 12 12h44" fill="#ece8fb" stroke="#c9c6d6" stroke-width="6" stroke-linejoin="round"/>
+<rect x="44" y="150" width="172" height="62" fill="#6E56CF"/>
+<text x="130" y="196" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="700" fill="#fff" letter-spacing="2">MD</text>
+<path d="M78 80h64M78 104h96M78 128h80" stroke="#b9b3d6" stroke-width="10" stroke-linecap="round"/>
+</svg>
