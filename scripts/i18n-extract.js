@@ -23,8 +23,15 @@ const PAGES = ['index.html', 'download.html', 'app.html', '404.html', 'docs.html
 const BLOCK = 'p|li|h1|h2|h3|h4|figcaption|td|th|label|summary|option|blockquote';
 const INLINE = 'a|button|span|b';
 
+// A release number is not a translation. It is replaced with {v} so one entry
+// keeps working after a version bump instead of orphaning every string that
+// mentions the release; i18n.js puts the real number back when it applies one.
 function normalise(html) {
-  return html.replace(/\s+/g, ' ').trim();
+  return html
+    .replace(/=""/g, '')
+    .replace(/\d+\.\d+\.\d+(?:\.\d+)?/g, '{v}')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Text that is not worth translating, or must not be. */
@@ -81,7 +88,10 @@ for (const page of PAGES) {
   const inlineRe = new RegExp(`<(${INLINE})\\b[^>]*>([\\s\\S]*?)</\\1>`, 'gi');
   m = inlineRe.exec(html);
   while (m) {
-    if (!inside(m.index) && !new RegExp(`<(${BLOCK}|${INLINE})\\b`, 'i').test(m[2])) {
+    // Only a block child disqualifies an inline element. Inline children do
+    // not: "<b>New</b> Plume 1.3.1 is out" is one phrase, and treating it as
+    // several left it in English in every language. i18n.js walks the same way.
+    if (!inside(m.index) && !new RegExp(`<(${BLOCK})\\b`, 'i').test(m[2])) {
       remember(normalise(m[2]), page);
     }
     m = inlineRe.exec(html);
@@ -94,6 +104,40 @@ for (const page of PAGES) {
     remember(normalise(meta[1]), page + ' <meta>');
   }
 }
+
+// The download card is built in site/assets/site.js rather than written into a
+// page, so no amount of reading HTML will find its words. They are listed here
+// in the shape the DOM ends up holding — entities decoded, the release number
+// replaced by {v} — so they are translated like everything else.
+const BUILT_IN_JS = [
+  // The hero and call-to-action buttons, relabelled for the visitor's system.
+  'Download for Windows',
+  'Download for macOS',
+  'Download for Linux',
+  'Download Plume',
+
+  'Plume for Windows',
+  'Windows 10 or 11, 64-bit · Plume-Setup-{v}.exe',
+  'Download the installer',
+  'On a Mac or Linux instead? <a href="#mac">macOS</a> · <a href="#linux">Linux</a>',
+
+  'Plume for macOS',
+  'Apple silicon (M1 and later) · Plume-{v}-mac-arm64.dmg',
+  'Download for Apple silicon',
+  'Got an Intel Mac? <a href="/api/download?file=Plume-{v}-mac-x64.dmg">Download the Intel build</a> · <a href="#mac">all macOS files</a>',
+
+  'Plume for Linux',
+  'x86-64 · Plume-{v}-linux-x86_64.AppImage',
+  'Download the AppImage',
+  'Debian or Ubuntu? <a href="/api/download?file=Plume-{v}-linux-amd64.deb">Download the .deb</a> · <a href="#linux">all Linux files</a>',
+
+  'Pick your system',
+  'Plume {v} runs on Windows, macOS and Linux',
+  'See all downloads',
+  '<a href="#win">Windows</a> · <a href="#mac">macOS</a> · <a href="#linux">Linux</a>',
+];
+
+for (const text of BUILT_IN_JS) remember(normalise(text), 'download.html <script>');
 
 const list = [...strings.keys()];
 const words = list.reduce((n, s) => n + s.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length, 0);

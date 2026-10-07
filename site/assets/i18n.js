@@ -68,8 +68,32 @@
     return 'en';
   }
 
+  // An icon carries no words, and a release number is not a translation: both
+  // are taken out of the key so one dictionary entry keeps working across
+  // releases and so a key matches what scripts/i18n-extract.js wrote.
+  function icons(html) { return String(html).match(/<svg[\s\S]*?<\/svg>/gi) || []; }
+  function versions(html) { return String(html).match(/\d+\.\d+\.\d+(?:\.\d+)?/g) || []; }
+
   function normalise(html) {
-    return String(html).replace(/\s+/g, ' ').trim();
+    return String(html)
+      .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
+      // The DOM writes a valueless attribute as name=""; the source writes the
+      // bare name. Collapse both so a key built either way is the same key.
+      .replace(/=""/g, '')
+      .replace(/\d+\.\d+\.\d+(?:\.\d+)?/g, '{v}')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /** Puts back what normalise() took out, using the English the page shows. */
+  function restore(value, source) {
+    var found = versions(source);
+    var i = 0;
+    var filled = String(value).replace(/\{v\}/g, function () {
+      return found.length ? (found[i++] || found[found.length - 1]) : '{v}';
+    });
+    // Every icon on this site leads its phrase, so they go back at the front.
+    return icons(source).join('') + filled;
   }
 
   // The same elements the extractor collects, in the same order.
@@ -86,26 +110,29 @@
       return false;
     }
 
-    function apply(nodes, isBlock) {
+    function apply(nodes) {
       for (var i = 0; i < nodes.length; i += 1) {
         var node = nodes[i];
         if (node.closest('script, style, pre, svg, [data-no-i18n]')) continue;
-        // A block holding another block is a wrapper; its children carry the text.
-        if (isBlock && node.querySelector(BLOCK)) continue;
-        if (!isBlock && (node.querySelector(BLOCK) || node.querySelector(INLINE))) continue;
+        // A node holding a block element is a wrapper; its children carry the
+        // text. Inline children are not a reason to skip: a sentence like
+        // "<b>Saved.</b> Nothing else changed." is one string, and refusing to
+        // look it up left every such sentence in English in all nine languages.
+        if (node.querySelector(BLOCK)) continue;
         if (alreadyDone(node)) continue;
 
-        var key = normalise(node.innerHTML);
-        var value = dict[key];
+        var html = node.innerHTML;
+        var value = dict[normalise(html)];
         if (value) {
-          node.innerHTML = value;
+          node.innerHTML = restore(value, html);
           done.push(node);
         }
       }
     }
 
-    apply(scope.querySelectorAll(BLOCK), true);
-    apply(scope.querySelectorAll(INLINE), false);
+    // Blocks first, so a whole sentence wins over a fragment inside it.
+    apply(scope.querySelectorAll(BLOCK));
+    apply(scope.querySelectorAll(INLINE));
   }
 
   var current = 'en';
@@ -116,19 +143,21 @@
     translateIn(dictionary, document.body);
 
     var title = dictionary[normalise(document.title)];
-    if (title) document.title = title;
+    if (title) document.title = restore(title, document.title);
 
     var meta = document.querySelector('meta[name="description"]');
     if (meta) {
-      var described = dictionary[normalise(meta.getAttribute('content'))];
-      if (described) meta.setAttribute('content', described);
+      var said = meta.getAttribute('content');
+      var described = dictionary[normalise(said)];
+      if (described) meta.setAttribute('content', restore(described, said));
     }
   }
 
   /** For strings built in JavaScript rather than written in the page. */
   function t(text) {
     if (!dictionary) return text;
-    return dictionary[normalise(text)] || text;
+    var value = dictionary[normalise(text)];
+    return value ? restore(value, text) : text;
   }
 
   function reveal() {
@@ -162,8 +191,10 @@
   // ---------- the picker ----------
 
   function buildPicker() {
-    var nav = document.querySelector('.nav-links');
-    if (!nav || document.getElementById('lang-picker')) return;
+    // The picker lives in the footer, beside the theme toggle: both are things
+    // you set once, and the header is for getting somewhere.
+    var host = document.getElementById('foot-controls') || document.querySelector('.nav-links');
+    if (!host || document.getElementById('lang-picker')) return;
 
     var wrap = document.createElement('div');
     wrap.className = 'lang-wrap';
@@ -199,11 +230,11 @@
       location.href = url.toString();
     });
 
-    var toggle = nav.querySelector('.theme-toggle');
+    var toggle = host.querySelector('.theme-toggle');
     wrap.appendChild(label);
     wrap.appendChild(select);
-    if (toggle) nav.insertBefore(wrap, toggle);
-    else nav.appendChild(wrap);
+    if (toggle) host.insertBefore(wrap, toggle);
+    else host.appendChild(wrap);
   }
 
   // ---------- start ----------
