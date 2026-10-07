@@ -1,10 +1,33 @@
-# Plume
+<p align="center">
+  <img src="resources/icon.png" width="96" height="96" alt="Plume">
+</p>
 
-**A feather-light Markdown viewer for Windows.** Double-click any `.md` file and it opens instantly — no vault, no project, no editor chrome. Just the document, beautifully set.
+<h1 align="center">Plume</h1>
 
-![Plume icon](resources/icon.png)
+<p align="center">
+  <b>A feather-light Markdown viewer for Windows.</b><br>
+  Double-click any <code>.md</code> file and it opens instantly — no vault, no project, no editor chrome. Just the document, beautifully set.
+</p>
 
-## What it does
+<p align="center">
+  <a href="https://github.com/Ishan-Nim/plume/releases/latest"><b>Download for Windows</b></a> ·
+  <a href="#features">Features</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#keyboard">Keyboard</a> ·
+  <a href="#build-from-source">Build</a>
+</p>
+
+![Plume showing a note with its folder tree, a callout and a table](docs/screenshots/light.png)
+
+## Screenshots
+
+| Dark mode | Code, diagrams & outline |
+|---|---|
+| ![Plume in dark mode](docs/screenshots/dark.png) | ![Highlighted code, a Mermaid diagram and the outline sidebar](docs/screenshots/diagram.png) |
+| **Reading settings** | **Welcome screen** |
+| ![Theme, text size, width, font and line-break settings](docs/screenshots/reading.png) | ![Welcome screen with recent files](docs/screenshots/welcome.png) |
+
+## Features
 
 - **Opens with one double-click.** The installer registers Plume for `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, `.mdtxt`, `.mdtext`. A second file opens in a new window of the already-running app — no cold start.
 - **Reads Obsidian notes properly.** `[[wiki links]]`, `[[Note#Heading|alias]]`, `![[image.png|300]]`, `![[Note#Section]]` transclusion, callouts (`> [!tip]`, foldable `> [!warning]-`), `==highlights==`, `#tags`, `%%comments%%`, `^block` ids, front-matter Properties, and Obsidian-style line breaks (toggleable).
@@ -19,16 +42,20 @@
 
 ## Install
 
-Run `release\Plume-Setup-1.0.0.exe`. It installs per-user (no admin prompt) and adds Start-menu and desktop shortcuts.
+1. Download `Plume-Setup-<version>.exe` from [Releases](https://github.com/Ishan-Nim/plume/releases/latest) (or build it yourself, below).
+2. Run it. Plume installs for all users in `C:\Program Files\Plume` — Windows asks for administrator approval once — and adds Start-menu and desktop shortcuts.
+
+Requires Windows 10 or 11, 64-bit. Uninstall from **Settings → Apps → Installed apps**.
 
 ### Make Plume the default for .md
 
-Windows only lets *you* pick default apps. Either:
+Windows only lets *you* choose default apps, so this is one click on your side. Any of these works:
 
-1. Right-click any `.md` file → **Open with** → **Choose another app** → **Plume** → **Always**, or
-2. In Plume, open **⋯ → Make Plume the default for .md** (jumps to Settings → Default apps → Plume).
+- Right-click any `.md` file → **Open with** → **Choose another app** → **Plume** → **Always**.
+- **Settings → Apps → Default apps**, type `.md` in *Set a default for a file type*, and pick **Plume**.
+- In Plume, open **⋯ → Make Plume the default for .md** — it jumps straight to Plume's page in Settings.
 
-After that, a double-click opens Markdown files straight into Plume.
+After that, a double-click opens Markdown files straight into Plume. Plume also appears in the right-click **Open with** menu for every Markdown extension.
 
 ## Keyboard
 
@@ -54,7 +81,7 @@ npm install
 npm start        # run in development
 npm test         # unit tests
 npm run icons    # re-render icons from resources/*.svg
-npm run dist     # build release/Plume-Setup-<version>.exe
+npm run dist     # build release/Plume-Setup-<version>.exe (per-machine installer)
 ```
 
 Visual smoke test (renders a document in the real app and saves a screenshot):
@@ -62,6 +89,8 @@ Visual smoke test (renders a document in the real app and saves a screenshot):
 ```bash
 PLUME_OUT=shot.png npx electron test/e2e/capture.js test/fixtures/vault/kitchen-sink.md
 ```
+
+The screenshots above come from the sample notes in [`docs/demo-notebook`](docs/demo-notebook), rendered by that harness.
 
 ## Project layout
 
@@ -71,4 +100,9 @@ src/renderer/   UI — markdown pipeline, DOM enhancements, find, sidebar, style
 resources/      icons (SVG sources + generated ICO/PNG), NSIS installer additions
 scripts/        build + icon generation
 test/           unit tests, e2e capture harness, fixture vault
+docs/           screenshots and the demo notebook they are taken from
 ```
+
+## Security
+
+Markdown files are untrusted input. Plume renders them in a sandboxed, context-isolated window with a strict Content-Security-Policy; HTML is sanitised with DOMPurify, scripts never run, external links open in your browser, and links to local files only open documents, images and media — programs, scripts and shortcuts are only ever revealed in File Explorer.
