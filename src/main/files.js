@@ -20,6 +20,26 @@ const NO_VAULT_MAX_DEPTH = 3;
 
 const isWin = process.platform === 'win32';
 
+// File types a link inside a document may open in their default app. This is
+// an allowlist: programs, scripts, shortcuts, HTML/SVG and anything unknown
+// are only ever revealed in File Explorer, never launched.
+const OPENABLE_EXTS = new Set(['.pdf', '.txt', '.log', '.csv', '.tsv', '.json', '.yaml', '.yml',
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif', '.mp3', '.wav', '.ogg', '.flac', '.m4a',
+  '.mp4', '.mov', '.webm', '.mkv', '.avi', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
+  '.odt', '.ods', '.odp', '.rtf', '.epub']);
+
+// Windows drops trailing dots/spaces and reads "name:stream" as an NTFS
+// alternate data stream, so "run.cmd." or "run.cmd::$DATA" would get past an
+// extension check yet still launch run.cmd. Such names are never opened.
+function isAmbiguousWindowsName(abs) {
+  const rest = abs.slice(path.win32.parse(abs).root.length);
+  return rest.includes(':') || /[. ]$/.test(path.win32.basename(abs));
+}
+
+function isOpenableFromLink(abs) {
+  return !isAmbiguousWindowsName(abs) && OPENABLE_EXTS.has(path.extname(abs).toLowerCase());
+}
+
 function isMarkdown(p) {
   return MD_EXTS.has(path.extname(p).toLowerCase());
 }
@@ -260,6 +280,9 @@ function clearCaches() {
 
 module.exports = {
   MD_EXTS,
+  OPENABLE_EXTS,
+  isAmbiguousWindowsName,
+  isOpenableFromLink,
   IMAGE_EXTS,
   MAX_DOC_BYTES,
   isMarkdown,

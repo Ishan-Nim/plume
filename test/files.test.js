@@ -90,3 +90,21 @@ test('resolveWiki finds notes and attachments across the vault', async () => {
 
   assert.equal(await files.resolveWiki(SINK, 'Missing note'), null);
 });
+
+test('links never open disguised or non-document files', () => {
+  const win = String.raw;
+  const refused = [win`C:\T\hello.cmd::$DATA`, win`C:\T\hello.cmd:evil`, win`C:\T\hello.cmd.`, win`C:\T\hello.cmd `];
+  for (const p of refused) {
+    assert.ok(files.isAmbiguousWindowsName(p), `ambiguous: ${p}`);
+    assert.ok(!files.isOpenableFromLink(p), `not openable: ${p}`);
+  }
+  const openable = [win`C:\T\report.pdf`, win`C:\T\a.b.c.PNG`, win`\\server\share\doc.pdf`, win`C:\T\notes.txt`];
+  for (const p of openable) {
+    assert.ok(!files.isAmbiguousWindowsName(p), `plain: ${p}`);
+    assert.ok(files.isOpenableFromLink(p), `openable: ${p}`);
+  }
+  const folderOnly = [win`C:\T\run.exe`, win`C:\T\HELLO~1.CMD`, win`C:\T\page.html`, win`C:\T\pic.svg`, win`C:\T\x.lnk`, win`C:\T\noext`];
+  for (const p of folderOnly) {
+    assert.ok(!files.isOpenableFromLink(p), `folder only: ${p}`);
+  }
+});

@@ -28,12 +28,6 @@ const THEME = {
   dark: { chrome: '#18181b', symbol: '#a4a4ae', bg: '#1e1e22' },
 };
 
-// Extensions we never hand to the OS from a link inside a document.
-const DANGEROUS_EXTS = new Set(['.exe', '.com', '.bat', '.cmd', '.ps1', '.psm1', '.vbs', '.vbe',
-  '.js', '.jse', '.wsf', '.wsh', '.msi', '.msp', '.scr', '.pif', '.lnk', '.hta', '.cpl', '.jar',
-  '.reg', '.inf', '.application', '.appref-ms', '.url', '.dll', '.sys', '.gadget', '.msc', '.scf',
-  '.settingcontent-ms', '.library-ms', '.appx', '.msix', '.appinstaller', '.sh', '.py', '.pyw']);
-
 /** @type {Map<number, {win: BrowserWindow, filePath: string|null, initialPath: string|null, watcher: fs.FSWatcher|null, timer: any, stamp: string}>} */
 const windows = new Map();
 const pendingOpen = [];
@@ -478,23 +472,33 @@ handle('link:resolve', async (_ctx, href) => {
 // Non-Markdown local file linked from a document: ask before handing it to the OS.
 handle('link:openFile', async (ctx, p) => {
   const abs = path.resolve(str(p));
-  const ext = path.extname(abs).toLowerCase();
   const name = path.basename(abs);
+  if (files.isAmbiguousWindowsName(abs)) {
+    await dialog.showMessageBox(ctx.win, {
+      type: 'warning',
+      buttons: ['OK'],
+      title: 'Plume',
+      message: 'Plume will not open this link.',
+      detail: `“${name}” is not a plain file name (it uses a stream suffix or trailing dot), a trick used to disguise programs.`,
+      noLink: true,
+    });
+    return true;
+  }
   let isDirectory = false;
   try { isDirectory = fs.statSync(abs).isDirectory(); } catch { return false; }
   if (isDirectory) {
     await shell.openPath(abs);
     return true;
   }
-  if (DANGEROUS_EXTS.has(ext)) {
+  if (!files.isOpenableFromLink(abs)) {
     const { response } = await dialog.showMessageBox(ctx.win, {
       type: 'warning',
       buttons: ['Show in folder', 'Cancel'],
       defaultId: 1,
       cancelId: 1,
       title: 'Plume',
-      message: `“${name}” is a program or script.`,
-      detail: 'Plume will not run it from a link. You can reveal it in File Explorer instead.',
+      message: `Plume does not open “${name}” from a link.`,
+      detail: 'Only documents, images and media open directly; programs, scripts and other files are never launched from a document. You can reveal it in File Explorer instead.',
       noLink: true,
     });
     if (response === 0) shell.showItemInFolder(abs);
