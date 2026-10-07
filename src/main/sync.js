@@ -37,6 +37,8 @@ const REFUSED_EXT = new Set([
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 2000;
+// Enough to show somebody what is being left behind, not enough to matter.
+const MAX_SKIPPED_LISTED = 200;
 const MAX_DEPTH = 10;
 const SKIP_DIR = /^[.]|^node_modules$|^__pycache__$|^\$RECYCLE/i;
 
@@ -112,7 +114,12 @@ async function walk(dir, root, out, depth = 0) {
 
     const why = refuse(full, stat.size);
     if (why) {
-      out.skipped.push({ localPath: full, reason: why });
+      // Counted always, listed only up to a point. Both caps in walk() key on
+      // files.length, so a folder of nothing but non-syncable files — a photo
+      // archive, a Steam library — kept neither of them and allocated one
+      // object per file, on every rescan, for files it would never send.
+      out.skippedTotal = (out.skippedTotal || 0) + 1;
+      if (out.skipped.length < MAX_SKIPPED_LISTED) out.skipped.push({ localPath: full, reason: why });
       continue;
     }
     out.files.push({
@@ -287,7 +294,7 @@ async function runOnce() {
       status: fitting.length ? 'syncing' : 'idle',
       total: fitting.length,
       done: 0,
-      skipped: found.skipped.length,
+      skipped: found.skippedTotal || 0,
       wontFit: tooBig.length,
     });
 
@@ -309,7 +316,7 @@ async function runOnce() {
       status: 'idle',
       folder,
       lastSyncAt: new Date().toISOString(),
-      message: describeFolder(found.skipped.length, tooBig),
+      message: describeFolder(found.skippedTotal || 0, tooBig),
     });
   } catch (err) {
     set({
@@ -415,7 +422,7 @@ async function preview(folder) {
     files: found.files.length,
     bytes: found.files.reduce((n, f) => n + f.size, 0),
     skipped: found.skipped.slice(0, 40),
-    skippedTotal: found.skipped.length,
+    skippedTotal: found.skippedTotal || 0,
     atLimit: found.files.length >= MAX_FILES,
   };
 }
