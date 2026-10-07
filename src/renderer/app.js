@@ -5,6 +5,7 @@ import { createMarkdown, splitWiki, wikiLabel, CODE_MARK } from './markdown.js';
 import { enhance, rebaseUrls, extractSection, plainText } from './enhance.js';
 import { Finder } from './find.js';
 import { FileTree, Outline } from './sidebar.js';
+import { Vault } from './vault.js';
 import { icon, LOGO } from './icons.js';
 import { el, debounce, basename, dirname, samePath, readingStats, slugify, relativeSegments } from './util.js';
 
@@ -920,8 +921,26 @@ function buildMoreMenu() {
   if (win && state.info.packaged) {
     items.push(menuItem('Make Plume the default for .md', 'star', () => api.openDefaultApps()));
   }
-  items.push(menuItem('About Plume', 'info', () => api.about()));
+  items.push(
+    sep(),
+    menuItem('Plume Vault…', 'cloud', openVault),
+    menuItem('About Plume', 'info', () => api.about()),
+  );
   ui.moreMenu.replaceChildren(...items);
+}
+
+// ---------------------------------------------------------------------------
+// Plume Vault
+
+let vaultPanel = null;
+
+function openVault() {
+  if (!vaultPanel) {
+    vaultPanel = new Vault(api, toast, () => (state.doc
+      ? { path: state.doc.path, name: basename(state.doc.path) }
+      : null));
+  }
+  vaultPanel.open();
 }
 
 // ---------------------------------------------------------------------------

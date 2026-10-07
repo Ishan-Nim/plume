@@ -14,6 +14,7 @@ const { pathToFileURL, fileURLToPath } = require('node:url');
 const { spawn, execFile } = require('node:child_process');
 const settings = require('./settings');
 const files = require('./files');
+const vault = require('./vault');
 
 const APP_ID = 'app.plume.viewer';
 const PROG_ID = 'Plume.Markdown';
@@ -941,6 +942,100 @@ handle('doc:exportPdf', async ctx => {
     return { error: friendlyError(err) };
   }
 });
+
+// ---------------------------------------------------------------------------
+// Plume Vault
+//
+// The renderer never sees the account token: it asks for an action here and
+// gets back a plain result. Errors are passed on as messages the user can act
+// on rather than as stack traces.
+
+function vaultResult(fn) {
+  return async (...args) => {
+    try {
+      return { ok: true, ...(await fn(...args)) };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err && err.message ? err.message : 'The vault is not available.',
+        status: err && err.status,
+        conflict: err && err.conflict,
+        usage: err && err.usage,
+      };
+    }
+  };
+}
+
+function broadcastVault() {
+  const state = vault.publicState();
+  for (const win of liveWindows()) win.webContents.send('vault:changed', state);
+}
+
+handle('vault:state', ctx => ({
+  ...vault.publicState(),
+  link: vault.linkFor(ctx.filePath),
+  syncable: vault.isSyncable(ctx.filePath),
+  suggested: ctx.filePath ? vault.suggestVaultPath(ctx.filePath) : null,
+}));
+
+handle('vault:signUp', vaultResult(async (_ctx, email, password) => {
+  const state = await vault.signUp(str(email, 320), str(password, 400));
+  broadcastVault();
+  return { state };
+}));
+
+handle('vault:signIn', vaultResult(async (_ctx, email, password) => {
+  const state = await vault.signIn(str(email, 320), str(password, 400));
+  broadcastVault();
+  return { state };
+}));
+
+handle('vault:signOut', vaultResult(async () => {
+  const state = vault.signOut();
+  broadcastVault();
+  return { state };
+}));
+
+handle('vault:list', vaultResult(async () => vault.list()));
+
+handle('vault:push', vaultResult(async (ctx, vaultPath, options) => {
+  if (!ctx.filePath) throw new Error('Open a document first.');
+  const result = await vault.push(ctx.filePath, vaultPath ? str(vaultPath, 400) : null, {
+    force: Boolean(options && options.force),
+  });
+  broadcastVault();
+  return result;
+}));
+
+handle('vault:pull', vaultResult(async (ctx, vaultPath) => {
+  const name = str(vaultPath, 400);
+  const defaultDir = ctx.filePath ? path.dirname(ctx.filePath) : app.getPath('documents');
+  const { canceled, filePath } = await dialog.showSaveDialog(ctx.win, {
+    title: 'Save from Plume Vault',
+    defaultPath: path.join(defaultDir, path.basename(name)),
+  });
+  if (canceled || !filePath) return { canceled: true };
+  const result = await vault.pull(name, filePath);
+  openPath(result.localPath);
+  return result;
+}));
+
+handle('vault:keepBoth', vaultResult(async (ctx, vaultPath) => {
+  if (!ctx.filePath) throw new Error('Open a document first.');
+  const copy = await vault.saveConflictCopy(ctx.filePath, str(vaultPath, 400));
+  return { copy };
+}));
+
+handle('vault:remove', vaultResult(async (_ctx, vaultPath) => {
+  const result = await vault.remove(str(vaultPath, 400));
+  broadcastVault();
+  return result;
+}));
+
+handle('vault:unlink', vaultResult(async ctx => {
+  if (!ctx.filePath) throw new Error('Open a document first.');
+  return vault.unlink(ctx.filePath);
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers

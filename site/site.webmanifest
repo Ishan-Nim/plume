@@ -1,0 +1,13 @@
+{
+  "name": "Plume — Markdown viewer",
+  "short_name": "Plume",
+  "description": "A feather-light Markdown viewer for Windows, macOS and Linux.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6e56cf",
+  "icons": [
+    { "src": "/assets/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

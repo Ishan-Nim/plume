@@ -48,6 +48,19 @@ contextBridge.exposeInMainWorld('plume', {
   print: () => invoke('doc:print'),
   exportPdf: () => invoke('doc:exportPdf'),
 
+  vault: {
+    state: () => invoke('vault:state'),
+    signUp: (email, password) => invoke('vault:signUp', email, password),
+    signIn: (email, password) => invoke('vault:signIn', email, password),
+    signOut: () => invoke('vault:signOut'),
+    list: () => invoke('vault:list'),
+    push: (vaultPath, options) => invoke('vault:push', vaultPath, options),
+    pull: vaultPath => invoke('vault:pull', vaultPath),
+    keepBoth: vaultPath => invoke('vault:keepBoth', vaultPath),
+    remove: vaultPath => invoke('vault:remove', vaultPath),
+    unlink: () => invoke('vault:unlink'),
+  },
+
   pathForFile: file => {
     try {
       return webUtils.getPathForFile(file) || null;
@@ -62,4 +75,5 @@ contextBridge.exposeInMainWorld('plume', {
   onDirChanged: subscribe('dir:changed'),
   onOpenPath: subscribe('open-path'),
   onCommand: subscribe('command'),
+  onVaultChanged: subscribe('vault:changed'),
 });

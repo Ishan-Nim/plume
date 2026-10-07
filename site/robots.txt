@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /app.html
+Disallow: /api/
+
+Sitemap: https://plume-md.com/sitemap.xml

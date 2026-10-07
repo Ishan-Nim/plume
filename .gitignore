@@ -3,3 +3,8 @@ out/
 release/
 *.log
 dist/
+
+# The Plume Vault server is a separate, private repository.
+/server/
+.env
+.env.*
