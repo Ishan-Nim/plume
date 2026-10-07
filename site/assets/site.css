@@ -329,7 +329,7 @@ section { padding-block: clamp(64px, 9vw, 108px); }
   max-width: 64ch; margin-inline: auto;
 }
 .section-more a { color: var(--accent); font-weight: 550; }
-.section-more a::after { content: " 92"; }
+.section-more a::after { content: " →"; }
 
 /* ---------- footer ---------- */
 
