@@ -31,6 +31,14 @@ const notebook = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-e2e-edit-notes-'))
 const DOC = path.join(notebook, 'Notes.md');
 const ORIGINAL = ['# Notes', '', 'The first line.', ''].join('\n');
 fs.writeFileSync(DOC, ORIGINAL);
+
+// A second document. Editing one and navigating to the other used to rebind
+// where the next save went, so the second was silently overwritten with the
+// first one's text — no attacker, no warning.
+const OTHER = path.join(notebook, 'Other.md');
+const OTHER_ORIGINAL = ['# Other', '', 'This must survive.', ''].join('\n');
+fs.writeFileSync(OTHER, OTHER_ORIGINAL);
+
 process.argv.push(DOC);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -141,6 +149,43 @@ async function main(win) {
 
   await run('window.confirm = () => true;');
   await sleep(200);
+  await run('document.getElementById("btn-edit").click();');
+  await sleep(600);
+
+  // ---- editing one document and navigating to another ----
+  await run('document.getElementById("btn-edit").click();');
+  await until('!document.getElementById("editor").hidden');
+  await run(`
+    const area = document.getElementById('editor');
+    area.value = ${JSON.stringify(['# Notes', '', 'Edited, never saved anywhere.', ''].join('\n'))};
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+  `);
+  await sleep(400);
+
+  // Say no when asked about leaving: the navigation must not happen at all.
+  await run('window.confirm = () => false;');
+  await run(`
+    document.querySelector('.sidebar-tab[data-tab="files"]').click();
+    await new Promise(r => setTimeout(r, 400));
+    const row = [...document.querySelectorAll('.tree-row')].find(r => r.textContent.trim() === 'Other');
+    if (row) row.click();
+  `);
+  await sleep(1400);
+
+  record('refusing to leave keeps the editor on its own document',
+    await read('!document.getElementById("editor").hidden')
+    && /never saved anywhere/.test(await read('document.getElementById("editor").value') || ''));
+
+  // Now save, and check the OTHER document was not touched.
+  await run('document.getElementById("btn-save").click();');
+  await sleep(1200);
+
+  record('the other document is untouched', fs.readFileSync(OTHER, 'utf8') === OTHER_ORIGINAL,
+    JSON.stringify(fs.readFileSync(OTHER, 'utf8').slice(0, 30)));
+  record('the edit went to the document being edited',
+    /never saved anywhere/.test(fs.readFileSync(DOC, 'utf8')));
+
+  await run('window.confirm = () => true;');
 }
 
 app.on('browser-window-created', (_e, win) => {

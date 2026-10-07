@@ -561,6 +561,20 @@ function handle(channel, fn) {
   });
 }
 
+/**
+ * A path the renderer chose. Reaching a \server path makes Windows sign in to
+ * it with the user's credentials, so one is only ever followed when it stays
+ * on this machine. Attaching the check to the argument type means a new
+ * handler cannot forget it.
+ */
+function localPath(ctx, p, max = 4096) {
+  const abs = path.resolve(str(p, max));
+  if (files.isForeignUnc(abs, ctx ? ctx.filePath : null)) {
+    throw new Error('That path is on another computer.');
+  }
+  return abs;
+}
+
 function str(v, max = 32768) {
   if (typeof v !== 'string' || !v || v.length > max) throw new Error('Invalid argument');
   return v;
@@ -604,7 +618,7 @@ handle('app:init', ctx => {
 });
 
 handle('doc:load', async (ctx, p) => {
-  const requested = path.resolve(str(p));
+  const requested = localPath(ctx, p);
   try {
     const doc = await files.readDocument(requested);
     ctx.filePath = doc.path;
@@ -645,12 +659,23 @@ handle('doc:load', async (ctx, p) => {
  * treat its own save as somebody else changing the file and reload over the
  * editor.
  */
-handle('doc:save', async (ctx, content) => {
+handle('doc:save', async (ctx, requested, content) => {
   if (!ctx.filePath) throw new Error('No document is open.');
   if (typeof content !== 'string') throw new Error('Invalid content');
   if (content.length > 20 * 1024 * 1024) throw new Error('That document is too large to save.');
 
-  const target = ctx.filePath;
+  const target = localPath(ctx, requested);
+
+  // The editor says which document it is editing, and this window says which
+  // one it is showing. If they disagree the reader navigated away mid-edit,
+  // and this text belongs to a document that is no longer open — writing it
+  // here would replace an unrelated file with content meant for another.
+  if (!files.samePath(target, ctx.filePath)) {
+    return { error: 'That document is no longer open in this window.' };
+  }
+  if (!files.isSavable(target)) {
+    return { error: 'Plume saves Markdown and text documents.' };
+  }
   const tmp = `${target}.${process.pid}.plume-tmp`;
 
   try {
@@ -819,7 +844,8 @@ handle('wiki:resolve', async (ctx, fromFile, targets) => {
   return out;
 });
 
-handle('dir:list', async (_ctx, dir) => {
+handle('dir:list', async (ctx, dir) => {
+  localPath(ctx, dir);
   try {
     return await files.listDir(str(dir));
   } catch (err) {
@@ -1126,9 +1152,17 @@ handle('vault:suggest', vaultResult(async (_ctx, paths, rootDir) => {
   return { items, skipped: list.length - items.length };
 }));
 
-handle('vault:collectFolder', vaultResult(async (_ctx, dir, rootDir) => {
-  const root = typeof rootDir === 'string' ? rootDir : path.dirname(path.resolve(str(dir)));
-  const items = await vault.collectFolder(path.resolve(str(dir)), root);
+handle('vault:collectFolder', vaultResult(async (ctx, dir, rootDir) => {
+  const target = localPath(ctx, dir);
+  // Only somewhere the user actually chose: the folder they sync, or the one
+  // the open document lives in. Otherwise this walks the whole disk and
+  // doubles as a list of every document on the machine.
+  const allowed = settings.get().vaultFolder || (ctx.filePath && path.dirname(ctx.filePath));
+  if (!allowed || !files.isWithin(allowed, target)) {
+    throw new Error('That folder is not one Plume is syncing.');
+  }
+  const root = typeof rootDir === 'string' ? path.resolve(rootDir) : path.dirname(target);
+  const items = await vault.collectFolder(target, root);
   return { items };
 }));
 
@@ -1136,7 +1170,9 @@ handle('vault:pushMany', vaultResult(async (ctx, items, options) => {
   const clean = (Array.isArray(items) ? items : [])
     .filter(i => i && typeof i.localPath === 'string' && typeof i.vaultPath === 'string')
     .slice(0, 2000)
-    .map(i => ({ localPath: path.resolve(i.localPath), vaultPath: i.vaultPath }));
+    // cleanVaultPath throws on anything that could step outside the account's
+    // own namespace, so a name typed into the panel cannot reach another vault.
+    .map(i => ({ localPath: localPath(ctx, i.localPath), vaultPath: vault.cleanVaultPath(i.vaultPath) }));
 
   if (!clean.length) throw new Error('Nothing to sync.');
 

@@ -12,8 +12,8 @@
 //   {
 //     "mcpServers": {
 //       "plume-vault": {
-//         "command": "npx",
-//         "args": ["-y", "@plume-md/vault-mcp"],
+//         "command": "node",
+//         "args": ["/path/to/plume/mcp/index.js"],
 //         "env": { "PLUME_TOKEN": "plm_…" }
 //       }
 //     }
@@ -28,6 +28,18 @@
 const readline = require('node:readline');
 
 const API = (process.env.PLUME_API || 'https://plume-md.com/api').replace(/\/+$/, '');
+
+// The token is sent on every request. Anything that can set an environment
+// variable could otherwise point this at a plain-HTTP host and collect it.
+{
+  const parsed = new URL(API);
+  const loopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]';
+  if (parsed.protocol !== 'https:' && !loopback) {
+    process.stderr.write(`[plume-vault] refusing to send your token to ${API} in the clear.
+`);
+    process.exit(2);
+  }
+}
 const TOKEN = process.env.PLUME_TOKEN || '';
 const PROTOCOL_VERSION = '2024-11-05';
 const TIMEOUT_MS = 30_000;
@@ -351,11 +363,22 @@ rl.on('line', (line) => {
     return write({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
   }
 
+  // `null` is valid JSON. Letting it through means handle() throws, the catch
+  // below then throws reading message.id, and the queue every later request
+  // waits on is left rejected — the server answers nothing ever again.
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return write({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } });
+  }
+
   outstanding += 1;
   queue = queue
     .then(() => handle(message))
     .catch((err) => {
-      replyError(message.id, -32603, err && err.message ? err.message : 'Internal error');
+      try {
+        replyError(message.id, -32603, err && err.message ? err.message : 'Internal error');
+      } catch (ignored) {
+        // Never let reporting a failure become the failure.
+      }
     })
     .finally(() => {
       outstanding -= 1;

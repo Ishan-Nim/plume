@@ -20,7 +20,7 @@ contextBridge.exposeInMainWorld('plume', {
 
   loadDoc: p => invoke('doc:load', p),
   readNote: p => invoke('doc:read', p),
-  saveDoc: content => invoke('doc:save', content),
+  saveDoc: (p, content) => invoke('doc:save', p, content),
   resolveLink: href => invoke('link:resolve', href),
   openFile: p => invoke('link:openFile', p),
   openExternal: url => invoke('link:external', url),

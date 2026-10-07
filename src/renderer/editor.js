@@ -118,7 +118,9 @@ export class Editor {
     }
 
     const content = this.area.value;
-    const res = await this.api.saveDoc(content);
+    // The path this editing session started on, not whatever the window has
+    // navigated to since. The main process refuses the write if they disagree.
+    const res = await this.api.saveDoc(this.path, content);
 
     if (!res || res.error) {
       this.toast(`Could not save: ${(res && res.error) || 'unknown problem'}`, 'error');

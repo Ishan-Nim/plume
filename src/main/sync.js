@@ -125,8 +125,13 @@ async function walk(dir, root, out, depth = 0) {
 }
 
 async function sha256Of(file) {
-  const body = await fsp.readFile(file);
-  return crypto.createHash('sha256').update(body).digest('hex');
+  // Streamed, and checked again: the walk's size was taken earlier, and a file
+  // can grow between being listed and being read.
+  const stat = await fsp.stat(file);
+  if (stat.size > MAX_FILE_BYTES) throw new Error('larger than 10 MB');
+  const hash = crypto.createHash('sha256');
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
+  return hash.digest('hex');
 }
 
 // ---------- telling the windows ----------

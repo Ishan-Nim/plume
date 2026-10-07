@@ -214,6 +214,11 @@ function restorePosition(pos) {
 }
 
 async function openDoc(p, { push = true, hash = '', position = null } = {}) {
+  // Navigating away mid-edit used to leave the editor open on one document
+  // while the window moved to another, so the next save wrote the first
+  // document's text over the second. Asked once, here, rather than at each
+  // of the six places that open something.
+  if (!mayLeaveDocument()) return false;
   const res = await api.loadDoc(p);
   if (res.error) {
     toast(`Couldn’t open ${basename(p)}: ${res.error}`, 'error');

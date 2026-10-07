@@ -1,6 +1,26 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no vault, no project, no editor chrome.
 
-**1.3.0 can edit, and can update itself.**
+**1.3.1 fixes a bug in 1.3.0 that could overwrite the wrong document, and closes everything a security audit of 1.3.0 turned up. If you edit in Plume, please update.**
+
+## Fixed in 1.3.1
+
+### Editing could overwrite a different document
+
+In 1.3.0, editing one document and then opening another — from the file tree, with Back, or with `Ctrl+O` — left the editor open on the first document while the window moved to the second. Saving then wrote the first document's text over the second one, with a cheerful "Saved" and no warning. The second document's contents were gone.
+
+A save is now tied to the document the editor actually opened, and is refused if the window has moved on. Opening anything else while there are unsaved changes asks first.
+
+### From the security audit
+
+- **The updater verified an installer and then stopped owning it.** The verified file sat at a predictable path in the shared temp folder until you pressed Install, and nothing re-checked it. Anything running as you could swap it in between — and because the installer asks for administrator rights, that was a way to gain them. The download now goes to a directory created fresh for it, refuses to open anything already there, and is hashed again immediately before it runs.
+- **Only documents are written back to disk.** Plume opens many kinds of text file; it will now only ever *save* Markdown and text. A shell profile, a `.bashrc`, a `.bat` on your PATH or an editor config could previously be overwritten through a flaw in the document renderer.
+- **Redirects during an update are checked at every hop**, rather than being followed wherever they lead.
+- **Reaching a `\server` path** now goes through the same credential check everywhere, rather than on most paths but not all.
+- **A name typed into the vault panel** cannot step outside your own vault, and syncing a folder cannot be pointed at one you did not choose.
+- **The MCP server** refuses to send your token to a plain-HTTP address, and a single malformed line no longer stops it answering.
+- **A development environment variable** that redirects Plume to another server is ignored in the packaged app — it is where your password goes.
+
+Still true, and worth saying plainly: Plume is not code-signed, so the checksums that make an update safe come from the same place as the download itself. That protects against a corrupted or swapped download; it does not protect against someone who controls the release itself. Signing is the fix, and it is next.
 
 ## New in 1.3.0
 
@@ -92,10 +112,10 @@ Open **⋯ → Plume Vault**, create an account with an email and a password, an
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.3.0.exe` |
-| macOS, Apple silicon | `Plume-1.3.0-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.3.0-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.3.0-linux-x86_64.AppImage` or `Plume-1.3.0-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.3.1.exe` |
+| macOS, Apple silicon | `Plume-1.3.1-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.3.1-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.3.1-linux-x86_64.AppImage` or `Plume-1.3.1-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html), which offers the right build for your system.
 
@@ -103,7 +123,7 @@ Or get them from [plume-md.com/download](https://plume-md.com/download.html), wh
 
 ### Windows
 
-Run `Plume-Setup-1.3.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
+Run `Plume-Setup-1.3.1.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 
 To make Plume the default for `.md`, right-click a Markdown file and choose **Open with → Choose another app → Plume → Always**, or use **⋯ → Make Plume the default for .md** inside Plume.
 
@@ -116,5 +136,5 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 ### Linux
 
-- **AppImage:** make it executable with `chmod +x Plume-1.3.0-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.3.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+- **AppImage:** make it executable with `chmod +x Plume-1.3.1-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.3.1-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.

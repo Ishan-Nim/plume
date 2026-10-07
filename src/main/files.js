@@ -361,8 +361,26 @@ function clearCaches() {
   indexCache.clear();
 }
 
+/**
+ * What Plume will write back to disk.
+ *
+ * Deliberately narrower than what it will open. Viewing a file must not be
+ * enough to make it writable: a shell profile, a .bashrc, a .bat on the PATH
+ * or an editor config are all plain text, and overwriting one of them turns a
+ * flaw in the renderer into code that runs as the user. A file with no
+ * extension at all — which is most dotfiles — is never savable.
+ */
+const SAVABLE_EXTS = new Set([...MD_EXTS, ...MD_LIKE_EXTS, ...TEXT_EXTS]);
+
+function isSavable(p) {
+  const ext = path.extname(p).toLowerCase();
+  return Boolean(ext) && SAVABLE_EXTS.has(ext);
+}
+
 module.exports = {
   MD_EXTS,
+  SAVABLE_EXTS,
+  isSavable,
   MD_LIKE_EXTS,
   OPENABLE_EXTS,
   isAmbiguousWindowsName,

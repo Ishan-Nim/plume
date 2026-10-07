@@ -11,7 +11,14 @@ const Module = require('node:module');
 // updater.js asks Electron only for the app version and the shell; outside
 // Electron there is no such module, so a stand-in is installed before it loads.
 const electronStub = {
-  app: { getVersion: () => '1.2.0', getPath: () => require('node:os').tmpdir(), quit: () => {} },
+  app: {
+    getVersion: () => '1.2.0',
+    getPath: () => require('node:os').tmpdir(),
+    quit: () => {},
+    isPackaged: false,
+    // The updater registers a will-quit handler to clean up its download.
+    on: () => {},
+  },
   shell: { openPath: async () => '', openExternal: async () => true },
 };
 
@@ -86,4 +93,24 @@ test('install refuses when there is no verified download', async () => {
 
 test('download refuses when no update has been found', async () => {
   await assert.rejects(updater.download(), /no update to install/i);
+});
+
+test('a redirect is only followed to a GitHub asset host', () => {
+  const allowed = [
+    'https://github.com/Ishan-Nim/plume/releases/download/v1.3.1/x.exe',
+    'https://objects.githubusercontent.com/anything/at/all',
+    'https://release-assets.githubusercontent.com/whatever',
+  ];
+  for (const url of allowed) assert.ok(updater.trustedHop(url), `should follow ${url}`);
+
+  const refused = [
+    'http://objects.githubusercontent.com/x',          // downgraded
+    'https://evil.example/x',
+    'https://objects.githubusercontent.com.evil.example/x',
+    'https://github.com@evil.example/x',
+    'file:///C:/Windows/System32/cmd.exe',
+    '',
+    null,
+  ];
+  for (const url of refused) assert.ok(!updater.trustedHop(url), `should refuse ${url}`);
 });

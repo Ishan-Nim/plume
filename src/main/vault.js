@@ -12,7 +12,24 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { app, safeStorage } = require('electron');
 
-const API = (process.env.PLUME_VAULT_API || 'https://plume-md.com/api').replace(/\/+$/, '');
+// The override is a development affordance. In a packaged build it is ignored:
+// anything running as this user can set an environment variable, and this is
+// where the account password goes.
+function resolveApi() {
+  const DEFAULT = 'https://plume-md.com/api';
+  const override = process.env.PLUME_VAULT_API;
+  if (!override || app.isPackaged) return DEFAULT;
+  try {
+    const url = new URL(override);
+    const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+    if (url.protocol !== 'https:' && !local) return DEFAULT;
+    return override.replace(/\/+$/, '');
+  } catch (err) {
+    return DEFAULT;
+  }
+}
+
+const API = resolveApi();
 const TIMEOUT_MS = 30_000;
 const MAX_PUSH_BYTES = 10 * 1024 * 1024;
 
@@ -194,7 +211,9 @@ function requireSession() {
 }
 
 const MAX_DEPTH = 10;
-const SKIP_DIR = /^[.]|^node_modules$|^__pycache__$/;
+const MAX_COLLECT = 2000;
+const MAX_VAULT_PATH = 400;
+const SKIP_DIR = /^[.]|^node_modules$|^__pycache__$|^[$]RECYCLE/i;
 
 /**
  * Where a file should live in the vault.
@@ -219,10 +238,31 @@ function suggestVaultPath(localPath, rootDir) {
   return trimmed.join('/');
 }
 
+/**
+ * The only shape a vault path may take: relative, forward slashes, no step
+ * outside. suggestVaultPath can never produce anything else, but a name typed
+ * into the panel can, and the server is entitled to assume it cannot.
+ */
+function cleanVaultPath(raw) {
+  const p = String(raw == null ? '' : raw).split('\\').join('/').trim();
+  if (!p || p.length > MAX_VAULT_PATH) throw new Error('That is not a usable name for the vault.');
+  for (let i = 0; i < p.length; i += 1) {
+    const code = p.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) throw new Error('That name contains control characters.');
+  }
+  if (p.startsWith('/') || /^[a-z]:/i.test(p)) throw new Error('A vault name cannot be an absolute path.');
+
+  const parts = p.split('/').filter(Boolean);
+  if (!parts.length || parts.some(seg => seg === '.' || seg === '..')) {
+    throw new Error('A vault name cannot step outside the vault.');
+  }
+  if (parts.length > 12) throw new Error('That path is nested too deeply for the vault.');
+  return parts.join('/');
+}
+
 /** Every syncable document under a folder, with the vault path each would take. */
-async function collectFolder(dir, rootDir, depth = 0) {
-  const found = [];
-  if (depth > MAX_DEPTH) return found;
+async function collectFolder(dir, rootDir, depth = 0, found = []) {
+  if (depth > MAX_DEPTH || found.length >= MAX_COLLECT) return found;
 
   let entries;
   try {
@@ -232,10 +272,11 @@ async function collectFolder(dir, rootDir, depth = 0) {
   }
 
   for (const entry of entries) {
+    if (found.length >= MAX_COLLECT) break;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIR.test(entry.name)) continue;
-      found.push(...(await collectFolder(full, rootDir, depth + 1)));
+      await collectFolder(full, rootDir, depth + 1, found);
     } else if (entry.isFile() && SYNCABLE.has(path.extname(entry.name).toLowerCase())) {
       found.push({ localPath: full, vaultPath: suggestVaultPath(full, rootDir) });
     }
@@ -311,7 +352,7 @@ async function push(localPath, vaultPath, { force = false } = {}) {
   }
 
   const body = await fsp.readFile(localPath);
-  const target = vaultPath || (links[localPath] && links[localPath].vaultPath) || suggestVaultPath(localPath);
+  const target = cleanVaultPath(vaultPath || (links[localPath] && links[localPath].vaultPath) || suggestVaultPath(localPath));
   const known = links[localPath];
 
   const headers = {};
@@ -407,6 +448,7 @@ module.exports = {
   linkFor,
   isSyncable,
   suggestVaultPath,
+  cleanVaultPath,
   collectFolder,
   pushMany,
   SYNCABLE,

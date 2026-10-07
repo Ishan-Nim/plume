@@ -2,15 +2,24 @@
 
 // Updates.
 //
-// Plume is not code-signed, so it cannot use a signing-based update mechanism
-// and must not simply download and run whatever an HTTP response hands it.
-// Instead every release publishes SHA256SUMS.txt alongside the installers, and
-// this refuses to run anything whose hash is not in that file. The hashes come
-// from the same GitHub release over HTTPS, which is not a defence against
-// GitHub itself — but it is a complete defence against a corrupted or
-// truncated download, and against a redirect that swaps the file underneath.
+// Plume is not code-signed, so it cannot rely on a signing-based update
+// mechanism and must not run whatever an HTTP response hands it. Every release
+// publishes SHA256SUMS.txt alongside the installers, and nothing runs unless
+// its hash is in that file.
 //
-// Nothing is ever installed without the user agreeing to it.
+// What that does and does not protect against, plainly:
+//   · a corrupted or truncated download — yes
+//   · a redirect that swaps the file underneath — yes; every hop is checked,
+//     and the bytes are hashed anyway
+//   · an attacker who can rewrite what a predictable temp path contains after
+//     it was verified — yes; the file is re-hashed immediately before it is
+//     handed to the system, and it lives in a directory nobody can pre-create
+//   · an attacker who controls GitHub, or who holds a certificate the system
+//     trusts and can rewrite both the installer and the sums file — NO. The
+//     checksums come from the same place as the binary. Only signing the
+//     manifest with an offline key closes that, and that is worth doing.
+//
+// Nothing is downloaded or installed without the user asking for it.
 
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -20,21 +29,30 @@ const { app, shell } = require('electron');
 
 const REPO = 'Ishan-Nim/plume';
 const LATEST = `https://api.github.com/repos/${REPO}/releases/latest`;
-const DOWNLOAD_HOST = 'github.com';
 const RELEASE_PAGE = `https://github.com/${REPO}/releases/latest`;
+
+// Where a release asset may actually come from, including the hosts GitHub
+// redirects asset downloads to.
+const ASSET_HOSTS = new Set([
+  'github.com',
+  'objects.githubusercontent.com',
+  'release-assets.githubusercontent.com',
+]);
+
+const VERSION_RE = /^\d{1,5}(\.\d{1,5}){0,3}(-[0-9A-Za-z.-]{1,32})?$/;
 
 const TIMEOUT_MS = 20_000;
 const MAX_INSTALLER_BYTES = 400 * 1024 * 1024;
+const MAX_HOPS = 5;
 
-// Windows installs in place. macOS cannot: Squirrel refuses to update an app
-// that is not signed, and pretending otherwise would fail silently after a
-// long download. Linux packages belong to the package manager. On those, an
-// update is an invitation to the download page rather than an install.
+// Windows installs in place. macOS cannot: an unsigned app is not allowed to
+// replace itself, and pretending otherwise would fail after a long download.
+// Linux packages belong to the package manager.
 const CAN_INSTALL = process.platform === 'win32';
 
 let checking = false;
-let found = null;      // { version, notes, url, size }
-let downloaded = null; // path to a verified installer
+let found = null;        // { version, page, installable, url, sumsUrl, size }
+let downloaded = null;   // { path, dir, sha256 }
 
 function installerName(version) {
   return `Plume-Setup-${version}.exe`;
@@ -52,6 +70,28 @@ function compare(a, b) {
   return 0;
 }
 
+/** The first URL of a download: a release asset of this repository, over HTTPS. */
+function trusted(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:'
+      && (parsed.hostname === 'github.com' || parsed.hostname === `objects.github.com`)
+      && parsed.pathname.startsWith(`/${REPO}/releases/download/`);
+  } catch (err) {
+    return false;
+  }
+}
+
+/** Any later hop in that download. Checked per hop rather than delegated. */
+function trustedHop(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && ASSET_HOSTS.has(parsed.hostname);
+  } catch (err) {
+    return false;
+  }
+}
+
 async function getJSON(url) {
   const res = await fetch(url, {
     headers: {
@@ -64,18 +104,6 @@ async function getJSON(url) {
   return res.json();
 }
 
-/** Only ever a release asset of this repository, over HTTPS. */
-function trusted(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'https:'
-      && (parsed.hostname === DOWNLOAD_HOST || parsed.hostname === `objects.${DOWNLOAD_HOST}`)
-      && parsed.pathname.startsWith(`/${REPO}/releases/download/`);
-  } catch (err) {
-    return false;
-  }
-}
-
 /**
  * Asks GitHub what the newest release is. Returns null when this is already
  * the newest, so a quiet check costs the caller nothing.
@@ -86,7 +114,10 @@ async function check({ force = false } = {}) {
   try {
     const release = await getJSON(LATEST);
     const version = String(release.tag_name || '').replace(/^v/, '');
-    if (!version || compare(version, app.getVersion()) <= 0) {
+
+    // A tag becomes part of a file name and a path. Anything that is not a
+    // version is not a release as far as this is concerned.
+    if (!VERSION_RE.test(version) || compare(version, app.getVersion()) <= 0) {
       found = null;
       return null;
     }
@@ -115,15 +146,30 @@ async function check({ force = false } = {}) {
   }
 }
 
+/** Follows redirects by hand, so every hop is checked rather than trusted. */
 async function fetchTrusted(url) {
   if (!trusted(url)) throw new Error('That download is not from the Plume releases.');
-  const res = await fetch(url, {
-    headers: { 'user-agent': `Plume/${app.getVersion()}` },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(10 * 60 * 1000),
-  });
-  if (!res.ok) throw new Error(`Download failed (${res.status}).`);
-  return res;
+
+  let current = url;
+  for (let hop = 0; hop < MAX_HOPS; hop += 1) {
+    const res = await fetch(current, {
+      headers: { 'user-agent': `Plume/${app.getVersion()}` },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(10 * 60 * 1000),
+    });
+
+    if (res.status < 300 || res.status > 399) {
+      if (!res.ok) throw new Error(`Download failed (${res.status}).`);
+      return res;
+    }
+
+    const location = res.headers.get('location');
+    if (!location) throw new Error('That download redirected to nowhere.');
+    const next = new URL(location, current).href;
+    if (!trustedHop(next)) throw new Error('That download was redirected away from GitHub.');
+    current = next;
+  }
+  throw new Error('That download redirected too many times.');
 }
 
 /** The hash the release says this file should have. */
@@ -137,9 +183,25 @@ async function expectedHash(sumsUrl, name) {
   throw new Error('The release does not list a checksum for that installer.');
 }
 
+async function hashFile(file) {
+  const hash = crypto.createHash('sha256');
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
+  return hash.digest('hex');
+}
+
+async function discard() {
+  if (!downloaded) return;
+  await fsp.rm(downloaded.dir, { recursive: true, force: true }).catch(() => {});
+  downloaded = null;
+}
+
 /**
- * Downloads the installer and checks it against the published hash. The file
- * is only kept if it matches; a mismatch is deleted and reported.
+ * Downloads the installer and checks it against the published hash.
+ *
+ * It goes into a directory created fresh for it, opened with a flag that fails
+ * if anything is already there — a predictable name in the shared temp folder
+ * can be pre-created, as a file to be swapped later or as a link pointing
+ * somewhere else entirely.
  */
 async function download(onProgress) {
   if (!found || !found.installable) throw new Error('There is no update to install.');
@@ -147,14 +209,16 @@ async function download(onProgress) {
   const name = installerName(found.version);
   const want = await expectedHash(found.sumsUrl, name);
 
-  const dest = path.join(app.getPath('temp'), `plume-update-${found.version}.exe`);
+  await discard();
+  const dir = await fsp.mkdtemp(path.join(app.getPath('temp'), 'plume-update-'));
+  const dest = path.join(dir, name);
   const res = await fetchTrusted(found.url);
 
   const total = Number(res.headers.get('content-length')) || found.size || 0;
   if (total > MAX_INSTALLER_BYTES) throw new Error('That installer is implausibly large.');
 
   const hash = crypto.createHash('sha256');
-  const handle = await fsp.open(dest, 'w');
+  const handle = await fsp.open(dest, 'wx');
   let read = 0;
 
   try {
@@ -165,28 +229,48 @@ async function download(onProgress) {
       await handle.write(chunk);
       if (onProgress && total) onProgress({ read, total, percent: Math.round((read / total) * 100) });
     }
-  } finally {
-    await handle.close();
+  } catch (err) {
+    await handle.close().catch(() => {});
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+    throw err;
   }
+  await handle.close();
 
-  const got = hash.digest('hex');
-  if (got !== want) {
-    await fsp.rm(dest, { force: true });
+  if (hash.digest('hex') !== want) {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
     throw new Error('The download did not match the published checksum, so it was discarded.');
   }
 
-  downloaded = dest;
+  downloaded = { path: dest, dir, sha256: want };
   return { path: dest, version: found.version, bytes: read };
 }
 
 /**
- * Hands the verified installer to Windows and steps aside. The installer needs
- * Plume closed to replace it, so the app quits once the handoff succeeds.
+ * Hands the verified installer to the system and steps aside.
+ *
+ * The file is hashed again first. Verifying at download time and running at
+ * install time are different moments — minutes apart, with the user in
+ * between — and what runs must be what was checked, not merely something with
+ * the same name.
  */
 async function install() {
-  if (!downloaded || !fs.existsSync(downloaded)) throw new Error('Download the update first.');
+  if (!downloaded) throw new Error('Download the update first.');
 
-  const problem = await shell.openPath(downloaded);
+  let actual;
+  try {
+    actual = await hashFile(downloaded.path);
+  } catch (err) {
+    await discard();
+    throw new Error('The downloaded update is no longer there. Download it again.');
+  }
+
+  if (actual !== downloaded.sha256) {
+    await discard();
+    throw new Error('The downloaded update changed on disk, so it was discarded. Download it again.');
+  }
+
+  const target = downloaded.path;
+  const problem = await shell.openPath(target);
   if (problem) throw new Error(problem);
 
   setTimeout(() => app.quit(), 800);
@@ -206,4 +290,11 @@ function state() {
   };
 }
 
-module.exports = { check, download, install, openReleasePage, state, compare, trusted };
+// Leaving an installer behind is leaving something executable in a temp folder.
+app.on('will-quit', () => {
+  if (downloaded) fs.rmSync(downloaded.dir, { recursive: true, force: true });
+});
+
+module.exports = {
+  check, download, install, openReleasePage, state, compare, trusted, trustedHop, discard,
+};
