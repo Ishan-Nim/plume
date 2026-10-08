@@ -30,18 +30,29 @@
     return d.toLocaleDateString();
   }
 
-  function note(el, text, kind) {
+  // Sentences built here are looked up when they are shown, in whatever
+  // language the page is in; English stands in until i18n.js has its
+  // dictionary. scripts/i18n-extract.js collects every t('…') literal in this
+  // file, so pass one whole literal, never a variable or a sum.
+  function t(text) {
+    return window.plumeI18n ? window.plumeI18n.t(text) : text;
+  }
+
+  function note(el, text, kind, stay) {
     // Make the live region visible before its text changes, or screen readers
     // announce it unreliably.
+    clearTimeout(el._t);
     el.className = 'msg show ' + (kind || 'err');
     el.textContent = text;
-    if (kind === 'ok') {
-      clearTimeout(el._t);
+    if (kind === 'ok' && !stay) {
       el._t = setTimeout(function () { el.className = 'msg'; }, 4000);
     }
   }
 
-  function clearNote(el) { el.className = 'msg'; }
+  function clearNote(el) {
+    clearTimeout(el._t);
+    el.className = 'msg';
+  }
 
   async function api(path, options) {
     var opts = options || {};
@@ -69,9 +80,19 @@
     var res = await api(path, options);
     var data = await res.json().catch(function () { return {}; });
     if (!res.ok || data.ok === false) {
-      throw new Error(data.error || 'Request failed (' + res.status + ').');
+      var err = new Error(data.error || t('Request failed ({n}).').replace('{n}', res.status));
+      err.status = res.status;
+      throw err;
     }
     return data;
+  }
+
+  function post(path, body) {
+    return apiJson(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   }
 
   async function apiRaw(path, options) {

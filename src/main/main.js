@@ -1186,10 +1186,24 @@ handle('vault:pushMany', vaultResult(async (ctx, items, options) => {
   return result;
 }));
 
-handle('vault:signUp', vaultResult(async (_ctx, email, password) => {
-  const state = await vault.signUp(str(email, 320), str(password, 400));
+// Creating an account is two calls: one asks for a code by email, the other
+// spends it. Only the second one signs anybody in.
+handle('vault:signUpStart', vaultResult(async (_ctx, email, password) => (
+  vault.signUpStart(str(email, 320), str(password, 400))
+)));
+
+handle('vault:signUpVerify', vaultResult(async (_ctx, email, code) => {
+  const state = await vault.signUpVerify(str(email, 320), str(code, 32));
   broadcastVault();
   return { state };
+}));
+
+handle('vault:forgot', vaultResult(async (_ctx, email) => vault.forgot(str(email, 320))));
+
+handle('vault:resetWithCode', vaultResult(async (_ctx, email, code, password) => {
+  const { state, note } = await vault.resetWithCode(str(email, 320), str(code, 32), str(password, 400));
+  broadcastVault();
+  return { state, note };
 }));
 
 handle('vault:signIn', vaultResult(async (_ctx, email, password) => {
