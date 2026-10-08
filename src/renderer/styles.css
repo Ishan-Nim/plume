@@ -1336,6 +1336,12 @@ summary.callout-title::-webkit-details-marker { display: none; }
 
 .vault-note { margin: 0; font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
 .vault-hint { font-size: 11.5px; color: var(--text-3); line-height: 1.45; }
+/* These carry the address a code went to, which can be one long unbroken
+   word: let it break anywhere rather than push the sidebar sideways. */
+.vault-note,
+.vault-hint,
+.vault-error,
+.vault-status { overflow-wrap: anywhere; }
 .vault-error {
   margin: 0;
   font-size: 12.5px;

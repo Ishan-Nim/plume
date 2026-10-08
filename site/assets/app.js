@@ -32,8 +32,8 @@
 
   // Sentences built here are looked up when they are shown, in whatever
   // language the page is in; English stands in until i18n.js has its
-  // dictionary. scripts/i18n-extract.js collects every t('…') literal in this
-  // file, so pass one whole literal, never a variable or a sum.
+  // dictionary. scripts/i18n-extract.js collects every quoted literal handed
+  // to t() in this file, so pass one whole literal, never a variable or a sum.
   function t(text) {
     return window.plumeI18n ? window.plumeI18n.t(text) : text;
   }
@@ -47,6 +47,21 @@
     if (kind === 'ok' && !stay) {
       el._t = setTimeout(function () { el.className = 'msg'; }, 4000);
     }
+    if (!kind || kind === 'err') reveal(el);
+  }
+
+  // A message is only any use where it can be seen. The gate's sits at the top
+  // of the panel, and a step can be taller than a phone's screen, so the button
+  // that was pressed may be a long way below it; without this, a refusal
+  // appears out of sight and the button seems to do nothing. It runs after
+  // whatever the caller focuses next has scrolled itself into view, and moves
+  // only as far as it must. CSS keeps it clear of the sticky header.
+  function reveal(el) {
+    var go = function () {
+      if (/\bshow\b/.test(el.className)) el.scrollIntoView({ block: 'nearest' });
+    };
+    if (window.requestAnimationFrame) window.requestAnimationFrame(go);
+    else setTimeout(go, 0);
   }
 
   function clearNote(el) {
@@ -105,58 +120,68 @@
   }
 
   // ---------- sign in / sign up ----------
+  //
+  // The gate shows one thing at a time: the sign-up / sign-in form, the code
+  // that finishes a sign-up, the address a reset code goes to, or that code
+  // with a new password. The address a code was sent to is kept here rather
+  // than read back from a field, so a code is always checked against the
+  // address it went to.
 
   var mode = 'signup';
   var gateMsg = $('gate-msg');
+  var VIEWS = ['auth', 'verify', 'forgot', 'reset'];
+  var pending = '';
+
+  function show(view) {
+    VIEWS.forEach(function (name) { $(name + '-form').hidden = name !== view; });
+    // Switching tabs halfway through a code would leave that code nowhere to go.
+    $('tabs').hidden = view !== 'auth';
+    if (view !== 'verify' && view !== 'reset') stopResend();
+    clearNote(gateMsg);
+  }
+
+  function paintSubmit() {
+    $('auth-submit').textContent = mode === 'signup' ? t('Create my vault') : t('Sign in');
+  }
 
   function setMode(next) {
     mode = next;
     $('tab-signup').setAttribute('aria-pressed', String(next === 'signup'));
     $('tab-login').setAttribute('aria-pressed', String(next === 'login'));
-    $('auth-submit').textContent = next === 'signup' ? 'Create my vault' : 'Sign in';
+    paintSubmit();
     $('password').setAttribute('autocomplete', next === 'signup' ? 'new-password' : 'current-password');
     $('pw-hint').hidden = next !== 'signup';
     // Only offered where it makes sense: there is nothing to reset until there
     // is an account.
     $('forgot-row').hidden = next !== 'login';
-    clearNote(gateMsg);
+    show('auth');
   }
 
   $('tab-signup').addEventListener('click', function () { setMode('signup'); });
   $('tab-login').addEventListener('click', function () { setMode('login'); });
 
-  // ---------- forgotten password ----------
-  //
-  // The answer is deliberately the same whether or not the address has an
-  // account, so this says what it says regardless, and the only error it can
-  // show is one about the service itself.
-  $('forgot').addEventListener('click', async function () {
-    var email = $('email').value.trim();
-    if (!email) {
-      note(gateMsg, 'Type your email address first, then press this again.');
-      $('email').focus();
-      return;
-    }
+  // Every way in ends here: a sign-in, a finished sign-up, a reset by code.
+  async function signedIn(data, message, stay) {
+    state.token = data.token;
+    state.account = data.account;
+    try { localStorage.setItem(TOKEN_KEY, data.token); } catch (e) { /* ignore */ }
+    forgetGate();
+    await showVault();
+    if (message) note($('acct-msg'), message, 'ok', stay);
+  }
 
-    var btn = $('forgot');
-    btn.disabled = true;
-    btn.textContent = 'Sending…';
-    clearNote(gateMsg);
+  // Nothing typed into the gate outlives it: not a password, not a code.
+  function forgetGate() {
+    ['password', 'verify-code', 'reset-code', 'reset-password', 'reset-username'].forEach(function (id) {
+      $(id).value = '';
+    });
+    pending = '';
+    setMode(mode);
+  }
 
-    try {
-      var data = await apiJson('/auth/forgot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email }),
-      });
-      note(gateMsg, data.note || 'If there is an account for that address, a link is on its way.', 'ok');
-    } catch (err) {
-      note(gateMsg, err.message);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Forgot your password?';
-    }
-  });
+  function looksLikeEmail(text) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+  }
 
   $('auth-form').addEventListener('submit', async function (ev) {
     ev.preventDefault();
@@ -165,31 +190,296 @@
     var password = $('password').value;
 
     if (!email || !password) {
-      note(gateMsg, 'Fill in both fields.');
+      note(gateMsg, t('Fill in both fields.'));
       return;
     }
 
     btn.disabled = true;
-    btn.textContent = mode === 'signup' ? 'Creating…' : 'Signing in…';
+    btn.textContent = mode === 'signup' ? t('Sending a code…') : t('Signing in…');
     clearNote(gateMsg);
 
     try {
-      var data = await apiJson('/auth/' + (mode === 'signup' ? 'signup' : 'login'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, password: password }),
-      });
-      state.token = data.token;
-      state.account = data.account;
-      try { localStorage.setItem(TOKEN_KEY, data.token); } catch (e) { /* ignore */ }
-      $('password').value = '';
-      await showVault();
+      if (mode === 'signup') {
+        // Nothing is created yet. The answer is the same whether or not the
+        // address already has a vault — that one gets an email saying so
+        // instead of a code — so the next step is the same either way.
+        var started = await post('/auth/signup/start', { email: email, password: password });
+        askForCode('verify', email, started.minutes);
+      } else {
+        await signedIn(await post('/auth/login', { email: email, password: password }));
+      }
     } catch (err) {
-      note(gateMsg, err.message);
+      note(gateMsg, t(err.message));
     } finally {
       btn.disabled = false;
-      setMode(mode);
+      paintSubmit();
     }
+  });
+
+  // ---------- the code from the email ----------
+
+  function askForCode(view, email, minutes) {
+    pending = email;
+    show(view);
+    $(view + '-email').textContent = email;
+    $(view + '-code').value = '';
+
+    if (view === 'verify') {
+      var ttl = $('verify-ttl');
+      ttl.textContent = minutes ? t('The code works for {n} minutes.').replace('{n}', minutes) : '';
+      ttl.hidden = !minutes;
+    } else {
+      $('reset-username').value = email;
+      $('reset-password').value = '';
+    }
+
+    holdResend($(view + '-resend'));
+    $(view + '-code').focus();
+  }
+
+  // Digits only, however they arrive: typed on a full-width keyboard, pasted
+  // with the space or dash a mail client put in the middle, or filled in by
+  // the browser from the message.
+  function digits(text) {
+    return String(text || '')
+      .replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+      .replace(/\D/g, '')
+      .slice(0, 6);
+  }
+
+  function submitForm(form) {
+    if (form.requestSubmit) form.requestSubmit();
+    else form.dispatchEvent(new Event('submit', { cancelable: true }));
+  }
+
+  ['verify', 'reset'].forEach(function (view) {
+    var input = $(view + '-code');
+
+    function tidy() {
+      var clean = digits(input.value);
+      if (clean !== input.value) input.value = clean;
+      // A whole sign-up code is the whole step, so it goes straight in. A reset
+      // still needs the new password, so that one waits for the button.
+      if (view === 'verify' && clean.length === 6 && !$('verify-submit').disabled) {
+        submitForm($('verify-form'));
+      }
+    }
+
+    // maxlength would cut "123 456" to "123 45" before anything could tidy
+    // it, so a paste is taken in whole and cleaned here instead.
+    input.addEventListener('paste', function (ev) {
+      var text = ev.clipboardData && ev.clipboardData.getData('text');
+      if (!text) return;
+      ev.preventDefault();
+      input.value = digits(text);
+      tidy();
+    });
+    input.addEventListener('input', function (ev) {
+      if (!ev.isComposing) tidy();
+    });
+    input.addEventListener('compositionend', tidy);
+  });
+
+  // A new code replaces the one before it, and the server will not send
+  // another inside a minute anyway, so the button sits that minute out where
+  // it can be seen.
+  var RESEND_WAIT = 60 * 1000;
+  var resendTimer = null;
+
+  function holdResend(btn) {
+    clearInterval(resendTimer);
+    var until = Date.now() + RESEND_WAIT;
+    var tick = function () {
+      // Counted from the clock, not the ticks: a background tab runs timers late.
+      var left = Math.ceil((until - Date.now()) / 1000);
+      if (left > 0) {
+        btn.disabled = true;
+        btn.textContent = t('Resend code in {n} s').replace('{n}', left);
+        return;
+      }
+      clearInterval(resendTimer);
+      resendTimer = null;
+      btn.disabled = false;
+      btn.textContent = t('Resend code');
+    };
+    tick();
+    resendTimer = setInterval(tick, 1000);
+  }
+
+  function stopResend() {
+    clearInterval(resendTimer);
+    resendTimer = null;
+    ['verify-resend', 'reset-resend'].forEach(function (id) {
+      $(id).disabled = false;
+      $(id).textContent = t('Resend code');
+    });
+  }
+
+  async function resend(view, path, body) {
+    holdResend($(view + '-resend'));
+    $(view + '-code').focus();
+    try {
+      await post(path, body);
+      note(gateMsg, t('A new code is on its way. Use the newest one.'), 'ok');
+      reveal(gateMsg);
+    } catch (err) {
+      note(gateMsg, t(err.message));
+    }
+  }
+
+  // ---------- creating an account: the code ----------
+
+  $('verify-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var btn = $('verify-submit');
+    if (btn.disabled) return;
+    var code = digits($('verify-code').value);
+    if (code.length !== 6) {
+      note(gateMsg, t('Enter the 6-digit code from the email.'));
+      $('verify-code').focus();
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = t('Checking…');
+    clearNote(gateMsg);
+
+    try {
+      // The password goes with the code. The vault is created with the one
+      // sent here, not with whatever was sent when the code was asked for, so
+      // a code that reaches this mailbox makes this person's vault, whoever
+      // else may have typed the address in meanwhile.
+      var verified = await post('/auth/signup/verify', {
+        email: pending, code: code, password: $('password').value,
+      });
+      await signedIn(verified, t('Your vault is ready.'));
+    } catch (err) {
+      if (err.status === 409) {
+        // The address got a vault while this code was on its way — most
+        // likely from another tab. Signing in is all that is left to do.
+        var email = pending;
+        setMode('login');
+        $('email').value = email;
+        note(gateMsg, t(err.message));
+        $('password').focus();
+        return;
+      }
+      note(gateMsg, t(err.message));
+      $('verify-code').select();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t('Finish creating my vault');
+    }
+  });
+
+  // The password is still in the hidden form: a new code is a new sign-up
+  // request, and the server checks the password again before sending one.
+  $('verify-resend').addEventListener('click', function () {
+    resend('verify', '/auth/signup/start', { email: pending, password: $('password').value });
+  });
+
+  $('verify-back').addEventListener('click', function () {
+    setMode('signup');
+    $('email').focus();
+    $('email').select();
+  });
+
+  // ---------- forgotten password ----------
+  //
+  // The answers are deliberately the same whether or not the address has an
+  // account, so the steps are too: the code step appears either way, and the
+  // only errors it can show are about the request or the service itself.
+
+  $('forgot').addEventListener('click', function () {
+    show('forgot');
+    $('forgot-email').value = $('email').value.trim();
+    $('forgot-email').focus();
+  });
+
+  $('forgot-back').addEventListener('click', function () {
+    setMode('login');
+    $('email').focus();
+  });
+
+  $('forgot-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var btn = $('forgot-submit');
+    var email = $('forgot-email').value.trim();
+
+    // The server answers a mistyped address exactly like a real one, so this
+    // is the only place a typo can be caught before someone waits for a code
+    // that is never coming.
+    if (!looksLikeEmail(email)) {
+      note(gateMsg, email ? t('That email address does not look right.') : t('Type your email address.'));
+      $('forgot-email').focus();
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = t('Sending…');
+    clearNote(gateMsg);
+
+    try {
+      await post('/auth/forgot', { email: email });
+      $('email').value = email;
+      askForCode('reset', email);
+    } catch (err) {
+      note(gateMsg, t(err.message));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t('Email me a code');
+    }
+  });
+
+  $('reset-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var btn = $('reset-submit');
+    var code = digits($('reset-code').value);
+    var password = $('reset-password').value;
+
+    if (code.length !== 6) {
+      note(gateMsg, t('Enter the 6-digit code from the email.'));
+      $('reset-code').focus();
+      return;
+    }
+    if (!password) {
+      note(gateMsg, t('Type a new password.'));
+      $('reset-password').focus();
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = t('Setting your password…');
+    clearNote(gateMsg);
+
+    try {
+      // The server checks the password before it spends the code, so a
+      // password that is too short costs nothing but a second try.
+      var data = await post('/auth/reset/code', { email: pending, code: code, password: password });
+      // Kept on screen: being signed out everywhere else is worth reading.
+      await signedIn(data, data.note ? t(data.note) : t('Your password is set.'), true);
+    } catch (err) {
+      note(gateMsg, t(err.message));
+      // The cursor where the fix goes. The server checks the password before
+      // the code, so a refusal that is not about the code is about the password.
+      if (/\bcode\b/i.test(err.message)) $('reset-code').select();
+      else $('reset-password').focus();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t('Set my password');
+    }
+  });
+
+  $('reset-resend').addEventListener('click', function () {
+    resend('reset', '/auth/forgot', { email: pending });
+  });
+
+  $('reset-back').addEventListener('click', function () {
+    var email = pending;
+    show('forgot');
+    $('forgot-email').value = email;
+    $('forgot-email').focus();
+    $('forgot-email').select();
   });
 
   // Hiding the panel is not forgetting it: the email, the file list and the
@@ -206,6 +496,7 @@
     $('viewer-body').textContent = '';
     viewer.classList.remove('show');
     clearNote(vaultMsg);
+    clearNote($('acct-msg'));
 
     $('tok-list').textContent = '';
     $('tok-empty').hidden = true;

@@ -139,6 +139,42 @@ const BUILT_IN_JS = [
 
 for (const text of BUILT_IN_JS) remember(normalise(text), 'download.html <script>');
 
+// The vault page builds its messages in site/assets/app.js, and passes each one
+// through t('…') at the moment it is shown. Every such literal is collected
+// here, so wrapping a sentence in t() is all it takes to make it translatable.
+// app.js therefore passes t() one whole literal, never a variable or a sum.
+const APP_JS = path.join(SITE, 'assets', 'app.js');
+const T_CALL = /\bt\('((?:[^'\\\n]|\\.)*)'\)/g;
+if (fs.existsSync(APP_JS)) {
+  for (const m of fs.readFileSync(APP_JS, 'utf8').matchAll(T_CALL)) {
+    remember(normalise(m[1].replace(/\\(.)/g, '$1')), 'app.html <script>');
+  }
+}
+
+// What the API says back, which app.js also shows through t(). These are the
+// sentences the sign-in, sign-up and reset endpoints answer with, word for
+// word; if the server rewords one, it simply shows in English until this list
+// and the dictionaries catch up.
+const SERVER_SAID = [
+  'That code is not right, or it has expired. Check it and try again, or ask for a new one.',
+  'Creating an account needs email, and email is not switched on yet. Try again later.',
+  'That email address does not look right.',
+  'Use at least 10 characters.',
+  'That password is too long.',
+  'Mix letters with a number or a symbol.',
+  'Too many sign-ups from here. Try again later.',
+  'Too many attempts for that address. Try again later.',
+  'There is already an account with that email. Try signing in.',
+  'Too many attempts. Wait a few minutes and try again.',
+  'Too many attempts for that address. Wait a few minutes.',
+  'That email and password do not match.',
+  'Too many reset requests from here. Try again later.',
+  'Password reset is not switched on yet. Email the address on the site and it will be sorted by hand.',
+  'Your password is set. Every other device, and every personal access token, has been signed out.',
+];
+
+for (const text of SERVER_SAID) remember(normalise(text), 'app.html <api>');
+
 const list = [...strings.keys()];
 const words = list.reduce((n, s) => n + s.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length, 0);
 

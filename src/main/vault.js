@@ -227,9 +227,9 @@ const noteOf = (data) => (data && typeof data.note === 'string' ? data.note : nu
 
 /**
  * Creating an account takes two steps, and this is the first: the vault emails
- * a code to the address. Nothing is created yet and nothing is kept here — the
- * vault hashes the password on its side, and the panel holds it only so that
- * "Resend code" can ask again.
+ * a code to the address. Nothing is created yet and nothing is kept, here or
+ * by the vault, which only checks the password is good enough; the panel holds
+ * it so that "Resend code" can ask again and the second step can send it.
  *
  * The answer is the same whether or not the address already has an account,
  * so it says nothing about who uses Plume. Someone who already has one gets
@@ -246,11 +246,19 @@ async function signUpStart(email, password) {
   };
 }
 
-/** The second step: the code from the email creates the account and signs in. */
-async function signUpVerify(email, code) {
-  const data = await call('/auth/signup/verify', {
-    method: 'POST', json: { email: String(email).trim(), code: cleanCode(code) }, auth: false,
-  });
+/**
+ * The second step: the code from the email, with the password, creates the
+ * account and signs in.
+ *
+ * The account gets the password sent here, not whatever was sent when the code
+ * was asked for. Anyone can start a sign-up for any address, so the code only
+ * proves the mailbox; tying the password to this step means a code that
+ * reaches the owner always creates the owner's account, with the owner's
+ * password, whoever asked for it.
+ */
+async function signUpVerify(email, code, password) {
+  const json = { email: String(email).trim(), code: cleanCode(code), password };
+  const data = await call('/auth/signup/verify', { method: 'POST', json, auth: false });
   return adopt(data);
 }
 

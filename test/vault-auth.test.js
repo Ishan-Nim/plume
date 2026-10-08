@@ -54,10 +54,11 @@ const panel = () => bundled || (bundled = loadRenderer('vault.js'));
 
 const GOOD_SIGNUP_CODE = '123456';
 const GOOD_RESET_CODE = '654321';
-const WRONG = 'That code is not right, or it has expired. Ask for a new one.';
+const WRONG = 'That code is not right, or it has expired. Check it and try again, or ask for a new one.';
 const START_NOTE = 'We sent a 6-digit code to that address. Enter it to finish creating your vault.';
 const FORGOT_NOTE = 'If there is an account for that address, a 6-digit code and a link are on their way.';
 const RESET_NOTE = 'Your password is set. Every other device, and every personal access token, has been signed out.';
+const SHORT = 'Use at least 10 characters.';
 
 const seen = [];
 let server;
@@ -87,6 +88,11 @@ function fakeVault(req, res) {
       case 'POST /api/auth/signup/verify':
         if (body.email === 'taken@plume-md.test') {
           return answer(res, 409, { ok: false, error: 'There is already an account with that email. Try signing in.' });
+        }
+        // As the vault does: the password the account is made with comes
+        // with the code, and is checked before the code is spent.
+        if (typeof body.password !== 'string' || body.password.length < 10) {
+          return answer(res, 400, { ok: false, error: SHORT });
         }
         if (body.code !== GOOD_SIGNUP_CODE) return answer(res, 400, { ok: false, error: WRONG });
         return answer(res, 201, { ok: true, token: 'token-signup', account: account(body.email) });
@@ -173,7 +179,7 @@ test('asking for a sign-up code sends the address and password, and signs nobody
 });
 
 test('a wrong sign-up code passes the vault\'s sentence on and signs nobody in', async () => {
-  await assert.rejects(vault.signUpVerify('new@plume-md.test', '000000'), (err) => {
+  await assert.rejects(vault.signUpVerify('new@plume-md.test', '000000', 'qa-flow-password-1'), (err) => {
     assert.strictEqual(err.message, WRONG);
     assert.strictEqual(err.status, 400);
     return true;
@@ -183,13 +189,13 @@ test('a wrong sign-up code passes the vault\'s sentence on and signs nobody in',
 
 test('a code that cannot be right is refused before it costs an attempt', async () => {
   const count = seen.length;
-  await assert.rejects(vault.signUpVerify('new@plume-md.test', '12345'), /6-digit code/);
+  await assert.rejects(vault.signUpVerify('new@plume-md.test', '12345', 'qa-flow-password-1'), /6-digit code/);
   await assert.rejects(vault.resetWithCode('new@plume-md.test', 'abc', 'another-password-2'), /6-digit code/);
   assert.strictEqual(seen.length, count, 'nothing reached the vault');
 });
 
 test('an account made elsewhere in the meantime comes back as a 409', async () => {
-  await assert.rejects(vault.signUpVerify('taken@plume-md.test', GOOD_SIGNUP_CODE), (err) => {
+  await assert.rejects(vault.signUpVerify('taken@plume-md.test', GOOD_SIGNUP_CODE, 'qa-flow-password-1'), (err) => {
     assert.strictEqual(err.status, 409);
     assert.match(err.message, /already an account/);
     return true;
@@ -197,9 +203,20 @@ test('an account made elsewhere in the meantime comes back as a 409', async () =
   assert.strictEqual(vault.publicState().signedIn, false);
 });
 
+test('the password goes with the code, and one the vault refuses creates nothing', async () => {
+  await assert.rejects(vault.signUpVerify('new@plume-md.test', GOOD_SIGNUP_CODE, 'short'), (err) => {
+    assert.strictEqual(err.message, SHORT);
+    assert.strictEqual(err.status, 400);
+    return true;
+  });
+  assert.deepStrictEqual(last().body, { email: 'new@plume-md.test', code: GOOD_SIGNUP_CODE, password: 'short' });
+  assert.strictEqual(vault.publicState().signedIn, false);
+});
+
 test('the right sign-up code creates the account and signs in', async () => {
-  const state = await vault.signUpVerify('new@plume-md.test', '123 456');
-  assert.deepStrictEqual(last().body, { email: 'new@plume-md.test', code: '123456' });
+  const state = await vault.signUpVerify('new@plume-md.test', '123 456', 'qa-flow-password-1');
+  // The password goes with the code: it is the one the account is made with.
+  assert.deepStrictEqual(last().body, { email: 'new@plume-md.test', code: '123456', password: 'qa-flow-password-1' });
   assert.strictEqual(last().url, '/api/auth/signup/verify');
   assert.strictEqual(state.signedIn, true);
   assert.strictEqual(state.email, 'new@plume-md.test');
@@ -227,7 +244,7 @@ test('a vault without mail says so in its own words', async () => {
 
 test('the reset code sets the new password and signs in, without sending an old session', async () => {
   // Signed in as somebody else first: the reset must not carry that token.
-  await vault.signUpVerify('other@plume-md.test', GOOD_SIGNUP_CODE);
+  await vault.signUpVerify('other@plume-md.test', GOOD_SIGNUP_CODE, 'qa-flow-password-1');
   assert.strictEqual(vault.publicState().signedIn, true);
 
   const { state, note } = await vault.resetWithCode('someone@plume-md.test', '６５４３２１', 'another-password-2');

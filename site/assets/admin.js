@@ -202,6 +202,37 @@
 
   function textNode(text) { return document.createTextNode(text); }
 
+  function ago(iso) {
+    var minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+    if (minutes < 60) return minutes + 'm ago';
+    var hours = Math.round(minutes / 60);
+    return hours < 48 ? hours + 'h ago' : Math.round(hours / 24) + 'd ago';
+  }
+
+  // Gmail's grant is checked once a day; a failure here means reset and
+  // sign-up codes are not going out until the token is minted again.
+  function mailValue(mail) {
+    var value = document.createElement('span');
+    var dot = document.createElement('i');
+    var check = mail.lastCheck;
+    var label;
+    if (!mail.configured) {
+      label = 'Off — no mail provider is set';
+    } else if (mail.provider !== 'gmail') {
+      label = mail.provider === 'log' ? 'Log only (development)' : 'On (' + mail.provider + ')';
+    } else if (!check) {
+      label = 'Gmail — first token check pending';
+    } else if (check.ok) {
+      label = 'Gmail — token checked ' + ago(check.at);
+    } else {
+      label = 'Gmail — failing: ' + (check.error || 'unknown error') + '. Run scripts/gmail-token.js again.';
+    }
+    dot.className = 'dot ' + (mail.configured && (!check || check.ok) ? 'ok' : 'bad');
+    value.appendChild(dot);
+    value.appendChild(textNode(label));
+    return value;
+  }
+
   function paintHealth(health) {
     var grid = $('health-grid');
     clearChildren(grid);
@@ -214,6 +245,9 @@
     grid.appendChild(healthItem('Storage', storageValue));
 
     grid.appendChild(healthItem('Bucket', textNode(health.storage.bucket + ' (' + health.storage.region + ')')));
+
+    // Older API versions do not report mail at all.
+    if (health.mail) grid.appendChild(healthItem('Mail', mailValue(health.mail)));
 
     var uptime = health.uptimeSeconds || 0;
     var h = Math.floor(uptime / 3600);

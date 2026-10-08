@@ -1192,8 +1192,8 @@ handle('vault:signUpStart', vaultResult(async (_ctx, email, password) => (
   vault.signUpStart(str(email, 320), str(password, 400))
 )));
 
-handle('vault:signUpVerify', vaultResult(async (_ctx, email, code) => {
-  const state = await vault.signUpVerify(str(email, 320), str(code, 32));
+handle('vault:signUpVerify', vaultResult(async (_ctx, email, code, password) => {
+  const state = await vault.signUpVerify(str(email, 320), str(code, 32), str(password, 400));
   broadcastVault();
   return { state };
 }));

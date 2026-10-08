@@ -93,7 +93,8 @@
   }
   .tabs button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
 
-  .tabs[hidden] { display: none; }
+  /* Both have a display of their own, which beats the hidden attribute. */
+  .tabs[hidden], #signout[hidden] { display: none; }
 
   .forgot { margin-top: 14px; text-align: center; }
   .linkish {
@@ -130,6 +131,8 @@
   .field .hint { font-size: .82rem; color: var(--text-3); }
 
   .msg { border-radius: 10px; padding: 11px 14px; font-size: .91rem; margin-bottom: 16px; display: none; }
+  /* Brought into view when it says something, and clear of the 64px sticky header. */
+  .msg { scroll-margin-top: 84px; scroll-margin-bottom: 16px; }
   .msg.show { display: block; }
   .msg.err { background: rgba(220, 70, 70, .11); border: 1px solid rgba(220, 70, 70, .35); color: #c23b3b; }
   .msg.ok { background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--accent-strong); }

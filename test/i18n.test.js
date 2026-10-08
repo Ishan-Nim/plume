@@ -25,6 +25,26 @@ const tags = (s) => (String(s).match(/<[^>]+>/g) || []).map((t) => t.toLowerCase
 const codes = (s) => (String(s).match(/<code[^>]*>[\s\S]*?<\/code>/g) || []).sort().join('');
 const hrefs = (s) => (String(s).match(/href="([^"]*)"/g) || []).sort().join('');
 const slots = (s) => (String(s).match(/\{v\}/g) || []).length;
+// What site/assets/app.js fills in itself after looking a sentence up: a count
+// of seconds, of minutes, an HTTP status.
+const fills = (s) => (String(s).match(/\{\w+\}/g) || []).filter((x) => x !== '{v}').sort().join('');
+
+const APP_JS = fs.readFileSync(path.join(__dirname, '..', 'site', 'assets', 'app.js'), 'utf8');
+
+test('every sentence app.js looks up is a key, so none of them quietly stays English', () => {
+  // The same literals scripts/i18n-extract.js collects.
+  const asked = [...APP_JS.matchAll(/\bt\('((?:[^'\\\n]|\\.)*)'\)/g)]
+    .map((m) => m[1].replace(/\\(.)/g, '$1').replace(/\s+/g, ' ').trim());
+  assert.ok(asked.length > 10, 'expected app.js to look its messages up through t()');
+  assert.deepStrictEqual(asked.filter((s) => !keys.has(s)), [],
+    're-run scripts/i18n-extract.js, then translate what it adds');
+});
+
+test('no key holds a control, which a translation would replace without its event handlers', () => {
+  // i18n.js writes a translated block back through innerHTML. A button inside
+  // one comes back as a new element that nothing is listening to.
+  assert.deepStrictEqual(strings.filter((k) => /<(button|input|select|textarea|form)\b/i.test(k)), []);
+});
 
 test('no key carries a release number, so a version bump orphans nothing', () => {
   const stale = strings.filter((k) => /\d+\.\d+\.\d+/.test(k));
@@ -82,6 +102,11 @@ for (const lang of LANGS) {
 
     const dropped = Object.entries(dict).filter(([k, v]) => slots(k) !== slots(v)).map(([k]) => k);
     assert.deepStrictEqual(dropped.slice(0, 3), [], '{v} must survive translation, once per occurrence');
+  });
+
+  test(`${lang}: a translation keeps every slot the script fills in`, () => {
+    const lost = Object.entries(dict).filter(([k, v]) => fills(k) !== fills(v)).map(([k]) => k);
+    assert.deepStrictEqual(lost.slice(0, 3), [], 'app.js replaces {n} after the lookup; a lost one shows nothing');
   });
 
   test(`${lang}: the dictionary covers most of the site`, () => {

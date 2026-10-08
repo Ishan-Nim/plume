@@ -55,7 +55,7 @@ contextBridge.exposeInMainWorld('plume', {
     collectFolder: (dir, rootDir) => invoke('vault:collectFolder', dir, rootDir),
     pushMany: (items, options) => invoke('vault:pushMany', items, options),
     signUpStart: (email, password) => invoke('vault:signUpStart', email, password),
-    signUpVerify: (email, code) => invoke('vault:signUpVerify', email, code),
+    signUpVerify: (email, code, password) => invoke('vault:signUpVerify', email, code, password),
     signIn: (email, password) => invoke('vault:signIn', email, password),
     forgot: email => invoke('vault:forgot', email),
     resetWithCode: (email, code, password) => invoke('vault:resetWithCode', email, code, password),
