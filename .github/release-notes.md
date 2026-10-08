@@ -112,3 +112,7 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 - **AppImage:** make it executable with `chmod +x Plume-1.1.1-linux-x86_64.AppImage`, then run it.
 - **Debian / Ubuntu:** `sudo apt install ./Plume-1.1.1-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+
+---
+
+Plume is written and maintained by **Ishan Nim** — [personal site and blog](https://ishan-nim-portfolio-74tdd.ondigitalocean.app) · [GitHub](https://github.com/Ishan-Nim). Free software under the MIT licence.

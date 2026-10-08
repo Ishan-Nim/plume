@@ -269,3 +269,11 @@ public issue.
 
 Plume is free software by [Ishan Nim](https://github.com/Ishan-Nim), released
 under the MIT licence. Not affiliated with Obsidian.
+
+---
+
+## Who makes it
+
+Plume is written and maintained by **Ishan Nim** — [personal site and blog](https://ishan-nim-portfolio-74tdd.ondigitalocean.app) · [GitHub](https://github.com/Ishan-Nim) · [CyberCrew](https://cybercrew.co.jp).
+
+Full credits, including the themes the colour palettes are derived from and every library that ships inside Plume, are in [docs/CREDITS.md](docs/CREDITS.md).

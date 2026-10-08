@@ -183,6 +183,9 @@ docs/           screenshots and the demo notebook they are taken from
 
 ## Credits
 
+Written and maintained by **Ishan Nim** — [personal site and blog](https://ishan-nim-portfolio-74tdd.ondigitalocean.app). Full credits are in [docs/CREDITS.md](docs/CREDITS.md).
+
+
 The four colour palettes beyond Plume's own are derived from Obsidian community
 themes, each MIT licensed. The CSS in this repository is Plume's; the colour
 schemes are theirs, and the names here are different so neither is mistaken for
