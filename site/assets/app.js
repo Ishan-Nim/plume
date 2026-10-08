@@ -109,43 +109,18 @@
   // The answer is deliberately the same whether or not the address has an
   // account, so this says what it says regardless, and the only error it can
   // show is one about the service itself.
-  $('forgot').addEventListener('click', async function () {
+  // This used to post from here and report back in the sign-in card, which gave
+  // a person who had just failed to sign in an error where they expected a way
+  // forward. It is a page of its own now: one thing to do, room to say what
+  // happens next, and somewhere to land.
+  $('forgot').addEventListener('click', function () {
     var email = $('email').value.trim();
-    if (!email) {
-      note(gateMsg, 'Type your email address first, then press this again.');
-      $('email').focus();
-      return;
+    // Carried across so nobody types their address twice. Session storage
+    // rather than the URL: an address in a link ends up in history and in logs.
+    if (email) {
+      try { sessionStorage.setItem('plume-forgot-email', email); } catch (e) { /* private mode */ }
     }
-
-    var btn = $('forgot');
-    btn.disabled = true;
-    btn.textContent = 'Sending…';
-    clearNote(gateMsg);
-
-    try {
-      var data = await apiJson('/auth/forgot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email }),
-      });
-      note(gateMsg, data.note || 'If there is an account for that address, a link is on its way.', 'ok');
-    } catch (err) {
-      note(gateMsg, err.message);
-      // The service can be up with no mail provider, and then this is the only
-      // route a locked-out person has. Telling them so without giving them
-      // somewhere to go is how the old copy failed: it said "email the address
-      // on the site", and the site printed none.
-      if (/not switched on/i.test(err.message)) {
-        var link = document.createElement('a');
-        link.href = 'contact.html';
-        link.textContent = 'Open the contact form';
-        gateMsg.append(document.createTextNode(' '));
-        gateMsg.append(link);
-      }
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Forgot your password?';
-    }
+    location.href = 'forgot.html';
   });
 
   $('auth-form').addEventListener('submit', async function (ev) {
