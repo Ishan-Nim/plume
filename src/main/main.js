@@ -16,6 +16,7 @@ const settings = require('./settings');
 const files = require('./files');
 const vault = require('./vault');
 const sync = require('./sync');
+const git = require('./git');
 const updater = require('./updater');
 
 const APP_ID = 'app.plume.viewer';
@@ -132,6 +133,11 @@ function onReady() {
   // The folder picks up where it left off, including anything changed while
   // Plume was closed.
   setTimeout(() => sync.start(), 1500);
+
+  // The same for Git, if a folder is set: one round shortly after the window
+  // is usable, so a machine that was off picks up what arrived meanwhile, then
+  // on the interval.
+  setTimeout(() => { gitTick(); gitSchedule(); }, 4000);
 
   // A quiet look for a newer release, well after the window is usable.
   setTimeout(async () => {
@@ -1103,6 +1109,125 @@ handle('sync:choose', vaultResult(async ctx => {
   sync.refresh();
   return { folder, preview: look, state: sync.publicState() };
 }));
+
+// ---------------------------------------------------------------------------
+// Git sync
+//
+// Separate from the vault on purpose: they can point at the same folder, and
+// neither needs to know about the other. Credentials are git's business, not
+// ours — see the note at the top of git.js.
+
+let gitTimer = null;
+let gitRunning = false;
+
+// Git sync is part of having an account. Checked here rather than only in the
+// panel, because a renderer is not a place to enforce anything.
+const NEEDS_ACCOUNT = 'Sign in to Plume Vault to use Git sync.';
+
+function signedIn() {
+  try {
+    return Boolean(vault.publicState().signedIn);
+  } catch (err) {
+    return false;
+  }
+}
+
+function gitBroadcast(payload) {
+  for (const win of liveWindows()) win.webContents.send('git:changed', payload);
+}
+
+async function gitState() {
+  if (!signedIn()) return { folder: null, repo: false, locked: true, reason: NEEDS_ACCOUNT };
+  const folder = settings.get().gitFolder;
+  if (!folder) return { folder: null, repo: false };
+  return { folder, ...(await git.inspect(folder)) };
+}
+
+/** One automatic round. Never overlaps itself, and never raises a dialog. */
+async function gitTick() {
+  const { gitFolder, gitAuto } = settings.get();
+  if (!gitAuto || !gitFolder || gitRunning || !signedIn()) return;
+  gitRunning = true;
+  try {
+    const result = await git.sync(gitFolder);
+    gitBroadcast({ ...(await gitState()), lastResult: result, automatic: true });
+  } catch (err) {
+    gitBroadcast({ ...(await gitState()), lastResult: { ok: false, error: err.message }, automatic: true });
+  } finally {
+    gitRunning = false;
+  }
+}
+
+function gitSchedule() {
+  clearInterval(gitTimer);
+  gitTimer = null;
+  const { gitAuto, gitEvery, gitFolder } = settings.get();
+  if (!gitAuto || !gitFolder) return;
+  const every = Math.max(1, Math.min(1440, gitEvery || 15)) * 60_000;
+  gitTimer = setInterval(() => { gitTick(); }, every);
+  if (gitTimer.unref) gitTimer.unref();
+}
+
+handle('git:state', async () => ({ ...(await gitState()), available: await git.available() }));
+
+handle('git:choose', async (ctx) => {
+  if (!signedIn()) return { ok: false, error: NEEDS_ACCOUNT, locked: true };
+  const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
+    title: 'Choose the folder to keep in a Git repository',
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Use this folder',
+  });
+  if (canceled || !filePaths.length) return { canceled: true };
+  settings.update({ gitFolder: filePaths[0] });
+  broadcastSettings();
+  gitSchedule();
+  return { ...(await gitState()) };
+});
+
+handle('git:connect', async (ctx, remote, branch) => {
+  if (!signedIn()) return { ok: false, error: NEEDS_ACCOUNT, locked: true };
+  const folder = settings.get().gitFolder;
+  if (!folder) return { ok: false, error: 'Choose a folder first.' };
+  const result = await git.connect(localPath(ctx, folder), str(remote, 2048), {
+    branch: branch ? str(branch, 200) : undefined,
+  });
+  gitSchedule();
+  return { ...result, ...(await gitState()) };
+});
+
+handle('git:sync', async (_ctx, message) => {
+  if (!signedIn()) return { ok: false, error: NEEDS_ACCOUNT, locked: true };
+  const folder = settings.get().gitFolder;
+  if (!folder) return { ok: false, error: 'Choose a folder first.' };
+  if (gitRunning) return { ok: false, error: 'A sync is already running.' };
+  gitRunning = true;
+  try {
+    const result = await git.sync(folder, { message: message ? str(message, 500) : undefined });
+    const state = await gitState();
+    gitBroadcast({ ...state, lastResult: result });
+    return { ...result, state };
+  } finally {
+    gitRunning = false;
+  }
+});
+
+handle('git:auto', async (_ctx, on, every) => {
+  if (!signedIn()) return { ok: false, error: NEEDS_ACCOUNT, locked: true };
+  const patch = { gitAuto: Boolean(on) };
+  if (Number.isInteger(every)) patch.gitEvery = every;
+  settings.update(patch, { fromRenderer: true });
+  broadcastSettings();
+  gitSchedule();
+  return gitState();
+});
+
+handle('git:forget', async () => {
+  settings.update({ gitFolder: null, gitAuto: false });
+  broadcastSettings();
+  gitSchedule();
+  // The folder and its repository stay exactly as they are.
+  return { folder: null, repo: false };
+});
 
 handle('sync:forget', vaultResult(async () => {
   settings.update({ vaultFolder: null, syncPaused: false });

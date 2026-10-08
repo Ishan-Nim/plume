@@ -30,6 +30,9 @@ const DEFAULTS = Object.freeze({
   skippedVersion: null,   // a version the user chose not to be told about again
   vaultFolder: null,      // the folder kept in step with the vault, if any
   syncPaused: false,
+  gitFolder: null,        // a folder kept in step with a Git remote, if any
+  gitAuto: false,         // sync it on a timer as well as on demand
+  gitEvery: 15,           // minutes between automatic syncs
   bounds: null,           // { x, y, width, height } of the last closed window
   maximized: false,
 });
@@ -49,6 +52,9 @@ const VALIDATORS = {
   skippedVersion: v => v === null || (typeof v === 'string' && v.length < 40),
   vaultFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
   syncPaused: v => typeof v === 'boolean',
+  gitFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
+  gitAuto: v => typeof v === 'boolean',
+  gitEvery: v => Number.isInteger(v) && v >= 1 && v <= 1440,
   bounds: v => v === null || (typeof v === 'object' &&
     ['x', 'y', 'width', 'height'].every(k => Number.isFinite(v[k]))),
   maximized: v => typeof v === 'boolean',
@@ -57,7 +63,8 @@ const VALIDATORS = {
 // Keys the renderer may change. Window geometry and the recent list are
 // managed by the main process only.
 const RENDERER_KEYS = new Set(['theme', 'palette', 'fontSize', 'width', 'font', 'lineBreaks',
-  'sidebar', 'sidebarTab', 'sidebarWidth', 'autoUpdate', 'skippedVersion']);
+  'sidebar', 'sidebarTab', 'sidebarWidth', 'autoUpdate', 'skippedVersion',
+  'gitAuto', 'gitEvery']);
 
 let state = { ...DEFAULTS, recent: [] };
 let file = null;

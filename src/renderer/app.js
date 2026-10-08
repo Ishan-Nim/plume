@@ -8,6 +8,7 @@ import { FileTree, Outline } from './sidebar.js';
 import { Vault } from './vault.js';
 import { Graph } from './graph.js';
 import { Updates } from './updates.js';
+import { GitPanel } from './git.js';
 import { Editor } from './editor.js';
 import { icon, LOGO } from './icons.js';
 import { el, debounce, basename, dirname, samePath, readingStats, slugify, relativeSegments } from './util.js';
@@ -65,6 +66,7 @@ const ui = {
   lightbox: $('#lightbox'),
   readingPop: $('#pop-reading'),
   moreMenu: $('#menu-more'),
+  gitPop: $('#pop-git'),
 };
 
 // ---------------------------------------------------------------------------
@@ -941,6 +943,7 @@ function buildMoreMenu() {
   items.push(
     sep(),
     menuItem('Plume Vault…', 'cloud', openVault),
+    menuItem('Git sync…', 'refresh', openGit),
     menuItem('About Plume', 'info', () => api.about()),
   );
   ui.moreMenu.replaceChildren(...items);
@@ -1025,6 +1028,22 @@ let lastSyncState = null;
 
 function openVault() {
   updateSettings({ sidebar: true, sidebarTab: 'vault' });
+}
+
+// Git lives in a panel of its own rather than beside the vault: they can point
+// at the same folder, and neither is the other's setting.
+let gitPanel = null;
+
+async function openGit() {
+  if (!gitPanel) {
+    gitPanel = new GitPanel(api, toast);
+    gitPanel.onOpenVault = () => { closePopover(); openVault(); };
+  }
+  ui.gitPop.replaceChildren(
+    el('div', { class: 'pop-title', text: 'Git sync' }),
+    await gitPanel.open(),
+  );
+  togglePopover($('#btn-more'), ui.gitPop);
 }
 
 function toggleVault() {

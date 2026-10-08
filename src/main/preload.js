@@ -49,6 +49,17 @@ contextBridge.exposeInMainWorld('plume', {
   print: () => invoke('doc:print'),
   exportPdf: () => invoke('doc:exportPdf'),
 
+  // Git sync. Plume never handles a credential here: git does, with whatever
+  // helper or key the machine already has.
+  git: {
+    state: () => invoke('git:state'),
+    choose: () => invoke('git:choose'),
+    connect: (remote, branch) => invoke('git:connect', remote, branch),
+    sync: message => invoke('git:sync', message),
+    auto: (on, every) => invoke('git:auto', on, every),
+    forget: () => invoke('git:forget'),
+  },
+
   vault: {
     state: rootDir => invoke('vault:state', rootDir),
     suggest: (paths, rootDir) => invoke('vault:suggest', paths, rootDir),
@@ -101,6 +112,7 @@ contextBridge.exposeInMainWorld('plume', {
   onVaultChanged: subscribe('vault:changed'),
   onVaultProgress: subscribe('vault:progress'),
   onSyncChanged: subscribe('sync:changed'),
+  onGitChanged: subscribe('git:changed'),
   onUpdateAvailable: subscribe('update:available'),
   onUpdateProgress: subscribe('update:progress'),
   onUpdateReady: subscribe('update:ready'),
