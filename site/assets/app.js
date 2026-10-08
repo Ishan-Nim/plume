@@ -131,6 +131,17 @@
       note(gateMsg, data.note || 'If there is an account for that address, a link is on its way.', 'ok');
     } catch (err) {
       note(gateMsg, err.message);
+      // The service can be up with no mail provider, and then this is the only
+      // route a locked-out person has. Telling them so without giving them
+      // somewhere to go is how the old copy failed: it said "email the address
+      // on the site", and the site printed none.
+      if (/not switched on/i.test(err.message)) {
+        var link = document.createElement('a');
+        link.href = 'contact.html';
+        link.textContent = 'Open the contact form';
+        gateMsg.append(document.createTextNode(' '));
+        gateMsg.append(link);
+      }
     } finally {
       btn.disabled = false;
       btn.textContent = 'Forgot your password?';

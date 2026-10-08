@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact — Plume</title>
+<meta name="description" content="Ask a question about Plume, report a problem, or get help with a Plume Vault account you cannot sign in to.">
+<meta name="referrer" content="strict-origin">
+<link rel="canonical" href="https://plume-md.com/contact.html">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<meta name="theme-color" content="#6e56cf">
+<meta property="og:title" content="Contact — Plume">
+<meta property="og:description" content="Ask a question about Plume, report a problem, or get help with an account you cannot sign in to.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://plume-md.com/contact.html">
+<link rel="stylesheet" href="assets/site.css">
+<script>
+  (function () {
+    var d = document.documentElement;
+    try {
+      var t = localStorage.getItem('plume-theme');
+      if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+      // Before paint, or the page flashes Plume's colours first.
+      var p = localStorage.getItem('plume-palette');
+      if (p && /^(starless|greenwood|commit|lapis)$/.test(p)) d.setAttribute('data-palette', p);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  .contact-wrap { max-width: 560px; padding-block: clamp(48px, 10vw, 96px); }
+  .panel {
+    border: 1px solid var(--line); border-radius: 16px;
+    background: var(--card); box-shadow: var(--shadow); padding: 30px;
+  }
+  .panel h1 { font-size: 1.45rem; letter-spacing: -.02em; }
+  .panel > p.lede-sm { margin-top: 10px; color: var(--text-3); font-size: .94rem; line-height: 1.6; }
+  .field { margin-top: 18px; }
+  .field label { display: block; font-size: .86rem; font-weight: 550; margin-bottom: 6px; }
+  .field input, .field textarea {
+    width: 100%; font: inherit; padding: 11px 13px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--text);
+  }
+  .field textarea { min-height: 150px; resize: vertical; line-height: 1.6; }
+  .field input:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hint { display: block; margin-top: 6px; font-size: .82rem; color: var(--text-3); }
+  .count { float: right; font-variant-numeric: tabular-nums; }
+  .msg { margin-top: 18px; font-size: .9rem; line-height: 1.6; border-radius: 10px; padding: 12px 14px; display: none; }
+  .msg.show { display: block; }
+  .msg.bad { background: color-mix(in srgb, #d9405a 12%, transparent); color: #d9405a; }
+  .msg.good { background: color-mix(in srgb, #1f9d63 12%, transparent); color: #1f9d63; }
+  .msg.wait { background: var(--bg-3); color: var(--text-2); }
+  .actions { margin-top: 22px; }
+  /* Not display:none — some bots skip what is hidden that way and fill the rest. */
+  .nope {
+    position: absolute; left: -9999px; width: 1px; height: 1px;
+    overflow: hidden; opacity: 0;
+  }
+  .other-ways { margin-top: 26px; font-size: .9rem; color: var(--text-3); line-height: 1.7; }
+  .other-ways b { color: var(--text-2); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="/">
+      <img src="assets/logo.svg" alt="" width="28" height="28">
+      Plume
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="navlink nav-hide" href="/">Home</a>
+      <a class="navlink nav-hide" href="docs.html">Docs</a>
+      <a class="navlink" href="app.html">Sign in</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap contact-wrap" id="main">
+  <div class="panel">
+    <h1>Get in touch</h1>
+    <p class="lede-sm">
+      A question about Plume, a problem to report, or an account you cannot sign in to.
+      Write to us here and we will reply to the address you give.
+    </p>
+
+    <form id="form" novalidate>
+      <div class="field">
+        <label for="name">Your name <span class="hint" style="display:inline">(optional)</span></label>
+        <input type="text" id="name" name="name" autocomplete="name" maxlength="80" placeholder="Jane">
+      </div>
+
+      <div class="field">
+        <label for="email">Your email</label>
+        <input type="email" id="email" name="email" autocomplete="email" required
+               maxlength="200" placeholder="you@example.com">
+        <span class="hint">So we can reply. Nothing else is done with it.</span>
+      </div>
+
+      <div class="field">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" required maxlength="4000"
+                  placeholder="What can we help with?"></textarea>
+        <span class="hint"><span class="count" id="count">0 / 4000</span>At least a sentence, please.</span>
+      </div>
+
+      <!-- A field no person sees. Left empty by anyone real. -->
+      <div class="nope" aria-hidden="true">
+        <label for="website">Leave this empty</label>
+        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="submit">Send message</button>
+      </div>
+    </form>
+
+    <div class="msg" id="msg" role="alert"></div>
+
+    <p class="other-ways">
+      <b>Locked out of your vault?</b> Say so here with the address on the account and we will sort it by hand.<br>
+      <b>Found a bug?</b> <a href="https://github.com/Ishan-Nim/plume/issues">Open an issue on GitHub</a> — it is public, so leave personal details out of it.
+    </p>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="foot-bottom" style="border-top:0;margin-top:0;padding-top:0">
+      <p class="foot-note">
+        Plume is free software by <a href="https://github.com/Ishan-Nim">Ishan Nim</a>, released under the MIT licence.
+      </p>
+      <div class="foot-controls" id="foot-controls">
+        <select class="palette-picker" id="palette-picker" aria-label="Colour palette" data-no-i18n>
+          <option value="plume">Plume</option>
+          <option value="starless">Starless</option>
+          <option value="greenwood">Greenwood</option>
+          <option value="commit">Commit</option>
+          <option value="lapis">Lapis</option>
+        </select>
+        <button class="theme-toggle" type="button" aria-label="Switch between light and dark">
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var API = '/api';
+  var $ = function (id) { return document.getElementById(id); };
+  var form = $('form'), msg = $('msg'), submit = $('submit'), count = $('count');
+
+  function say(text, kind) {
+    msg.textContent = text;
+    msg.className = 'msg show ' + (kind || 'wait');
+  }
+
+  $('message').addEventListener('input', function () {
+    count.textContent = this.value.length + ' / 4000';
+  });
+
+  form.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+
+    var email = $('email').value.trim();
+    var message = $('message').value.trim();
+
+    // Said here rather than after a round trip, in the same words the server
+    // would use, so the two never disagree.
+    if (!email || email.indexOf('@') < 1) { say('That email address does not look right.', 'bad'); $('email').focus(); return; }
+    if (message.length < 10) { say('Tell us a little more than that.', 'bad'); $('message').focus(); return; }
+
+    submit.disabled = true;
+    submit.textContent = 'Sending…';
+    say('Sending…', 'wait');
+
+    try {
+      var res = await fetch(API + '/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: $('name').value.trim(),
+          email: email,
+          message: message,
+          website: $('website').value,
+        }),
+      });
+      var data = await res.json().catch(function () { return {}; });
+
+      if (!res.ok || !data.ok) {
+        say(data.error || 'That message could not be sent. Try again in a moment.', 'bad');
+        submit.disabled = false;
+        submit.textContent = 'Send message';
+        return;
+      }
+
+      say(data.note || 'Thanks — your message is on its way.', 'good');
+      form.hidden = true;
+    } catch (err) {
+      say('That message could not be sent — check your connection and try again.', 'bad');
+      submit.disabled = false;
+      submit.textContent = 'Send message';
+    }
+  });
+})();
+</script>
+</body>
+</html>
