@@ -44,9 +44,12 @@ test('an update is only offered for a genuinely newer version', () => {
 
 test('only a release asset of this repository, over HTTPS, is ever downloaded', () => {
   const allowed = [
+    // Both homes the project has had. A build from before the repository moved
+    // is answered with URLs under the new owner, and must still accept them.
     'https://github.com/Ishan-Nim/plume/releases/download/v1.3.0/Plume-Setup-1.3.0.exe',
     'https://github.com/Ishan-Nim/plume/releases/download/v1.3.0/SHA256SUMS.txt',
-    'https://objects.github.com/Ishan-Nim/plume/releases/download/v1.3.0/Plume-Setup-1.3.0.exe',
+    'https://github.com/Plume-MD/plume/releases/download/v1.3.0/Plume-Setup-1.3.0.exe',
+    'https://github.com/Plume-MD/plume/releases/download/v1.3.0/SHA256SUMS.txt',
   ];
   for (const url of allowed) {
     assert.ok(updater.trusted(url), `should allow ${url}`);
@@ -63,6 +66,11 @@ test('only a release asset of this repository, over HTTPS, is ever downloaded', 
     // The right host, the wrong repository.
     'https://github.com/someone-else/plume/releases/download/v1.3.0/x.exe',
     'https://github.com/Ishan-Nim/other/releases/download/v1.3.0/x.exe',
+    'https://github.com/Plume-MD/other/releases/download/v1.3.0/x.exe',
+    'https://github.com/Plume-MD-evil/plume/releases/download/v1.3.0/x.exe',
+    // objects.github.com is not a GitHub host at all — the asset host is
+    // objects.githubusercontent.com, and that is only ever a later hop.
+    'https://objects.github.com/Ishan-Nim/plume/releases/download/v1.3.0/x.exe',
     // The right host and repository, but not a release asset.
     'https://github.com/Ishan-Nim/plume/raw/master/x.exe',
     'https://github.com/Ishan-Nim/plume/archive/master.zip',

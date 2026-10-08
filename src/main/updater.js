@@ -27,8 +27,20 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { app, shell } = require('electron');
 
-const REPO = 'Ishan-Nim/plume';
-const LATEST = `https://api.github.com/repos/${REPO}/releases/latest`;
+// Where releases come from, newest home first.
+//
+// Two entries, not one, because the repository moved and an update must survive
+// that in both directions. A copy of Plume built before the move asks GitHub
+// about the old path; GitHub redirects, and answers with asset URLs under the
+// new one. A client that trusts only the path it was built with would reject
+// its own update and quietly stop updating for ever — which is exactly what
+// hardcoding a single owner would have done here.
+//
+// It stays an allowlist: two names, both ours, checked exactly. Nothing is
+// taken from the response and trusted because the response said so.
+const REPOS = ['Plume-MD/plume', 'Ishan-Nim/plume'];
+const REPO = REPOS[0];
+const LATEST = REPOS.map((r) => `https://api.github.com/repos/${r}/releases/latest`);
 const RELEASE_PAGE = `https://github.com/${REPO}/releases/latest`;
 
 // Where a release asset may actually come from, including the hosts GitHub
@@ -77,9 +89,9 @@ function compare(a, b) {
 function trusted(url) {
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'https:'
-      && (parsed.hostname === 'github.com' || parsed.hostname === `objects.github.com`)
-      && parsed.pathname.startsWith(`/${REPO}/releases/download/`);
+    if (parsed.protocol !== 'https:') return false;
+    if (parsed.hostname !== 'github.com') return false;
+    return REPOS.some((repo) => parsed.pathname.startsWith(`/${repo}/releases/download/`));
   } catch (err) {
     return false;
   }
@@ -119,7 +131,19 @@ async function check({ force = false } = {}) {
     await sweep();
   }
   try {
-    const release = await getJSON(LATEST);
+    // The first that answers. After the move both work, because GitHub
+    // redirects the old one; before it, only the old one exists.
+    let release = null;
+    let lastError = null;
+    for (const endpoint of LATEST) {
+      try {
+        release = await getJSON(endpoint);
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    if (!release) throw lastError || new Error('Update check failed.');
     const version = String(release.tag_name || '').replace(/^v/, '');
 
     // A tag becomes part of a file name and a path. Anything that is not a
