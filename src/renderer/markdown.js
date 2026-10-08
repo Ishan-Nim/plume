@@ -46,6 +46,53 @@ const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i;
 export const CODE_MARK = [...crypto.getRandomValues(new Uint8Array(12))]
   .map(b => b.toString(16).padStart(2, '0')).join('');
 
+// Marks the source lines a block was rendered from, for live preview: click a
+// paragraph and Plume edits exactly those lines. Same reasoning as CODE_MARK —
+// raw HTML in a document can imitate the attribute but cannot know this
+// per-session value, so it can never aim a click at another part of the file
+// and have the edit overwrite it.
+export const SRC_MARK = [...crypto.getRandomValues(new Uint8Array(12))]
+  .map(b => b.toString(16).padStart(2, '0')).join('');
+
+/** The [from, to) line range in `data-plume-src`, or null if it is not ours. */
+export function srcRange(value) {
+  const parts = String(value || '').split(':');
+  if (parts.length !== 3 || parts[0] !== SRC_MARK) return null;
+  const from = Number(parts[1]);
+  const to = Number(parts[2]);
+  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to <= from) return null;
+  return [from, to];
+}
+
+// The same attribute, for the rules below that build their HTML by hand.
+function srcAttr(token) {
+  const v = token.attrGet('data-plume-src');
+  return v ? ` data-plume-src="${escapeHtml(v)}"` : '';
+}
+
+// Stamps each top-level block with the half-open line range it came from.
+// Only the document being read asks for this (env.srcMap): a transcluded note
+// belongs to another file, so its blocks are not editable here.
+function sourceMapPlugin(md) {
+  md.core.ruler.push('plume_source_map', state => {
+    if (!state.env || !state.env.srcMap) return;
+    const lines = state.src.split('\n');
+    for (const token of state.tokens) {
+      // Everything from here on is generated rather than written: the
+      // footnote list has no lines of its own in the document.
+      if (token.type === 'footnote_block_open') break;
+      if (token.level !== 0 || token.nesting < 0 || !token.map) continue;
+      if (token.type === 'front_matter') continue;
+      const from = token.map[0];
+      let to = token.map[1];
+      // A list's range runs on to the blank line after it; that line separates
+      // it from the next block and must survive the block being edited.
+      while (to > from + 1 && !lines[to - 1].trim()) to--;
+      token.attrSet('data-plume-src', `${SRC_MARK}:${from}:${to}`);
+    }
+  });
+}
+
 const LANG_ALIASES = {
   sh: 'bash', shell: 'bash', zsh: 'bash', console: 'bash', ps: 'powershell', ps1: 'powershell',
   pwsh: 'powershell', yml: 'yaml', js: 'javascript', jsx: 'javascript', mjs: 'javascript',
@@ -270,9 +317,9 @@ function highlightCode(code, lang) {
   return escapeHtml(code);
 }
 
-function codeBlock(code, lang, label) {
+function codeBlock(code, lang, label, src = '') {
   const cls = lang ? ` language-${escapeHtml(lang)}` : '';
-  return `<div class="code-block" data-plume-code="${CODE_MARK}"><div class="code-head"><span class="code-lang">${escapeHtml(label || '')}</span></div>` +
+  return `<div class="code-block" data-plume-code="${CODE_MARK}"${src}><div class="code-head"><span class="code-lang">${escapeHtml(label || '')}</span></div>` +
     `<pre><code class="hljs${cls}">${highlightCode(code, lang)}</code></pre></div>\n`;
 }
 
@@ -300,7 +347,9 @@ export function createMarkdown({ breaks = true } = {}) {
     })
     .use(wikiPlugin)
     .use(tagPlugin)
-    .use(commentPlugin);
+    .use(commentPlugin)
+    // Last, so it sees the tokens every other plugin has finished moving.
+    .use(sourceMapPlugin);
 
   md.linkify.set({ fuzzyLink: false, fuzzyEmail: false });
 
@@ -310,18 +359,19 @@ export function createMarkdown({ breaks = true } = {}) {
     const raw = info.split(/\s+/)[0] || '';
     const lang = raw.toLowerCase();
     const code = token.content;
+    const src = srcAttr(token);
     if (lang === 'mermaid') {
-      return `<div class="mermaid-block"><pre class="mermaid-src">${escapeHtml(code)}</pre></div>\n`;
+      return `<div class="mermaid-block"${src}><pre class="mermaid-src">${escapeHtml(code)}</pre></div>\n`;
     }
     if (lang === 'math' || lang === 'katex') {
-      return `<div class="math-block">${katex.renderToString(code, {
+      return `<div class="math-block"${src}>${katex.renderToString(code, {
         displayMode: true, throwOnError: false, strict: 'ignore', output: 'htmlAndMathml',
       })}</div>\n`;
     }
-    return codeBlock(code, lang, raw);
+    return codeBlock(code, lang, raw, src);
   };
 
-  md.renderer.rules.code_block = (tokens, idx) => codeBlock(tokens[idx].content, '', '');
+  md.renderer.rules.code_block = (tokens, idx) => codeBlock(tokens[idx].content, '', '', srcAttr(tokens[idx]));
 
   // ![alt|300](img.png) and ![alt|300x200](img.png) — Obsidian image sizing.
   md.renderer.rules.image = (tokens, idx, options, env, self) => {
@@ -342,10 +392,12 @@ export function createMarkdown({ breaks = true } = {}) {
 
   return {
     // docId namespaces footnote ids (fn-<docId>-1) so a transcluded note's
-    // footnotes do not collide with the host's.
-    render(src, { docId } = {}) {
+    // footnotes do not collide with the host's. srcMap asks for the line
+    // ranges live preview edits blocks by.
+    render(src, { docId, srcMap = false } = {}) {
       frontMatterRaw = null;
       const env = typeof docId === 'string' ? { docId } : {};
+      if (srcMap) env.srcMap = true;
       const html = md.render(src, env);
       return { html, frontMatter: frontMatterRaw, wiki: env.wiki ? [...env.wiki] : [] };
     },

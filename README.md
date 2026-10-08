@@ -46,7 +46,9 @@
 - **Reads Obsidian notes properly.** `[[wiki links]]`, `[[Note#Heading|alias]]`, `![[image.png|300]]`, `![[Note#Section]]` transclusion, callouts (`> [!tip]`, foldable `> [!warning]-`), `==highlights==`, `#tags`, `%%comments%%`, `^block` ids, front-matter Properties, and Obsidian-style line breaks (toggleable).
 - **Full GitHub-flavoured Markdown.** Tables, task lists, footnotes, definition lists, emoji shortcodes, syntax highlighting (incl. PowerShell, Dockerfile, nginx…), KaTeX math, Mermaid diagrams.
 - **Sidebar** with the folder tree around the file (the whole vault when the file is inside one) and an outline of headings with reading time.
-- **Edits when you ask it to.** Press the pencil, or `Ctrl+E`, for the raw Markdown in a plain editor — no hidden formatting model. Nothing is written until you save, an unsaved change is never dropped silently, and a file changed elsewhere cannot overwrite your work.
+- **Live preview.** Click a paragraph and it becomes the Markdown it was written as, where it sits; move away and it is a paragraph again. The rest of the page stays rendered. A list, table or code block opens whole; diagrams, maths and images stay rendered. Editing a block rewrites only that block's own lines. Turn it off in **Reading settings → Live preview**.
+- **Or the whole file as text.** Press the pencil, or `Ctrl+E`, for the raw Markdown in a plain editor — no hidden formatting model. Both ways of typing share one buffer, so `Ctrl+E` loses nothing. Nothing is written until you save, an unsaved change is never dropped silently, and a file changed elsewhere cannot overwrite your work.
+- **Open a folder** of notes from the welcome screen or **⋯ → Open folder…**: the sidebar roots itself there and stays there, and Plume remembers it for next time.
 - **Live reload** — save the file in any editor and Plume updates in place, keeping your scroll position.
 - **Updates that ask first.** Plume tells you when a new version is out and installs it when you say so. Every download is checked against the release's published checksum.
 - **Find in page**, back/forward between linked notes, image lightbox, copy buttons on code blocks.
@@ -136,7 +138,10 @@ On macOS, use `⌘` in place of `Ctrl` and `⌥` in place of `Alt`.
 | Toggle sidebar | `Ctrl+\` |
 | Text size | `Ctrl+=` / `Ctrl+-` / `Ctrl+0`, `Ctrl`+wheel |
 | Reload | `F5` / `Ctrl+R` |
-| Open in editor | `Ctrl+E` |
+| Edit one block, where it is | click it |
+| Edit the whole file as text | `Ctrl+E` |
+| Save | `Ctrl+S` |
+| Open in your editor | `Ctrl+Shift+E` |
 | Print | `Ctrl+P` |
 | Full screen | `F11` |
 | Open link in new window | `Ctrl`+click or middle-click |

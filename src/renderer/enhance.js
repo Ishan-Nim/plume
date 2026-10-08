@@ -111,6 +111,9 @@ function transformCallouts(root) {
 
     const foldable = fold === '+' || fold === '-';
     const callout = el(foldable ? 'details' : 'div', { class: 'callout', dataset: { callout: type } });
+    // The quote's source range belongs to the callout that replaces it, or
+    // the callout could not be edited in place.
+    if (bq.dataset.plumeSrc) callout.dataset.plumeSrc = bq.dataset.plumeSrc;
     if (metadata) callout.dataset.calloutMetadata = metadata;
     callout.style.setProperty('--callout', rgb);
     if (foldable && fold === '+') callout.open = true;
@@ -177,6 +180,12 @@ function wrapTables(root) {
       const wrap = el('div', { class: 'table-wrap' });
       table.replaceWith(wrap);
       wrap.append(table);
+      // The wrapper is now the document's own child, so it carries the
+      // source range live preview edits the table by.
+      if (table.dataset.plumeSrc) {
+        wrap.dataset.plumeSrc = table.dataset.plumeSrc;
+        delete table.dataset.plumeSrc;
+      }
     }
     const head = table.tHead;
     if (head && [...head.querySelectorAll('th, td')].every(c => !c.textContent.trim())) {

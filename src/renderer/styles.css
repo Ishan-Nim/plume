@@ -720,6 +720,8 @@ body:not(.is-welcome) .welcome { display: none; }
 .tagline { margin: 0 0 26px; font-size: 14.5px; color: var(--text-2); }
 .hint { margin: 12px 0 0; font-size: 12.5px; color: var(--text-3); }
 
+.welcome-acts { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+
 .primary-btn {
   display: inline-flex;
   align-items: center;
@@ -738,6 +740,24 @@ body:not(.is-welcome) .welcome { display: none; }
 .primary-btn:hover { filter: brightness(1.07); }
 .primary-btn:active { transform: translateY(1px); }
 .primary-btn kbd { background: rgba(255, 255, 255, 0.2); color: #fff; }
+
+/* Beside the primary button, so the two read as one row of choices. */
+.secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  transition: border-color 0.12s, color 0.12s, transform 0.06s;
+}
+.secondary-btn:hover { border-color: var(--accent); color: var(--accent-strong); }
+.secondary-btn:active { transform: translateY(1px); }
 
 .ghost-btn {
   flex: none;
@@ -1872,6 +1892,68 @@ summary.callout-title::-webkit-details-marker { display: none; }
    so leaving edit mode puts the reader back exactly where they were. */
 body.is-editing #doc,
 body.is-editing #welcome { display: none; }
+
+/* ------------------------------------------------------- live preview */
+
+/* The block being edited: its rendered copy stands aside and a textarea
+   takes its place. Not [hidden], because the UA rule for that loses to any
+   display a block style sets. */
+#doc > .live-hidden { display: none !important; }
+
+/* Sized and spaced like the block it stands in for, so opening one does not
+   move the text around it. The negative gutter is the padding: the letters
+   stay exactly where they were on the line. */
+.live-edit {
+  display: block;
+  box-sizing: border-box;
+  width: calc(100% + 20px);
+  margin: 0 -10px 1.05em;
+  padding: 1px 10px;
+  border: 0;
+  border-radius: 7px;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  tab-size: 2;
+  white-space: pre-wrap;
+  word-break: break-word;
+  caret-color: var(--accent);
+}
+.live-edit::selection { background: var(--selection); }
+
+/* Headings keep their own size while they are being typed. */
+.live-edit[data-tag^="h"] {
+  font-weight: 680;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+  color: var(--heading);
+  margin: 1.9em -10px 0.6em;
+}
+.live-edit[data-tag="h1"] { font-size: 2em; margin-top: 1.4em; letter-spacing: -0.02em; }
+.live-edit[data-tag="h2"] { font-size: 1.5em; }
+.live-edit[data-tag="h3"] { font-size: 1.25em; }
+.live-edit[data-tag="h4"] { font-size: 1.08em; }
+.live-edit[data-tag="h5"] { font-size: 1em; }
+.live-edit[data-tag="h6"] { font-size: 0.94em; }
+/* hr, and the empty paragraph a click past the end of the document opens. */
+.live-edit[data-tag="hr"] { margin: 2.2em -10px; }
+
+.live-edit.is-code {
+  font-family: var(--font-mono);
+  font-size: calc(var(--content-size) * 0.88);
+  line-height: 1.6;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--code-bg);
+  color: var(--code-text);
+}
 
 body.is-editing #btn-edit { color: var(--accent); background: var(--accent-soft); }
 

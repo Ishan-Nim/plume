@@ -113,7 +113,10 @@
           <div class="welcome-logo" data-logo></div>
           <h1>Plume</h1>
           <p class="tagline">A feather-light Markdown viewer.</p>
-          <button id="btn-welcome-open" class="primary-btn" type="button" data-icon="folderOpen">Open file <kbd>Ctrl O</kbd></button>
+          <div class="welcome-acts">
+            <button id="btn-welcome-open" class="primary-btn" type="button" data-icon="folderOpen">Open file <kbd>Ctrl O</kbd></button>
+            <button id="btn-welcome-folder" class="secondary-btn" type="button" data-icon="folder">Open folder</button>
+          </div>
           <p class="hint">or drop a Markdown file anywhere in this window</p>
           <div id="default-banner" class="default-banner" hidden>
             <span>Open <b>.md</b> files with a double-click — make Plume your default viewer.</span>
@@ -175,6 +178,12 @@
       <span class="pop-label" title="When on, a single newline starts a new line — like Obsidian. When off, it follows strict CommonMark.">Line breaks</span>
       <button id="toggle-linebreaks" type="button" class="switch" role="switch" aria-checked="true">
         <span class="switch-text">Obsidian style</span><span class="switch-track"><span class="switch-thumb"></span></span>
+      </button>
+    </div>
+    <div class="pop-row">
+      <span class="pop-label" title="When on, clicking a paragraph shows the Markdown it was written as; move away and it is a paragraph again. Ctrl+E still shows the whole file as text.">Live preview</span>
+      <button id="toggle-liveedit" type="button" class="switch" role="switch" aria-checked="true">
+        <span class="switch-text">Click to edit</span><span class="switch-track"><span class="switch-thumb"></span></span>
       </button>
     </div>
   </div>

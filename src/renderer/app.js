@@ -10,6 +10,7 @@ import { Graph } from './graph.js';
 import { Updates } from './updates.js';
 import { GitPanel } from './git.js';
 import { Editor } from './editor.js';
+import { LivePreview } from './live.js';
 import { icon, LOGO } from './icons.js';
 import { el, debounce, basename, dirname, samePath, readingStats, slugify, relativeSegments } from './util.js';
 
@@ -152,6 +153,7 @@ function applySettings(s) {
   root.dataset.width = s.width;
   root.dataset.font = s.font;
   body.classList.toggle('sidebar-hidden', !s.sidebar);
+  body.classList.toggle('live-edit', !!s.liveEdit);
   showSidebarTab(s.sidebarTab);
   syncReadingControls();
   renderRecent();
@@ -237,7 +239,11 @@ async function openDoc(p, { push = true, hash = '', position = null } = {}) {
   if (push && state.doc && !samePath(state.doc.path, res.path)) {
     pushHistory({ path: state.doc.path, ...readingPosition() });
   }
+  if (live) live.discard();
   state.doc = res;
+  // An open buffer follows the window rather than being left pointing at the
+  // document it was opened on.
+  if (editor) editor.retarget(res);
   hideBanner();
   setBase(res.dirUrl);
   body.classList.remove('is-welcome');
@@ -252,9 +258,18 @@ async function openDoc(p, { push = true, hash = '', position = null } = {}) {
   } catch (err) {
     console.error(err);
   }
-  fileTree.show(res.vaultRoot || res.dir, res.path).catch(() => {});
+  fileTree.show(treeRootFor(res), res.path).catch(() => {});
   ui.viewer.focus({ preventScroll: true });
   return true;
+}
+
+// Where the file tree should be rooted for a document: the folder the reader
+// opened, when the document is inside it, so the tree stays put as they move
+// around their notes.
+function treeRootFor(doc) {
+  const folder = state.settings && state.settings.folder;
+  if (folder && relativeSegments(folder, doc.path)) return folder;
+  return doc.vaultRoot || doc.dir;
 }
 
 // `position` (from readingPosition) is where to put the reader; keepScroll
@@ -266,7 +281,7 @@ async function renderDoc({ position = null, keepScroll = false } = {}) {
 
   let out;
   try {
-    out = getMarkdown().render(doc.content);
+    out = getMarkdown().render(doc.content, { srcMap: true });
   } catch (err) {
     console.error(err);
     out = { html: `<pre>${doc.content.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</pre>`, wiki: [], frontMatter: null };
@@ -549,7 +564,10 @@ async function onPaper(action) {
 }
 
 function printDoc() {
-  if (state.doc) onPaper(() => api.print()).catch(console.error);
+  if (!state.doc) return;
+  const paper = () => onPaper(() => api.print()).catch(console.error);
+  if (live && live.active) live.close().then(paper).catch(console.error);
+  else paper();
 }
 
 // ---------------------------------------------------------------------------
@@ -816,6 +834,9 @@ async function showWelcome() {
   renderRecent();
   fileTree.clear();
   outlineView.clear();
+  // With no document open the folder is all there is to show, so show it.
+  const folder = state.settings && state.settings.folder;
+  if (folder) fileTree.setRoot(folder, null).catch(() => {});
   try {
     state.defaultStatus = await api.defaultStatus();
   } catch {
@@ -871,6 +892,9 @@ function syncReadingControls() {
   const lb = $('#toggle-linebreaks');
   lb.setAttribute('aria-checked', String(s.lineBreaks));
   lb.classList.toggle('on', s.lineBreaks);
+  const le = $('#toggle-liveedit');
+  le.setAttribute('aria-checked', String(s.liveEdit));
+  le.classList.toggle('on', s.liveEdit);
 }
 
 function setFontSize(size) {
@@ -940,6 +964,10 @@ function buildMoreMenu() {
   if (win && state.info.packaged) {
     items.push(menuItem('Make Plume the default for .md', 'star', () => api.openDefaultApps()));
   }
+  items.push(sep(), menuItem('Open folder…', 'folder', () => openFolder().catch(console.error)));
+  if (state.settings && state.settings.folder) {
+    items.push(menuItem('Close folder', 'close', () => forgetFolder().catch(console.error)));
+  }
   items.push(
     sep(),
     menuItem('Plume Vault…', 'cloud', openVault),
@@ -953,17 +981,26 @@ function buildMoreMenu() {
 // Editing
 
 let editor = null;
+let live = null;
 
-function markDirty(editing, dirty) {
-  $('#btn-edit').setAttribute('aria-pressed', String(editing));
-  $('#btn-edit').title = editing ? 'Stop editing (Esc)' : 'Edit (Ctrl+E)';
-  $('#btn-save').hidden = !editing;
+function markDirty(source, dirty) {
+  const edit = $('#btn-edit');
+  edit.setAttribute('aria-pressed', String(source));
+  edit.title = source ? 'Back to the document (Esc)' : 'Edit the Markdown source (Ctrl+E)';
+  // Live preview has no mode to be in, so Save appears when there is
+  // something to save and not before.
+  $('#btn-save').hidden = !source && !dirty;
   $('#btn-save').disabled = !dirty;
   ui.crumbFile.classList.toggle('is-dirty', dirty);
 }
 
-function toggleEdit() {
-  if (!state.doc) return;
+// The rendered document is drawn from the buffer, not from the file: that is
+// what makes an unsaved edit visible in the reading view at all.
+function syncFromBuffer() {
+  if (editor && editor.editing && state.doc) state.doc = { ...state.doc, content: editor.value };
+}
+
+function getEditor() {
   if (!editor) {
     editor = new Editor({
       host: ui.viewer,
@@ -971,18 +1008,52 @@ function toggleEdit() {
       toast,
       onModeChange: markDirty,
       onSaved: content => {
-        // Keep the rendered copy in step, so leaving edit mode shows what was
-        // just written rather than what was there before.
+        // Keep the rendered copy in step, so going back to the document shows
+        // what was just written rather than what was there before.
         state.doc = { ...state.doc, content };
+      },
+      onHide: () => {
+        syncFromBuffer();
+        renderDoc({ keepScroll: true }).catch(console.error);
       },
     });
   }
-  if (editor.editing) {
-    if (!editor.stop()) return;
-    renderDoc({ keepScroll: true }).catch(console.error);
+  return editor;
+}
+
+function getLive() {
+  if (!live) {
+    live = new LivePreview({
+      host: ui.article,
+      scroller: ui.viewer,
+      read: () => (editor && editor.editing ? editor.value : (state.doc ? state.doc.content : '')),
+      write: text => {
+        // The first keystroke in a block is what opens the buffer, so reading
+        // a document costs nothing until it is actually edited.
+        getEditor().open(state.doc);
+        editor.setValue(text);
+      },
+      rerender: async () => {
+        syncFromBuffer();
+        await renderDoc({ keepScroll: true });
+      },
+      enabled: () => !!state.doc && !!state.settings && state.settings.liveEdit
+        && !(editor && editor.source),
+    });
+  }
+  return live;
+}
+
+function toggleEdit() {
+  if (!state.doc) return;
+  if (editor && editor.source) {
+    // onHide renders the document again, from the buffer.
+    editor.hide();
     return;
   }
-  editor.start(state.doc);
+  const toSource = () => getEditor().start(state.doc);
+  if (live && live.active) live.close().then(toSource).catch(console.error);
+  else toSource();
 }
 
 function saveDoc() {
@@ -992,6 +1063,7 @@ function saveDoc() {
 /** True when leaving now would lose work, after asking. */
 function mayLeaveDocument() {
   if (!editor || !editor.hasUnsaved) return true;
+  if (live && live.active) live.discard();
   return editor.stop();
 }
 
@@ -1164,15 +1236,42 @@ async function openDialog() {
 
 async function reloadDoc() {
   if (!state.doc) return;
+  // Re-reading the file replaces anything typed since, so ask first.
+  if (!mayLeaveDocument()) return;
   const position = readingPosition();
   const res = await api.loadDoc(state.doc.path);
   if (res.error) {
     toast(res.error, 'error');
     return;
   }
+  if (live) live.discard();
   state.doc = res;
+  if (editor) editor.retarget(res);
   hideBanner();
   await renderDoc({ position });
+}
+
+// A folder of notes to work out of. The sidebar roots itself there and
+// stays there: opening a document inside it reveals the file in place rather
+// than re-rooting the tree on the document's own folder.
+async function openFolder() {
+  const res = await api.openFolder();
+  if (!res || res.canceled) return;
+  if (res.error) {
+    toast(res.error, 'error');
+    return;
+  }
+  state.settings = { ...state.settings, folder: res.folder };
+  if (!state.settings.sidebar) await updateSettings({ sidebar: true });
+  showSidebarTab('files');
+  await fileTree.setRoot(res.folder, state.doc ? state.doc.path : null);
+}
+
+async function forgetFolder() {
+  await api.forgetFolder();
+  state.settings = { ...state.settings, folder: null };
+  if (state.doc) fileTree.show(state.doc.vaultRoot || state.doc.dir, state.doc.path).catch(() => {});
+  else fileTree.clear();
 }
 
 async function openInEditor() {
@@ -1287,6 +1386,7 @@ function wireUi() {
   $('#btn-reading').addEventListener('click', e => togglePopover(e.currentTarget, ui.readingPop));
   $('#btn-more').addEventListener('click', e => togglePopover(e.currentTarget, ui.moreMenu));
   $('#btn-welcome-open').addEventListener('click', openDialog);
+  $('#btn-welcome-folder').addEventListener('click', () => openFolder().catch(console.error));
   $('#btn-default').addEventListener('click', () => api.openDefaultApps());
   $('#btn-tree-refresh').addEventListener('click', () => fileTree.refresh());
   $('#banner-close').addEventListener('click', hideBanner);
@@ -1326,6 +1426,10 @@ function wireUi() {
   $('#font-larger').addEventListener('click', () => setFontSize(state.settings.fontSize + 1));
   $('#font-size-value').addEventListener('click', () => setFontSize(16));
   $('#toggle-linebreaks').addEventListener('click', () => updateSettings({ lineBreaks: !state.settings.lineBreaks }));
+  $('#toggle-liveedit').addEventListener('click', () => {
+    if (live && live.active) live.close().catch(console.error);
+    updateSettings({ liveEdit: !state.settings.liveEdit });
+  });
 
   // Find bar.
   const input = $('#find-input');
@@ -1369,7 +1473,13 @@ function wireUi() {
       return;
     }
     const img = e.target.closest('img');
-    if (img && !img.closest('.mermaid-svg')) openLightbox(img);
+    if (img && !img.closest('.mermaid-svg')) {
+      openLightbox(img);
+      return;
+    }
+    // Nothing else wanted the click, so it is a place to type: live preview
+    // opens that block's Markdown where it sits.
+    getLive().click(e);
   });
   ui.article.addEventListener('auxclick', e => {
     if (e.button !== 1) return;
@@ -1573,9 +1683,15 @@ function wireIpc() {
     if (!state.doc || !samePath(path, state.doc.path)) return;
 
     if (editor && editor.editing) {
+      // A block open for editing holds the text as it was a moment ago; the
+      // file has moved on, so that copy goes.
+      if (live && live.active && !editor.dirty) live.discard();
       const outcome = editor.externalChange(content);
       if (outcome === 'handled') {
         state.doc = { ...state.doc, content };
+        // In source mode the new text is already on show; in live preview the
+        // rendered document is what has to catch up.
+        if (!editor.source) renderDoc({ keepScroll: true }).catch(console.error);
         return;
       }
       if (outcome === 'conflict') {
@@ -1587,8 +1703,10 @@ function wireIpc() {
             'or Cancel to keep editing yours.'].join('\n'),
         );
         if (takeTheirs) {
+          if (live && live.active) live.discard();
           editor.takeExternal();
           state.doc = { ...state.doc, content };
+          if (!editor.source) renderDoc({ keepScroll: true }).catch(console.error);
         } else {
           editor.keepMine();
         }

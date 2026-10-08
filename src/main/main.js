@@ -883,6 +883,28 @@ handle('app:openDialog', async ctx => {
   return filePaths.slice(0, 1);
 });
 
+// A folder of notes to work out of, the way Obsidian opens a vault: the
+// sidebar roots itself there, and Plume remembers it for the next launch.
+// Opening a folder is not opening a document, so nothing is read from disk
+// here beyond listing it.
+handle('app:openFolder', async ctx => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
+    title: 'Open a folder of notes',
+    properties: ['openDirectory'],
+    buttonLabel: 'Open folder',
+  });
+  if (canceled || !filePaths.length) return { canceled: true };
+  settings.update({ folder: filePaths[0] });
+  broadcastSettings();
+  return { folder: filePaths[0] };
+});
+
+handle('app:forgetFolder', () => {
+  settings.update({ folder: null });
+  broadcastSettings();
+  return { folder: null };
+});
+
 // Extra windows for dropped files and Ctrl+clicked links: documents only, so
 // a dropped image or PDF never opens a window of binary noise (doc:load also
 // refuses binary content behind a text-like name).

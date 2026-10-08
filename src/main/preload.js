@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('plume', {
   removeRecent: p => invoke('recent:remove', p),
 
   openDialog: () => invoke('app:openDialog'),
+  openFolder: () => invoke('app:openFolder'),
+  forgetFolder: () => invoke('app:forgetFolder'),
   openPaths: paths => invoke('app:openPaths', paths),
   newWindow: () => invoke('app:newWindow'),
   about: () => invoke('app:about'),

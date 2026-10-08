@@ -1,9 +1,15 @@
 // Editing.
 //
-// Plume is a reader first, so editing is a mode you turn on rather than the
-// state you are always in. The raw Markdown goes into a plain textarea — no
-// hidden rich-text model, no transformation on the way in or out, so what you
-// save is exactly what you typed.
+// Plume keeps one buffer per open document: the raw Markdown, in a plain
+// textarea — no hidden rich-text model, no transformation on the way in or
+// out, so what you save is exactly what you typed. Two things write into it:
+//
+//   · live preview (live.js), a block at a time, with the document rendered
+//   · source mode, the whole file as text, which is this textarea on show
+//
+// Because it is the same buffer, the unsaved mark, Ctrl+S and the handling of
+// a file that changes on disk work the same whichever way you are typing, and
+// switching between them loses nothing.
 //
 // The rules that matter:
 //   · nothing is written to disk until you ask
@@ -12,6 +18,7 @@
 //     overwrite them — you are told, and you choose
 
 import { el } from './util.js';
+import { markdownKeys } from './mdkeys.js';
 
 export class Editor {
   /**
@@ -19,17 +26,22 @@ export class Editor {
    * @param {HTMLElement} options.host     where the textarea goes
    * @param {object} options.api           the preload bridge
    * @param {Function} options.toast       the notification helper
-   * @param {Function} options.onModeChange called with true when editing starts
+   * @param {Function} options.onModeChange called with (sourceMode, dirty)
    * @param {Function} options.onSaved     called after a successful save
+   * @param {Function} options.onHide      called when source mode is left
    */
-  constructor({ host, api, toast, onModeChange, onSaved }) {
+  constructor({ host, api, toast, onModeChange, onSaved, onHide }) {
     this.host = host;
     this.api = api;
     this.toast = toast;
     this.onModeChange = onModeChange || (() => {});
     this.onSaved = onSaved || (() => {});
+    this.onHide = onHide || (() => {});
 
+    // A buffer is open (either way of editing), and the big textarea is on
+    // show (source mode). The second implies the first.
     this.editing = false;
+    this.source = false;
     this.dirty = false;
     this.original = '';
     this.path = null;
@@ -56,7 +68,7 @@ export class Editor {
     const dirty = this.area.value !== this.original;
     if (dirty === this.dirty) return;
     this.dirty = dirty;
-    this.onModeChange(this.editing, this.dirty);
+    this.onModeChange(this.source, this.dirty);
   }
 
   /** True when there is unsaved work that would be lost. */
@@ -64,17 +76,49 @@ export class Editor {
     return this.editing && this.dirty;
   }
 
+  /** The current text, for rendering the document or for saving it. */
+  get value() {
+    return this.area.value;
+  }
+
+  /** Text typed elsewhere — live preview — for this same document. */
+  setValue(text) {
+    if (!this.editing || text === this.area.value) return;
+    this.area.value = text;
+    this.touched();
+  }
+
   // ---------- turning it on and off ----------
 
-  start(doc) {
+  /** Opens a buffer on `doc` without showing it: live preview types here. */
+  open(doc) {
+    if (this.editing && this.path === doc.path) return;
     this.path = doc.path;
     this.original = doc.content;
     this.area.value = doc.content;
     this.dirty = false;
     this.editing = true;
+    this.onModeChange(this.source, false);
+  }
+
+  /** Points an open buffer at another document, with nothing unsaved. */
+  retarget(doc) {
+    if (!this.editing) return;
+    this.path = doc.path;
+    this.original = doc.content;
+    this.area.value = doc.content;
+    this.dirty = false;
+    this.pendingExternal = null;
+    this.onModeChange(this.source, false);
+  }
+
+  /** Shows the whole document as text (source mode). */
+  start(doc) {
+    this.open(doc);
+    this.source = true;
     this.area.hidden = false;
     document.body.classList.add('is-editing');
-    this.onModeChange(true, false);
+    this.onModeChange(true, this.dirty);
     // Put the caret where the reader was looking, near enough: the top.
     this.area.focus({ preventScroll: true });
     this.area.setSelectionRange(0, 0);
@@ -82,30 +126,41 @@ export class Editor {
   }
 
   /**
-   * Leaves edit mode. Returns false when the reader said no to losing work, so
-   * the caller knows nothing happened.
+   * Hides the source textarea and goes back to the rendered document. The
+   * buffer stays, so unsaved text is not lost — the document is rendered from
+   * it, and the unsaved mark says why it does not match the file yet.
+   */
+  hide() {
+    if (!this.source) return;
+    this.source = false;
+    this.area.hidden = true;
+    document.body.classList.remove('is-editing');
+    this.onModeChange(false, this.dirty);
+    this.onHide();
+  }
+
+  /**
+   * Closes the buffer altogether. Returns false when the reader said no to
+   * losing work, so the caller knows nothing happened.
    */
   stop({ force = false } = {}) {
     if (this.hasUnsaved && !force) {
       const leave = window.confirm(
         'This document has changes that have not been saved.\n\n'
-        + 'Leave edit mode and lose them?',
+        + 'Close it and lose them?',
       );
       if (!leave) return false;
     }
     this.editing = false;
+    this.source = false;
     this.dirty = false;
     this.area.hidden = true;
     this.area.value = '';
     this.original = '';
+    this.pendingExternal = null;
     document.body.classList.remove('is-editing');
     this.onModeChange(false, false);
     return true;
-  }
-
-  /** The current text, for rendering a preview or for the caller to save. */
-  get value() {
-    return this.area.value;
   }
 
   // ---------- saving ----------
@@ -148,56 +203,12 @@ export class Editor {
     }
     if (ev.key === 'Escape') {
       ev.preventDefault();
-      this.stop();
+      // Back to the rendered document, keeping the text: in source mode Esc
+      // is a way of looking at the document, not of throwing work away.
+      this.hide();
       return;
     }
-
-    // Tab indents rather than leaving the document — in a Markdown editor that
-    // is what the key is for.
-    if (ev.key === 'Tab') {
-      ev.preventDefault();
-      const { selectionStart: start, selectionEnd: end, value } = this.area;
-
-      if (start === end && !ev.shiftKey) {
-        this.area.setRangeText('  ', start, end, 'end');
-      } else {
-        const from = value.lastIndexOf('\n', start - 1) + 1;
-        const block = value.slice(from, end);
-        const shifted = ev.shiftKey
-          ? block.replace(/^ {1,2}/gm, '')
-          : block.replace(/^/gm, '  ');
-        this.area.setRangeText(shifted, from, end, 'select');
-      }
-      this.touched();
-      return;
-    }
-
-    // Enter continues a list, the way every Markdown editor does.
-    if (ev.key === 'Enter' && !ev.shiftKey && !mod) {
-      const { selectionStart: start, value } = this.area;
-      if (start !== this.area.selectionEnd) return;
-      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-      const line = value.slice(lineStart, start);
-      const marker = /^(\s*)(?:([-*+])|(\d+)([.)]))(\s+\[[ xX]\])?\s+/.exec(line);
-      if (!marker) return;
-
-      // A marker with nothing after it means the list is finished.
-      if (line.length === marker[0].length) {
-        ev.preventDefault();
-        this.area.setRangeText('\n', lineStart, start, 'end');
-        this.touched();
-        return;
-      }
-
-      ev.preventDefault();
-      const indent = marker[1];
-      const box = marker[5] ? ' [ ]' : '';
-      const next = marker[2]
-        ? `${indent}${marker[2]}${box} `
-        : `${indent}${parseInt(marker[3], 10) + 1}${marker[4]}${box} `;
-      this.area.setRangeText(`\n${next}`, start, start, 'end');
-      this.touched();
-    }
+    if (markdownKeys(this.area, ev)) this.touched();
   }
 
   // ---------- the file changing underneath ----------
@@ -225,7 +236,7 @@ export class Editor {
     this.original = content;
     this.area.value = content;
     this.dirty = false;
-    this.onModeChange(true, false);
+    this.onModeChange(this.source, false);
     return true;
   }
 
@@ -233,6 +244,6 @@ export class Editor {
     this.pendingExternal = null;
     // Still different from disk, so still unsaved.
     this.dirty = true;
-    this.onModeChange(true, true);
+    this.onModeChange(this.source, true);
   }
 }

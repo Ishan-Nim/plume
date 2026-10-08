@@ -300,8 +300,9 @@
     </figure>
 
     <ul>
+      <li><b>Open a folder</b> of notes from the welcome screen, or <b>&ctdot; &rarr; Open folder…</b>, and the sidebar roots itself there and stays there — opening a note inside it reveals the file in the tree instead of re-rooting on the note's own folder. Plume remembers the folder, so it is waiting next time; <b>Close folder</b> lets it go.</li>
       <li><b>The sidebar</b> has two tabs — <b>Files</b> (the folder around your document, or the whole vault if it is in one) and <b>Outline</b> (every heading, with a reading time) — and the <b>Plume Vault</b> bar at its foot. Toggle the sidebar with <code>Ctrl+\</code>.</li>
-      <li><b>Reading settings</b> (the <code>Aa</code> button) set the theme, text size, reading width, serif or sans, and whether a single newline is a line break.</li>
+      <li><b>Reading settings</b> (the <code>Aa</code> button) set the theme, the colour palette, text size, reading width, serif or sans, whether a click edits a paragraph (live preview), and whether a single newline is a line break.</li>
       <li><b>Live reload:</b> save the file in any editor and Plume updates in place, keeping your scroll position. Write in your editor, read here.</li>
       <li><b>Find in page</b> with <code>Ctrl+F</code>; <b>back and forward</b> between linked notes with <code>Alt+←</code> and <code>Alt+→</code>, or your mouse side buttons.</li>
       <li><b>Print</b> and <b>Export as PDF</b> from the <code>⋯</code> menu. PDFs get a real outline built from your headings, and diagrams are redrawn in the light theme for paper.</li>
@@ -595,10 +596,17 @@ people/notes.md                 who said what, and when</code></pre>
 
     <h2 id="editing">Editing</h2>
     <p>
-      Plume is a reader first, so editing is a mode you turn on rather than the state you are always
-      in. Press the pencil in the toolbar, or <code>Ctrl+E</code>, and the document becomes editable:
-      the raw Markdown, in a plain editor, with no hidden formatting model between what you type and
-      what is saved.
+      <b>Click a paragraph.</b> It turns into the Markdown it was written as, right where it sits —
+      the stars around <b>bold</b>, the brackets around a link — while everything else on the page
+      stays rendered, so nothing moves under you. Type, click somewhere else, and it is a paragraph
+      again. That is <b>live preview</b>, and it is on unless you turn it off in
+      <b>Reading settings &rarr; Live preview</b>.
+    </p>
+    <p>
+      For the whole file as plain text, press the pencil in the toolbar or <code>Ctrl+E</code>.
+      Both write into the same text, so you can move between them mid-sentence without losing
+      anything, and the rendered document always shows what you have typed — saved or not.
+      There is no hidden formatting model between what you type and what is saved.
     </p>
     <figure>
       <video class="film" width="1180" height="760" preload="none" muted loop playsinline
@@ -606,20 +614,24 @@ people/notes.md                 who said what, and when</code></pre>
         <source src="assets/clips/editing.webm" type="video/webm">
         <source src="assets/clips/editing.mp4" type="video/mp4">
       </video>
-      <figcaption>Ctrl+E for the raw Markdown, in a plain editor.</figcaption>
+      <figcaption>Ctrl+E for the whole file as text. For one paragraph, a click is enough.</figcaption>
     </figure>
 
     <ul>
-      <li><code>Ctrl+S</code> saves. <code>Esc</code> goes back to reading.</li>
+      <li><code>Ctrl+S</code> saves, wherever you are typing. <code>Esc</code> goes back to reading and keeps what you typed.</li>
+      <li><b>A block opens whole.</b> A list, a table or a code block is edited as the one thing it is. Diagrams, maths and images stay rendered — a click on those does nothing, so a stray click cannot replace a diagram with its source.</li>
+      <li><b>Arrow keys carry on into the next block</b>, as though the whole document were one editor. Clicking past the end of the document starts a new paragraph there.</li>
       <li><b>Tab</b> indents and <b>Shift+Tab</b> outdents, across a whole selection.</li>
       <li><b>Enter</b> continues a list — bullets, numbers and task boxes — and ends it when you press Enter on an empty item.</li>
+      <li><b>Selecting text does not start an edit</b>, so you can still read with the mouse. Links still follow on a click.</li>
       <li><code>Ctrl+Shift+E</code> still hands the file to VS Code, Cursor or your system editor.</li>
     </ul>
 
     <h3>What it will not do to your work</h3>
     <ul>
       <li><b>Nothing is written until you ask.</b> Typing changes nothing on disk.</li>
-      <li><b>Unsaved work is never dropped silently.</b> A dot appears beside the file name while there are unsaved changes, and leaving edit mode asks before discarding them.</li>
+      <li><b>Only the lines you edited are rewritten.</b> Editing one paragraph replaces that paragraph's own lines and passes the rest of the file through exactly as it was — including anything Plume does not render.</li>
+      <li><b>Unsaved work is never dropped silently.</b> A dot appears beside the file name while there are unsaved changes. Going back to reading keeps them; moving to another document, or re-reading the file from disk, asks first.</li>
       <li><b>A file changed elsewhere cannot overwrite you.</b> If something else writes to the document while you are editing it — another editor, or a sync from another machine — Plume stops, tells you, and lets you choose which version to keep.</li>
       <li><b>Saving does not fight live reload.</b> Plume recognises its own write, so the editor is not reloaded out from under you.</li>
     </ul>
@@ -708,7 +720,8 @@ people/notes.md                 who said what, and when</code></pre>
           <tr><td>Toggle sidebar</td><td><code>Ctrl+\</code></td></tr>
           <tr><td>Text size</td><td><code>Ctrl+=</code> / <code>Ctrl+-</code> / <code>Ctrl+0</code></td></tr>
           <tr><td>Reload</td><td><code>F5</code></td></tr>
-          <tr><td>Edit this document</td><td><code>Ctrl+E</code></td></tr>
+          <tr><td>Edit one block, where it is</td><td>click it</td></tr>
+          <tr><td>Edit the whole file as text</td><td><code>Ctrl+E</code></td></tr>
           <tr><td>Save</td><td><code>Ctrl+S</code></td></tr>
           <tr><td>Open in your editor</td><td><code>Ctrl+Shift+E</code></td></tr>
           <tr><td>Print</td><td><code>Ctrl+P</code></td></tr>

@@ -1,6 +1,34 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no workspace to import, no project to set up, no editor chrome.
 
-**1.1.1 prepares for the repository moving to its own organisation.** The updater accepted release downloads from one repository path, baked in at build time. Plume is moving to github.com/Plume-MD, and after that move GitHub answers an older copy of Plume with URLs under the new name — which that copy would have refused, stopping its own updates for good. This release accepts both, so the move costs nobody an update. **If you are on 1.1.0 or earlier, take this one before the move.**
+**1.2.0 adds live preview, and a button for opening a folder of notes.**
+
+**Live preview.** Click a paragraph and it becomes the Markdown it was
+written as, right where it sits — the stars around **bold**, the brackets
+around a link — while the rest of the page stays rendered, so nothing moves
+under you. Click somewhere else and it is a paragraph again. A list, a table
+or a code block opens whole, as the one thing it is; diagrams, maths blocks
+and images stay rendered, so a stray click cannot replace a diagram with its
+source. Arrow keys carry on into the next block, and clicking past the end of
+the document starts a new paragraph there. Editing a block replaces that
+block's own lines and passes the rest of the file through exactly as it was.
+It is on by default — **Reading settings → Live preview** turns it off — and
+`Ctrl+E` still shows the whole file as plain text when that is what you want.
+
+**Open folder** sits beside *Open file* on the welcome screen, and in
+**⋯ → Open folder…** once a document is open. Pick a folder of notes and the
+sidebar roots itself there and stays there; opening a note inside it reveals
+the file in the tree rather than re-rooting on the note's own folder. Plume
+remembers the folder, so it is waiting the next time you open the app.
+**Close folder** lets it go.
+
+**Typing one way no longer loses the other.** Live preview and the whole-file
+editor write into the same text, so `Ctrl+E` in the middle of a sentence
+keeps it, the reading view shows your unsaved edits rather than the last
+saved version, and `Esc` goes back to reading without throwing anything away.
+Re-reading the file from disk (`F5`) now asks first instead of discarding
+unsaved work.
+
+**1.2.0 prepares for the repository moving to its own organisation.** The updater accepted release downloads from one repository path, baked in at build time. Plume is moving to github.com/Plume-MD, and after that move GitHub answers an older copy of Plume with URLs under the new name — which that copy would have refused, stopping its own updates for good. This release accepts both, so the move costs nobody an update. **If you are on 1.1.0 or earlier, take this one before the move.**
 
 **1.1.0 adds Git sync, and four colour palettes.**
 
@@ -28,11 +56,11 @@ Plume registers itself for `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn
 
 Everything GitHub-flavoured works too: tables, task lists, footnotes, definition lists, emoji shortcodes, syntax highlighting, KaTeX maths and Mermaid diagrams.
 
-### Edits when you ask it to
+### Edits where you click
 
-Press the pencil, or `Ctrl+E`, and the document becomes editable — the raw Markdown, in a plain editor, with no hidden formatting model. `Ctrl+S` saves. `Esc` goes back to reading.
+Click a paragraph and it becomes the Markdown it was written as, right where it sits; move away and it is a paragraph again. For the whole file as plain text, press the pencil or `Ctrl+E`. `Ctrl+S` saves. `Esc` goes back to reading.
 
-Plume is a reader first, so editing is a mode you turn on rather than the state you are always in. The rules it keeps:
+Both write into the same text, so moving between them loses nothing. The rules Plume keeps:
 
 - **Nothing is written until you ask.** Typing changes nothing on disk.
 - **An unsaved change is never thrown away silently.** A dot marks it, and leaving asks first.
@@ -86,10 +114,10 @@ Worth saying plainly: **Plume is not code-signed.** Those checksums come from th
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.1.1.exe` |
-| macOS, Apple silicon | `Plume-1.1.1-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.1.1-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.1.1-linux-x86_64.AppImage` or `Plume-1.1.1-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.2.0.exe` |
+| macOS, Apple silicon | `Plume-1.2.0-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.2.0-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.2.0-linux-x86_64.AppImage` or `Plume-1.2.0-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html), which offers the right build for your system.
 
@@ -97,7 +125,7 @@ Or get them from [plume-md.com/download](https://plume-md.com/download.html), wh
 
 ### Windows
 
-Run `Plume-Setup-1.1.1.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
+Run `Plume-Setup-1.2.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 
 To make Plume the default for `.md`, right-click a Markdown file and choose **Open with → Choose another app → Plume → Always**, or use **⋯ → Make Plume the default for .md** inside Plume.
 
@@ -110,8 +138,8 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 ### Linux
 
-- **AppImage:** make it executable with `chmod +x Plume-1.1.1-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.1.1-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+- **AppImage:** make it executable with `chmod +x Plume-1.2.0-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.2.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
 
 ---
 

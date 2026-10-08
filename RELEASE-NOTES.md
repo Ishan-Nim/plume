@@ -1,8 +1,36 @@
-# Plume 1.1.1
+# Plume 1.2.0
 
 **Released 8 October 2026** · [plume-md.com](https://plume-md.com) · MIT licence
 
-> **1.1.1 prepares for the repository moving to its own organisation.** The
+> **1.2.0 adds live preview, and a button for opening a folder of notes.**
+>
+> **Live preview.** Click a paragraph and it becomes the Markdown it was
+> written as, right where it sits — the stars around **bold**, the brackets
+> around a link — while the rest of the page stays rendered, so nothing moves
+> under you. Click somewhere else and it is a paragraph again. A list, a table
+> or a code block opens whole, as the one thing it is; diagrams, maths blocks
+> and images stay rendered, so a stray click cannot replace a diagram with its
+> source. Arrow keys carry on into the next block, and clicking past the end of
+> the document starts a new paragraph there. Editing a block replaces that
+> block's own lines and passes the rest of the file through exactly as it was.
+> It is on by default — **Reading settings → Live preview** turns it off — and
+> `Ctrl+E` still shows the whole file as plain text when that is what you want.
+>
+> **Open folder** sits beside *Open file* on the welcome screen, and in
+> **⋯ → Open folder…** once a document is open. Pick a folder of notes and the
+> sidebar roots itself there and stays there; opening a note inside it reveals
+> the file in the tree rather than re-rooting on the note's own folder. Plume
+> remembers the folder, so it is waiting the next time you open the app.
+> **Close folder** lets it go.
+>
+> **Typing one way no longer loses the other.** Live preview and the whole-file
+> editor write into the same text, so `Ctrl+E` in the middle of a sentence
+> keeps it, the reading view shows your unsaved edits rather than the last
+> saved version, and `Esc` goes back to reading without throwing anything away.
+> Re-reading the file from disk (`F5`) now asks first instead of discarding
+> unsaved work.
+>
+> **1.2.0 prepares for the repository moving to its own organisation.** The
 > updater accepted release downloads from one repository path, baked in at
 > build time. Plume is moving to github.com/Plume-MD, and after that move
 > GitHub answers an older copy of Plume with URLs under the new name — which
@@ -201,22 +229,22 @@ vault, and no way to forge a session.
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.1.1.exe` |
-| macOS, Apple silicon | `Plume-1.1.1-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.1.1-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.1.1-linux-x86_64.AppImage` or `Plume-1.1.1-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.2.0.exe` |
+| macOS, Apple silicon | `Plume-1.2.0-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.2.0-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.2.0-linux-x86_64.AppImage` or `Plume-1.2.0-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html),
 which offers the right build for your system.
 
 Checksums for every file are in `SHA256SUMS.txt` on the
-[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.1.1).
+[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.2.0).
 
 ## Installing
 
 ### Windows
 
-Run `Plume-Setup-1.1.1.exe`. Plume installs for all users in
+Run `Plume-Setup-1.2.0.exe`. Plume installs for all users in
 `C:\Program Files\Plume`, so Windows asks for administrator approval once. The
 installer is not code-signed yet: if SmartScreen shows "Windows protected your
 PC", choose **More info → Run anyway**.
@@ -238,8 +266,8 @@ so macOS blocks the first launch. Use either of these:
 ### Linux
 
 - **AppImage:** make it executable with
-  `chmod +x Plume-1.1.1-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.1.1-linux-amd64.deb`. On
+  `chmod +x Plume-1.2.0-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.2.0-linux-amd64.deb`. On
   Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that
   Electron apps need to start there.
 

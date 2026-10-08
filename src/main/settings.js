@@ -22,12 +22,14 @@ const DEFAULTS = Object.freeze({
   width: 'normal',        // 'narrow' | 'normal' | 'wide' | 'full'
   font: 'sans',           // 'sans' | 'serif'
   lineBreaks: true,       // Obsidian-style: a single newline is a line break
+  liveEdit: true,         // click a block in the document to edit it in place
   sidebar: true,
   sidebarTab: 'files',    // 'files' | 'outline' | 'vault'
   sidebarWidth: 260,
   recent: [],
   autoUpdate: true,       // check GitHub for a newer release on launch
   skippedVersion: null,   // a version the user chose not to be told about again
+  folder: null,           // the folder of notes the sidebar opens on
   vaultFolder: null,      // the folder kept in step with the vault, if any
   syncPaused: false,
   gitFolder: null,        // a folder kept in step with a Git remote, if any
@@ -44,12 +46,14 @@ const VALIDATORS = {
   width: v => ['narrow', 'normal', 'wide', 'full'].includes(v),
   font: v => ['sans', 'serif'].includes(v),
   lineBreaks: v => typeof v === 'boolean',
+  liveEdit: v => typeof v === 'boolean',
   sidebar: v => typeof v === 'boolean',
   sidebarTab: v => ['files', 'outline', 'vault'].includes(v),
   sidebarWidth: v => Number.isInteger(v) && v >= 180 && v <= 520,
   recent: v => Array.isArray(v) && v.every(p => typeof p === 'string' && p.length < 4096),
   autoUpdate: v => typeof v === 'boolean',
   skippedVersion: v => v === null || (typeof v === 'string' && v.length < 40),
+  folder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
   vaultFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
   syncPaused: v => typeof v === 'boolean',
   gitFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
@@ -62,7 +66,7 @@ const VALIDATORS = {
 
 // Keys the renderer may change. Window geometry and the recent list are
 // managed by the main process only.
-const RENDERER_KEYS = new Set(['theme', 'palette', 'fontSize', 'width', 'font', 'lineBreaks',
+const RENDERER_KEYS = new Set(['theme', 'palette', 'fontSize', 'width', 'font', 'lineBreaks', 'liveEdit',
   'sidebar', 'sidebarTab', 'sidebarWidth', 'autoUpdate', 'skippedVersion',
   'gitAuto', 'gitEvery']);
 
