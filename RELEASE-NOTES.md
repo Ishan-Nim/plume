@@ -1,8 +1,15 @@
-# Plume 1.0.2
+# Plume 1.0.3
 
 **Released 8 October 2026** · [plume-md.com](https://plume-md.com) · MIT licence
 
-> **1.0.2 fixes the updater, which could not install an update.**
+> **1.0.3 adds four colour palettes.** Starless, Greenwood, Commit and Lapis
+> sit beside Plume's own under **Reading settings → Palette**. A palette
+> recolours whichever of light or dark is in force rather than replacing that
+> choice, so Auto still follows the system inside every one of them. The same
+> five are on the website and the web app, in the footer. They are derived from
+> four MIT-licensed Obsidian community themes, credited in the README.
+>
+> **1.0.2 fixed the updater, which could not install an update.**
 > "Install and restart" started the install *and* a second download at the same
 > time, and the second one deleted the installer the first had just handed to
 > Windows. Nothing was installed, Plume reopened on the old version, and
@@ -172,22 +179,22 @@ vault, and no way to forge a session.
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.0.2.exe` |
-| macOS, Apple silicon | `Plume-1.0.2-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.0.2-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.0.2-linux-x86_64.AppImage` or `Plume-1.0.2-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.0.3.exe` |
+| macOS, Apple silicon | `Plume-1.0.3-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.0.3-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.0.3-linux-x86_64.AppImage` or `Plume-1.0.3-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html),
 which offers the right build for your system.
 
 Checksums for every file are in `SHA256SUMS.txt` on the
-[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.0.2).
+[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.0.3).
 
 ## Installing
 
 ### Windows
 
-Run `Plume-Setup-1.0.2.exe`. Plume installs for all users in
+Run `Plume-Setup-1.0.3.exe`. Plume installs for all users in
 `C:\Program Files\Plume`, so Windows asks for administrator approval once. The
 installer is not code-signed yet: if SmartScreen shows "Windows protected your
 PC", choose **More info → Run anyway**.
@@ -209,8 +216,8 @@ so macOS blocks the first launch. Use either of these:
 ### Linux
 
 - **AppImage:** make it executable with
-  `chmod +x Plume-1.0.2-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.0.2-linux-amd64.deb`. On
+  `chmod +x Plume-1.0.3-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.0.3-linux-amd64.deb`. On
   Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that
   Electron apps need to start there.
 
