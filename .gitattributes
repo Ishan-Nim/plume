@@ -6,3 +6,14 @@ site/assets/*.js text eol=lf
 site/*.html text eol=lf
 site/robots.txt text eol=lf
 site/sitemap.xml text eol=lf
+
+# Binary, whatever git's heuristic thinks: a PDF or an image with line endings
+# "fixed" on checkout is a corrupted file, and it corrupts silently.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.mp4 binary
+*.webm binary
+*.ico binary
+*.icns binary
