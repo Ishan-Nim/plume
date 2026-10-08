@@ -51,6 +51,7 @@
 - **Updates that ask first.** Plume tells you when a new version is out and installs it when you say so. Every download is checked against the release's published checksum.
 - **Find in page**, back/forward between linked notes, image lightbox, copy buttons on code blocks.
 - **Light / dark / auto theme**, text size, reading width, sans/serif.
+- **Five colour palettes** — Plume, Starless, Greenwood, Commit and Lapis. A palette recolours whichever of light or dark is in force rather than replacing that choice, so auto still follows the system inside every one of them. The same five are on the website and the web app.
 - **Print** and **Export to PDF** (with a PDF outline from your headings).
 - **Open in editor** (VS Code or Cursor if installed, otherwise the system text editor), **Open in Obsidian** for vault files, **Open with…** (Windows), **Show in folder**.
 - Safe by default: documents are sanitised, scripts never run, links to programs are never executed.
@@ -178,6 +179,23 @@ scripts/        build + icon generation
 test/           unit tests, e2e capture + vault-flow harnesses, fixture vault
 docs/           screenshots and the demo notebook they are taken from
 ```
+
+## Credits
+
+The four colour palettes beyond Plume's own are derived from Obsidian community
+themes, each MIT licensed. The CSS in this repository is Plume's; the colour
+schemes are theirs, and the names here are different so neither is mistaken for
+the other.
+
+| Palette | Derived from | Author |
+|---|---|---|
+| Starless | [Void](https://github.com/0crazy-0/obsidian-void) | 0crazy-0 |
+| Greenwood | [Everforest Enchanted](https://github.com/fireisgood/obsidian-everforest-enchanted) | fireisgood |
+| Commit | [GitHub Flavored Markdown](https://github.com/tofrankie/obsidian-theme-gfm) | tofrankie |
+| Lapis | [Sodalite](https://github.com/tomzorz/Sodalite) | tomzorz |
+
+Void and Sodalite are dark-only upstream; their light sides are built from the
+same hues so that Light and Auto keep working when one of them is chosen.
 
 ## Security
 

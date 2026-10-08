@@ -122,6 +122,250 @@
   --hl-add: #aff5b4;
 }
 
+/* ---------------------------------------------------------------- palettes
+ *
+ * A palette is a recolouring, not a second theme system: Auto / Light / Dark
+ * still decides whether it is day or night, and a palette only overrides the
+ * tokens that give it its character. Everything it does not mention — syntax
+ * highlighting, find marks, toasts — falls through to the light or dark block
+ * above, so a palette can never leave a colour undefined.
+ *
+ * The four colour schemes are derived from Obsidian community themes, all MIT
+ * licensed, credited in README.md. The CSS is ours; the palettes are theirs:
+ *   Starless  ← Void (0crazy-0)
+ *   Greenwood ← Everforest Enchanted (fireisgood)
+ *   Commit    ← GitHub Flavored Markdown (tofrankie)
+ *   Lapis     ← Sodalite (tomzorz)
+ *
+ * Void and Sodalite are dark-only upstream, so their light sides are built
+ * here from the same hues rather than left to fall back to Plume's own.
+ */
+
+/* ---- Starless: no hue at all, paper-white type on true black ---- */
+[data-theme="dark"][data-palette="starless"] {
+  --bg: #0b0b0b;
+  --chrome: #0a0a0a;
+  --chrome-2: #121111;
+  --pop-bg: #121111;
+  --seg-active: #1f1f1f;
+  --border: #202020;
+  --border-soft: #171717;
+  --border-strong: #3d3d3d;
+  --text: #e6e6e6;
+  --heading: #f6f6f6;
+  --text-2: #a9a9a9;
+  --text-3: #767676;
+  --accent: #d3d3d3;
+  --accent-strong: #ffffff;
+  --accent-soft: rgba(232, 232, 232, 0.10);
+  --link: #e0e0e0;
+  --code-bg: #1a1a1a;
+  --code-text: #e6e6e6;
+  --inline-code-bg: #1a1a1a;
+  --inline-code-text: #dcdcdc;
+  --quote-border: #2a2a2a;
+  --zebra: #101010;
+  --selection: rgba(232, 232, 232, 0.15);
+  --img-border: #202020;
+  --scroll: rgba(255, 255, 255, 0.14);
+  --scroll-hover: rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="light"][data-palette="starless"] {
+  --bg: #ffffff;
+  --chrome: #f4f4f4;
+  --chrome-2: #e9e9e9;
+  --pop-bg: #ffffff;
+  --seg-active: #ffffff;
+  --border: #dcdcdc;
+  --border-soft: #ededed;
+  --border-strong: #bdbdbd;
+  --text: #16161a;
+  --heading: #000000;
+  --text-2: #4f4f4f;
+  --text-3: #7d7d7d;
+  --accent: #3a3a3a;
+  --accent-strong: #000000;
+  --accent-soft: rgba(0, 0, 0, 0.07);
+  --link: #2b2b2b;
+  --code-bg: #f4f4f4;
+  --inline-code-bg: #ededed;
+  --quote-border: #d4d4d4;
+  --zebra: #fafafa;
+  --selection: rgba(0, 0, 0, 0.13);
+  --img-border: #e2e2e2;
+}
+
+/* ---- Greenwood: warm forest greens over a soft, low-contrast ground ---- */
+[data-theme="dark"][data-palette="greenwood"] {
+  --bg: #333c43;
+  --chrome: #293136;
+  --chrome-2: #3a464c;
+  --pop-bg: #3a464c;
+  --seg-active: #434f55;
+  --border: #4b575d;
+  --border-soft: #3d474d;
+  --border-strong: #5d6b66;
+  --text: #d3c6aa;
+  --heading: #e6dcc3;
+  --text-2: #a7b0a6;
+  --text-3: #859289;
+  --accent: #76bf98;
+  --accent-strong: #8fd0ad;
+  --accent-soft: rgba(86, 157, 121, 0.18);
+  --link: #7fb3c0;
+  --code-bg: #293136;
+  --code-text: #d3c6aa;
+  --inline-code-bg: #2c353b;
+  --inline-code-text: #d8cdb4;
+  --quote-border: #5d6b66;
+  --zebra: #38424a;
+  --mark: #55544a;
+  --selection: rgba(92, 63, 79, 0.6);
+  --img-border: #4a555b;
+  --danger: #da6362;
+  --success: #899c40;
+  --warn-bg: #55544a;
+  --warn-text: #e8d9a8;
+}
+
+[data-theme="light"][data-palette="greenwood"] {
+  --bg: #fffbef;
+  --chrome: #f8f5e4;
+  --chrome-2: #f2efdf;
+  --pop-bg: #fffbef;
+  --seg-active: #ffffff;
+  --border: #dfdac4;
+  --border-soft: #efebd8;
+  --border-strong: #bec5b2;
+  --text: #5c6a72;
+  --heading: #414b53;
+  --text-2: #687363;
+  --text-3: #717f68;
+  --accent: #3f8763;
+  --accent-strong: #2f6e4f;
+  --accent-soft: rgba(63, 135, 99, 0.14);
+  --link: #3a7d8c;
+  --code-bg: #f2efdf;
+  --inline-code-bg: #f4f1e0;
+  --quote-border: #dfdac4;
+  --zebra: #faf7e8;
+  --mark: #fef2d5;
+  --selection: rgba(222, 216, 219, 0.95);
+  --img-border: #e6e1cc;
+  --danger: #f85552;
+  --success: #8da101;
+  --warn-bg: #fef2d5;
+  --warn-text: #8a6a16;
+}
+
+/* ---- Commit: the palette a diff is usually read in ---- */
+[data-theme="dark"][data-palette="commit"] {
+  --bg: #0d1117;
+  --chrome: #161b22;
+  --chrome-2: #010409;
+  --pop-bg: #161b22;
+  --seg-active: #21262d;
+  --border: #30363d;
+  --border-soft: #21262d;
+  --border-strong: #484f58;
+  --text: #c9d1d9;
+  --heading: #e6edf3;
+  --text-2: #8b949e;
+  --text-3: #6e7681;
+  --accent: #2f81f7;
+  --accent-strong: #58a6ff;
+  --accent-soft: rgba(47, 129, 247, 0.15);
+  --link: #58a6ff;
+  --code-bg: #161b22;
+  --code-text: #c9d1d9;
+  --inline-code-bg: #21262d;
+  --inline-code-text: #c9d1d9;
+  --quote-border: #30363d;
+  --zebra: #11161d;
+  --selection: rgba(47, 129, 247, 0.28);
+  --img-border: #30363d;
+}
+
+[data-theme="light"][data-palette="commit"] {
+  --bg: #ffffff;
+  --chrome: #f6f8fa;
+  --chrome-2: #eaeef2;
+  --pop-bg: #ffffff;
+  --seg-active: #ffffff;
+  --border: #d0d7de;
+  --border-soft: #eaeef2;
+  --border-strong: #afb8c1;
+  --text: #1f2328;
+  --heading: #1f2328;
+  --text-2: #57606a;
+  --text-3: #6e7781;
+  --accent: #0969da;
+  --accent-strong: #0550ae;
+  --accent-soft: rgba(9, 105, 218, 0.1);
+  --link: #0969da;
+  --code-bg: #f6f8fa;
+  --inline-code-bg: #eff1f3;
+  --quote-border: #d0d7de;
+  --zebra: #f6f8fa;
+  --selection: rgba(9, 105, 218, 0.2);
+  --img-border: #d8dee4;
+}
+
+/* ---- Lapis: deep blue stone, a navy accent rather than a bright one ---- */
+[data-theme="dark"][data-palette="lapis"] {
+  --bg: #222832;
+  --chrome: #202028;
+  --chrome-2: #1b2020;
+  --pop-bg: #252c38;
+  --seg-active: #2b3340;
+  --border: #1a1f28;
+  --border-soft: #232a34;
+  --border-strong: #404050;
+  --text: #e3e6ea;
+  --heading: #f2f4f7;
+  --text-2: #cacaca;
+  --text-3: #909090;
+  --accent: #8ba4cc;
+  --accent-strong: #a8bde0;
+  --accent-soft: rgba(48, 79, 128, 0.32);
+  --link: #8ba4cc;
+  --code-bg: #1b2029;
+  --code-text: #e3e6ea;
+  --inline-code-bg: #20262f;
+  --inline-code-text: #dfe3e8;
+  --quote-border: #304f80;
+  --zebra: #242b35;
+  --mark: #caca00;
+  --selection: rgba(48, 79, 128, 0.6);
+  --img-border: #2a313c;
+}
+
+[data-theme="light"][data-palette="lapis"] {
+  --bg: #f7f8fb;
+  --chrome: #eef1f7;
+  --chrome-2: #e4e9f2;
+  --pop-bg: #ffffff;
+  --seg-active: #ffffff;
+  --border: #d7dce6;
+  --border-soft: #e8ecf3;
+  --border-strong: #b8c1d1;
+  --text: #1c2230;
+  --heading: #131824;
+  --text-2: #4d586b;
+  --text-3: #7c8799;
+  --accent: #304f80;
+  --accent-strong: #22395e;
+  --accent-soft: rgba(48, 79, 128, 0.12);
+  --link: #304f80;
+  --code-bg: #eef1f7;
+  --inline-code-bg: #e8edf5;
+  --quote-border: #c3cde0;
+  --zebra: #f2f5fa;
+  --selection: rgba(48, 79, 128, 0.2);
+  --img-border: #dde3ed;
+}
+
 [data-width="narrow"] { --measure: 640px; }
 [data-width="normal"] { --measure: 780px; }
 [data-width="wide"] { --measure: 980px; }
@@ -595,6 +839,39 @@ body:not(.is-welcome) .welcome { display: none; }
 .segmented button:hover { color: var(--text); }
 .segmented button.active { background: var(--seg-active); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); }
 .segmented .serif { font-family: var(--font-serif); font-size: 13px; }
+
+/* Five palettes do not fit beside a label on a 318px popover, so that row
+   stacks and the chips wrap under it. */
+.pop-row.stack { flex-direction: column; align-items: stretch; gap: 7px; }
+.palette-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+.palette-grid button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--chrome);
+  color: var(--text-2);
+  font-size: 12px;
+}
+/* The dot is the colour the chip switches to, not the one already in force. */
+.palette-grid button::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+.palette-grid button:hover { color: var(--text); border-color: var(--border-strong); }
+.palette-grid button.active { background: var(--seg-active); color: var(--text); border-color: var(--accent); }
+.palette-grid [data-set="palette:plume"] { --swatch: #6e56cf; }
+.palette-grid [data-set="palette:starless"] { --swatch: #d3d3d3; }
+.palette-grid [data-set="palette:greenwood"] { --swatch: #569d79; }
+.palette-grid [data-set="palette:commit"] { --swatch: #2f81f7; }
+.palette-grid [data-set="palette:lapis"] { --swatch: #8ba4cc; }
 .stepper-value {
   min-width: 52px;
   height: 26px;

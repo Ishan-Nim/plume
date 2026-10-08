@@ -10,8 +10,14 @@ const { app } = require('electron');
 
 const MAX_RECENT = 12;
 
+// A palette recolours whichever of light or dark is in force; it does not
+// replace that choice. 'plume' is Plume's own, and the rest are derived from
+// the MIT-licensed Obsidian themes credited in README.md.
+const PALETTES = ['plume', 'starless', 'greenwood', 'commit', 'lapis'];
+
 const DEFAULTS = Object.freeze({
   theme: 'system',        // 'system' | 'light' | 'dark'
+  palette: 'plume',       // recolouring applied on top of light/dark
   fontSize: 16,           // content font size in px
   width: 'normal',        // 'narrow' | 'normal' | 'wide' | 'full'
   font: 'sans',           // 'sans' | 'serif'
@@ -30,6 +36,7 @@ const DEFAULTS = Object.freeze({
 
 const VALIDATORS = {
   theme: v => ['system', 'light', 'dark'].includes(v),
+  palette: v => PALETTES.includes(v),
   fontSize: v => Number.isInteger(v) && v >= 12 && v <= 28,
   width: v => ['narrow', 'normal', 'wide', 'full'].includes(v),
   font: v => ['sans', 'serif'].includes(v),
@@ -49,7 +56,7 @@ const VALIDATORS = {
 
 // Keys the renderer may change. Window geometry and the recent list are
 // managed by the main process only.
-const RENDERER_KEYS = new Set(['theme', 'fontSize', 'width', 'font', 'lineBreaks',
+const RENDERER_KEYS = new Set(['theme', 'palette', 'fontSize', 'width', 'font', 'lineBreaks',
   'sidebar', 'sidebarTab', 'sidebarWidth', 'autoUpdate', 'skippedVersion']);
 
 let state = { ...DEFAULTS, recent: [] };

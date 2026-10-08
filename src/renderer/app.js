@@ -126,6 +126,13 @@ function resolveTheme() {
   const pref = state.settings ? state.settings.theme : 'system';
   const dark = pref === 'dark' || (pref === 'system' && darkQuery.matches);
   const next = dark ? 'dark' : 'light';
+
+  // The palette recolours whichever of the two is in force, so it is a second
+  // attribute rather than a third value: every palette has a light and a dark
+  // side, and Auto still follows the system.
+  const palette = (state.settings && state.settings.palette) || 'plume';
+  if (root.dataset.palette !== palette) root.dataset.palette = palette;
+
   if (root.dataset.theme !== next) {
     root.dataset.theme = next;
     rerenderMermaid();

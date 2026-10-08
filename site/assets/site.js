@@ -40,6 +40,27 @@
     try { localStorage.setItem('plume-theme', next); } catch (e) { /* ignore */ }
   });
 
+  // ---------- palette ----------
+  //
+  // A recolouring on top of light or dark, not a replacement for it: the
+  // toggle above still works inside every palette. The page-head script has
+  // already applied the stored one, so this only has to agree with it.
+
+  var PALETTES = ['plume', 'starless', 'greenwood', 'commit', 'lapis'];
+
+  function applyPalette(name) {
+    if (PALETTES.indexOf(name) < 0) name = 'plume';
+    if (name === 'plume') root.removeAttribute('data-palette');
+    else root.setAttribute('data-palette', name);
+    try { localStorage.setItem('plume-palette', name); } catch (e) { /* ignore */ }
+  }
+
+  var picker = document.getElementById('palette-picker');
+  if (picker) {
+    picker.value = root.getAttribute('data-palette') || 'plume';
+    picker.addEventListener('change', function () { applyPalette(picker.value); });
+  }
+
   // ---------- header shadow ----------
 
   var header = document.querySelector('.site-header');
