@@ -114,3 +114,60 @@ test('a redirect is only followed to a GitHub asset host', () => {
   ];
   for (const url of refused) assert.ok(!updater.trustedHop(url), `should refuse ${url}`);
 });
+
+// The bug this guards against: the update bar grew a second click handler for
+// "Install and restart" without removing the first, so one click both started
+// the install and started a fresh download. The download's discard() deleted
+// the installer Windows was about to run, the install failed silently, and the
+// app reopened on the old version and offered the same update again.
+test('a second download cannot start while one is running', {
+  skip: process.platform === 'win32' ? false : 'an install is only offered on Windows',
+}, async () => {
+  const realFetch = globalThis.fetch;
+  const base = 'https://github.com/Ishan-Nim/plume/releases/download/v9.9.9';
+  const release = {
+    tag_name: 'v9.9.9',
+    body: '',
+    html_url: 'https://github.com/Ishan-Nim/plume/releases/tag/v9.9.9',
+    assets: [
+      { name: 'Plume-Setup-9.9.9.exe', size: 10, browser_download_url: `${base}/Plume-Setup-9.9.9.exe` },
+      { name: 'SHA256SUMS.txt', browser_download_url: `${base}/SHA256SUMS.txt` },
+    ],
+  };
+
+  // The checksum fetch never answers, so the first download is still in flight
+  // when the second one is attempted.
+  let abandon;
+  const stalled = new Promise((resolve, reject) => { abandon = reject; });
+
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('api.github.com')) return { ok: true, json: async () => release };
+    return stalled;
+  };
+
+  try {
+    const update = await updater.check({ force: true });
+    assert.ok(update && update.installable, 'the stubbed release should be installable');
+
+    const first = updater.download().then(() => 'finished', () => 'stopped');
+
+    // Raced against a timer rather than simply awaited: without the guard the
+    // second download does not reject at all, it goes and fetches, and the
+    // test would hang instead of failing.
+    const second = updater.download().then(() => 'a second download started', err => err.message);
+    const outcome = await Promise.race([
+      second,
+      new Promise(resolve => setTimeout(() => resolve('a second download started'), 2000).unref()),
+    ]);
+    assert.match(outcome, /already downloading/i);
+
+    abandon(new Error('the test is over'));
+    assert.strictEqual(await first, 'stopped');
+
+    // And once nothing is in flight, the guard is out of the way again.
+    await assert.rejects(updater.download(), /the test is over/);
+  } finally {
+    globalThis.fetch = realFetch;
+    await updater.discard();
+  }
+});

@@ -24,6 +24,12 @@ export class Updates {
     this.update = null;
     this.canInstall = false;
     this.downloading = false;
+    // Set once the download has been verified. The bar's one button means
+    // "download" before that and "install" after, which is why there is a flag
+    // here rather than a second click handler: two handlers on one button both
+    // fire, and the second download deletes the installer the first just
+    // handed to the system.
+    this.ready = false;
 
     this.notes.addEventListener('click', () => this.api.update.page());
     this.later.addEventListener('click', () => this.dismiss());
@@ -42,6 +48,7 @@ export class Updates {
     if (!update) return;
     this.update = update;
     this.canInstall = Boolean(update.installable);
+    this.ready = false;
 
     this.text.replaceChildren(
       el('b', { text: `Plume ${update.version} is available.` }),
@@ -68,7 +75,7 @@ export class Updates {
   }
 
   async act() {
-    if (!this.update) return;
+    if (!this.update || this.downloading) return;
 
     // Where Plume cannot replace itself — an unsigned app on macOS, or a
     // package the system owns on Linux — the honest offer is the download page.
@@ -77,6 +84,8 @@ export class Updates {
       this.bar.hidden = true;
       return;
     }
+
+    if (this.ready) return this.installNow();
 
     this.downloading = true;
     this.go.disabled = true;
@@ -88,6 +97,7 @@ export class Updates {
     this.later.disabled = false;
 
     if (!res.ok) {
+      this.ready = false;
       this.go.disabled = false;
       this.go.textContent = 'Install';
       this.text.replaceChildren(
@@ -97,20 +107,23 @@ export class Updates {
       return;
     }
 
+    this.ready = true;
     this.text.replaceChildren(
       el('b', { text: `Plume ${this.update.version} is ready.` }),
       document.createTextNode(' Plume will close while it installs, then reopen.'),
     );
     this.go.textContent = 'Install and restart';
     this.go.disabled = false;
-    this.go.onclick = async () => {
-      this.go.disabled = true;
-      const done = await this.api.update.install();
-      if (!done.ok) {
-        this.go.disabled = false;
-        this.toast(done.error, 'error');
-      }
-    };
+  }
+
+  /** The same button, once there is something verified to install. */
+  async installNow() {
+    this.go.disabled = true;
+    const done = await this.api.update.install();
+    if (!done.ok) {
+      this.go.disabled = false;
+      this.toast(done.error, 'error');
+    }
   }
 
   /** Not now means not now, and not again for this version. */

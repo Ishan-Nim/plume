@@ -51,6 +51,9 @@ const MAX_HOPS = 5;
 const CAN_INSTALL = process.platform === 'win32';
 
 let checking = false;
+let downloading = false;
+let installing = false;
+let swept = false;
 let found = null;        // { version, page, installable, url, sumsUrl, size }
 let downloaded = null;   // { path, dir, sha256 }
 
@@ -111,6 +114,10 @@ async function getJSON(url) {
 async function check({ force = false } = {}) {
   if (checking) return found;
   checking = true;
+  if (!swept) {
+    swept = true;
+    await sweep();
+  }
   try {
     const release = await getJSON(LATEST);
     const version = String(release.tag_name || '').replace(/^v/, '');
@@ -205,7 +212,21 @@ async function discard() {
  */
 async function download(onProgress) {
   if (!found || !found.installable) throw new Error('There is no update to install.');
+  // Two downloads at once would be two writers and, worse, the second one's
+  // discard() would delete the first one's installer — including one that has
+  // already been handed to the system to run.
+  if (downloading) throw new Error('That update is already downloading.');
+  if (installing) throw new Error('That update is already installing.');
 
+  downloading = true;
+  try {
+    return await fetchInstaller(onProgress);
+  } finally {
+    downloading = false;
+  }
+}
+
+async function fetchInstaller(onProgress) {
   const name = installerName(found.version);
   const want = await expectedHash(found.sumsUrl, name);
 
@@ -270,8 +291,12 @@ async function install() {
   }
 
   const target = downloaded.path;
+  installing = true;
   const problem = await shell.openPath(target);
-  if (problem) throw new Error(problem);
+  if (problem) {
+    installing = false;
+    throw new Error(problem);
+  }
 
   setTimeout(() => app.quit(), 800);
   return true;
@@ -291,9 +316,30 @@ function state() {
 }
 
 // Leaving an installer behind is leaving something executable in a temp folder.
+//
+// Except when we are quitting *because* that installer is starting: Windows
+// has an elevation prompt in front of the user and has not read the file yet.
+// Deleting it there is what turns an install into a download that never
+// sticks. It is swept up on the next check instead.
 app.on('will-quit', () => {
-  if (downloaded) fs.rmSync(downloaded.dir, { recursive: true, force: true });
+  if (downloaded && !installing) fs.rmSync(downloaded.dir, { recursive: true, force: true });
 });
+
+/** Clears installers left behind by an update that quit to run one. */
+async function sweep() {
+  const temp = app.getPath('temp');
+  let entries;
+  try {
+    entries = await fsp.readdir(temp);
+  } catch (err) {
+    return;
+  }
+  const mine = downloaded ? path.basename(downloaded.dir) : null;
+  for (const entry of entries) {
+    if (!entry.startsWith('plume-update-') || entry === mine) continue;
+    await fsp.rm(path.join(temp, entry), { recursive: true, force: true }).catch(() => {});
+  }
+}
 
 module.exports = {
   check, download, install, openReleasePage, state, compare, trusted, trustedHop, discard,
