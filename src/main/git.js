@@ -260,6 +260,11 @@ async function sync(dir, { message } = {}) {
  */
 async function ensureIdentity(dir, who) {
   if (!who || !who.email) return;
+  // `git config <name> <value>` reads a value beginning with "-" as an option,
+  // and there is no `--` to stop it. The address comes from the vault, which
+  // validates it, so this is belt and braces — but the belt is one line.
+  const address = String(who.email);
+  if (address.startsWith('-') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return;
   const email = await run(dir, ['config', 'user.email']);
   const name = await run(dir, ['config', 'user.name']);
   if (email.ok && email.out && name.ok && name.out) return;

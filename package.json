@@ -2,7 +2,7 @@
   "name": "plume",
   "productName": "Plume",
   "version": "1.1.0",
-  "description": "Plume \u2014 a feather-light Markdown viewer",
+  "description": "Plume — a feather-light Markdown viewer",
   "author": "Ishan Nim",
   "license": "MIT",
   "homepage": "https://github.com/Ishan-Nim/plume",
@@ -37,7 +37,7 @@
   "build": {
     "appId": "app.plume.viewer",
     "productName": "Plume",
-    "copyright": "Copyright \u00a9 2026 Ishan Nim",
+    "copyright": "Copyright © 2026 Ishan Nim",
     "directories": {
       "buildResources": "resources",
       "output": "release"
@@ -174,5 +174,8 @@
         "text/markdown"
       ]
     }
+  },
+  "overrides": {
+    "katex": "^0.19.0"
   }
 }

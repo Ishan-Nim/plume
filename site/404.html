@@ -56,6 +56,13 @@
   (function () {
     var d = document.documentElement;
     try {
+      // This host serves no X-Frame-Options and meta tags cannot carry
+      // frame-ancestors, so the page refuses to be framed itself. Weaker than
+      // a header — it is what is available, and the sign-in form is worth it.
+      if (window.top !== window.self) {
+        d.style.display = 'none';
+        window.top.location = window.self.location;
+      }
       var t = localStorage.getItem('plume-theme');
       if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
       // Before paint, or the page flashes Plume's colours first.
