@@ -1902,8 +1902,12 @@ body.is-editing #welcome { display: none; }
 
 /* Sized and spaced like the block it stands in for, so opening one does not
    move the text around it. The negative gutter is the padding: the letters
-   stay exactly where they were on the line. */
-.live-edit {
+   stay exactly where they were on the line.
+
+   Every rule here names the element as well as the class. A bare `.live-edit`
+   also matched <body> while a body class of the same name existed, which gave
+   the window `display: block` and collapsed the whole layout. */
+textarea.live-edit {
   display: block;
   box-sizing: border-box;
   width: calc(100% + 20px);
@@ -1926,26 +1930,26 @@ body.is-editing #welcome { display: none; }
   word-break: break-word;
   caret-color: var(--accent);
 }
-.live-edit::selection { background: var(--selection); }
+textarea.live-edit::selection { background: var(--selection); }
 
 /* Headings keep their own size while they are being typed. */
-.live-edit[data-tag^="h"] {
+textarea.live-edit[data-tag^="h"] {
   font-weight: 680;
   line-height: 1.3;
   letter-spacing: -0.012em;
   color: var(--heading);
   margin: 1.9em -10px 0.6em;
 }
-.live-edit[data-tag="h1"] { font-size: 2em; margin-top: 1.4em; letter-spacing: -0.02em; }
-.live-edit[data-tag="h2"] { font-size: 1.5em; }
-.live-edit[data-tag="h3"] { font-size: 1.25em; }
-.live-edit[data-tag="h4"] { font-size: 1.08em; }
-.live-edit[data-tag="h5"] { font-size: 1em; }
-.live-edit[data-tag="h6"] { font-size: 0.94em; }
+textarea.live-edit[data-tag="h1"] { font-size: 2em; margin-top: 1.4em; letter-spacing: -0.02em; }
+textarea.live-edit[data-tag="h2"] { font-size: 1.5em; }
+textarea.live-edit[data-tag="h3"] { font-size: 1.25em; }
+textarea.live-edit[data-tag="h4"] { font-size: 1.08em; }
+textarea.live-edit[data-tag="h5"] { font-size: 1em; }
+textarea.live-edit[data-tag="h6"] { font-size: 0.94em; }
 /* hr, and the empty paragraph a click past the end of the document opens. */
-.live-edit[data-tag="hr"] { margin: 2.2em -10px; }
+textarea.live-edit[data-tag="hr"] { margin: 2.2em -10px; }
 
-.live-edit.is-code {
+textarea.live-edit.is-code {
   font-family: var(--font-mono);
   font-size: calc(var(--content-size) * 0.88);
   line-height: 1.6;

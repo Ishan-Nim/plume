@@ -153,7 +153,6 @@ function applySettings(s) {
   root.dataset.width = s.width;
   root.dataset.font = s.font;
   body.classList.toggle('sidebar-hidden', !s.sidebar);
-  body.classList.toggle('live-edit', !!s.liveEdit);
   showSidebarTab(s.sidebarTab);
   syncReadingControls();
   renderRecent();
