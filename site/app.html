@@ -93,6 +93,9 @@
   }
   .tabs button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
 
+  /* Both have a display of their own, which beats the hidden attribute. */
+  .tabs[hidden], #signout[hidden] { display: none; }
+
   .forgot { margin-top: 14px; text-align: center; }
   .linkish {
     border: 0; background: none; padding: 0; cursor: pointer;
@@ -100,6 +103,22 @@
     text-underline-offset: 2px;
   }
   .linkish:hover { color: var(--accent); }
+  .linkish:disabled { cursor: default; text-decoration: none; }
+  .linkish:disabled:hover { color: var(--text-3); }
+
+  /* The steps that wait on an email: a code to finish signing up, an address
+     to send a reset code to, and that code with a new password. */
+  .step-lead { color: var(--text-2); font-size: .95rem; line-height: 1.6; margin: 8px 0 22px; }
+  .step-lead b { color: var(--text); word-break: break-all; }
+  .step-note { font-size: .84rem; color: var(--text-3); line-height: 1.6; margin: -2px 0 20px; }
+  .step-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; margin-top: 16px; }
+  .field .hint + .hint { margin-top: -2px; }
+  .field p.hint { line-height: 1.55; }
+  .field input.code {
+    font-family: var(--mono); font-size: 1.45rem; font-variant-numeric: tabular-nums;
+    letter-spacing: .42em; text-indent: .42em; text-align: center; padding-block: 12px;
+  }
+  .field input.code::placeholder { color: var(--text-3); opacity: .45; }
 
   .field { display: grid; gap: 7px; margin-bottom: 16px; }
   .field label { font-size: .89rem; font-weight: 580; color: var(--text-2); }
@@ -112,6 +131,8 @@
   .field .hint { font-size: .82rem; color: var(--text-3); }
 
   .msg { border-radius: 10px; padding: 11px 14px; font-size: .91rem; margin-bottom: 16px; display: none; }
+  /* Brought into view when it says something, and clear of the 64px sticky header. */
+  .msg { scroll-margin-top: 84px; scroll-margin-bottom: 16px; }
   .msg.show { display: block; }
   .msg.err { background: rgba(220, 70, 70, .11); border: 1px solid rgba(220, 70, 70, .35); color: #c23b3b; }
   .msg.ok { background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--accent-strong); }
@@ -254,7 +275,7 @@
     </div>
 
     <div class="panel">
-      <div class="tabs">
+      <div class="tabs" id="tabs">
         <button type="button" id="tab-signup" aria-pressed="true">Create account</button>
         <button type="button" id="tab-login" aria-pressed="false">Sign in</button>
       </div>
@@ -273,9 +294,69 @@
           <span class="hint" id="pw-hint">At least 10 characters, with a number or symbol.</span>
         </div>
         <button class="btn btn-primary btn-lg btn-block" type="submit" id="auth-submit">Create my vault</button>
-        <p class="forgot" id="forgot-row" hidden>
+        <!-- A div, not a p: i18n.js rewrites a translated paragraph whole, and
+             the button inside would come back without its click handler. -->
+        <div class="forgot" id="forgot-row" hidden>
           <button type="button" class="linkish" id="forgot">Forgot your password?</button>
-        </p>
+        </div>
+      </form>
+
+      <!-- Creating an account, second half: nothing exists until this code comes back. -->
+      <form id="verify-form" autocomplete="off" novalidate onsubmit="return false" hidden>
+        <h2>Check your email</h2>
+        <p class="step-lead" id="verify-lead">We emailed a 6-digit code to <b id="verify-email"></b>. Enter it here to finish creating your vault.</p>
+        <div class="field">
+          <label for="verify-code">6-digit code</label>
+          <input type="text" id="verify-code" class="code" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="6" required aria-describedby="verify-lead verify-ttl verify-hint" placeholder="000000">
+          <p class="hint" id="verify-ttl" hidden></p>
+          <p class="hint" id="verify-hint">Nothing there? Look in your spam folder. If that address already has a vault, the email says how to sign in instead.</p>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="verify-submit">Finish creating my vault</button>
+        <div class="step-links">
+          <button type="button" class="linkish" id="verify-resend">Resend code</button>
+          <button type="button" class="linkish" id="verify-back">Use a different email</button>
+        </div>
+      </form>
+
+      <!-- A forgotten password, first half: where to send the code. -->
+      <form id="forgot-form" autocomplete="on" novalidate onsubmit="return false" hidden>
+        <h2>Reset your password</h2>
+        <p class="step-lead" id="forgot-lead">Type the address you signed up with. We will email you a 6-digit code for choosing a new password, and a link that does the same.</p>
+        <div class="field">
+          <label for="forgot-email">Email</label>
+          <input type="email" id="forgot-email" autocomplete="email" required
+                 aria-describedby="forgot-lead" placeholder="you@example.com">
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="forgot-submit">Email me a code</button>
+        <div class="step-links">
+          <button type="button" class="linkish" id="forgot-back">Back to sign in</button>
+        </div>
+      </form>
+
+      <!-- A forgotten password, second half: the code and what replaces it. -->
+      <form id="reset-form" autocomplete="on" novalidate onsubmit="return false" hidden>
+        <h2>Choose a new password</h2>
+        <p class="step-lead" id="reset-lead">If <b id="reset-email"></b> has a vault, we emailed it a 6-digit code. Enter it below with your new password.</p>
+        <!-- Lets a password manager file the new password under the right account. -->
+        <input type="email" id="reset-username" autocomplete="username" readonly hidden tabindex="-1" aria-hidden="true">
+        <div class="field">
+          <label for="reset-code">6-digit code</label>
+          <input type="text" id="reset-code" class="code" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="6" required aria-describedby="reset-lead" placeholder="000000">
+        </div>
+        <div class="field">
+          <label for="reset-password">New password</label>
+          <input type="password" id="reset-password" autocomplete="new-password" required
+                 aria-describedby="reset-pw-hint reset-note" placeholder="••••••••••">
+          <span class="hint" id="reset-pw-hint">At least 10 characters, with a number or symbol.</span>
+        </div>
+        <p class="step-note" id="reset-note">Setting it signs you out everywhere else and retires every API token. The email also has a link that does the same, if you would rather use that.</p>
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="reset-submit">Set my password</button>
+        <div class="step-links">
+          <button type="button" class="linkish" id="reset-resend">Resend code</button>
+          <button type="button" class="linkish" id="reset-back">Use a different email</button>
+        </div>
       </form>
 
       <p class="hint" style="margin-top:16px;font-size:.84rem;color:var(--text-3)">
@@ -286,7 +367,7 @@
     <div class="panel">
       <h2>How syncing works</h2>
       <ol class="how" style="list-style:none;padding:0">
-        <li><span><b>Create an account</b> here — that is the whole sign-up. You get 100&nbsp;MB.</span></li>
+        <li><span><b>Create an account</b> here, and confirm it with the code we email you. You get 100&nbsp;MB.</span></li>
         <li><span><b>Open Plume</b> on your computer and sign in under <b>⋯ → Plume Vault</b>.</span></li>
         <li><span><b>Push a document</b> to the vault from the toolbar, or turn on auto-sync so every save goes up.</span></li>
         <li><span><b>Open it anywhere</b> — another computer running Plume, or right here in your browser.</span></li>
@@ -301,6 +382,7 @@
   <div id="vault" hidden>
     <h2 class="sr-only">Your vault</h2>
     <div class="panel">
+      <div class="msg" id="acct-msg" role="status"></div>
       <div class="acct">
         <div class="who">
           <b id="v-email">—</b>

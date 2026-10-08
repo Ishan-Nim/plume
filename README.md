@@ -151,11 +151,15 @@ npm run dist:mac    # build the macOS .dmg and .zip (on a Mac)
 npm run dist:linux  # build the Linux AppImage and .deb
 ```
 
-End-to-end check of the whole vault flow in the real app — sign up, sync, graph, sign out
-(point it at a vault API of your own, never production):
+End-to-end check of the whole vault flow in the real app — sign up with the emailed code,
+sync, graph, sign out, reset the password with a code, five wrong codes (point it at a vault
+API of your own, never production). The vault repository's `scripts/dev-server-memory.js`
+runs one entirely in memory and prints the mail it would send, codes included; the test
+reads the codes from that output:
 
 ```bash
-PLUME_VAULT_API=http://127.0.0.1:8098/api npx electron test/e2e/vault-flow.js
+node scripts/dev-server-memory.js > vault.log      # in plume-vault
+PLUME_VAULT_API=http://127.0.0.1:8098/api PLUME_MAIL_LOG=../plume-vault/vault.log npx electron test/e2e/vault-flow.js
 ```
 
 Visual smoke test (renders a document in the real app and saves a screenshot):

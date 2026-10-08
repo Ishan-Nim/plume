@@ -152,8 +152,14 @@ async function call(endpoint, { method = 'GET', body, json, headers = {}, auth =
   // Syncing a real notebook is hundreds of uploads in a row, so a sync that
   // treated 429 as a failure simply stopped partway through and reported a
   // number with no reason attached.
+  //
+  // It also says why — too many sign-ups from here, too many codes for one
+  // address — and on the sign-in form that sentence is the whole answer.
   if (res.status === 429) {
-    const err = new Error('The vault asked us to slow down.');
+    const said = (res.headers.get('content-type') || '').includes('application/json')
+      ? await res.json().catch(() => ({}))
+      : {};
+    const err = new Error(typeof said.error === 'string' && said.error ? said.error : 'The vault asked us to slow down.');
     err.status = 429;
     err.retryAfterMs = retryAfter(res);
     throw err;
@@ -193,18 +199,93 @@ function publicState() {
   };
 }
 
-async function signUp(email, password) {
-  const data = await call('/auth/signup', { method: 'POST', json: { email, password }, auth: false });
+/** Keeps the session the vault just handed over, from any of the ways in. */
+function adopt(data) {
+  if (!data || typeof data.token !== 'string' || !data.account || typeof data.account.email !== 'string') {
+    throw new Error('The vault sent an answer Plume does not understand.');
+  }
   session = { token: data.token, email: data.account.email, account: data.account };
   saveSession();
   return publicState();
 }
 
+/**
+ * A code from an email, the way the vault wants it: six plain digits. People
+ * paste "123 456" or "123-456", and typing with a Japanese input method on
+ * gives full-width digits; all of those are the same code. Anything else is
+ * refused here rather than spending one of the code's few attempts on it.
+ */
+function cleanCode(raw) {
+  const code = String(raw == null ? '' : raw)
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/[\s-]/g, '');
+  if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit code from the email.');
+  return code;
+}
+
+const noteOf = (data) => (data && typeof data.note === 'string' ? data.note : null);
+
+/**
+ * Creating an account takes two steps, and this is the first: the vault emails
+ * a code to the address. Nothing is created yet and nothing is kept, here or
+ * by the vault, which only checks the password is good enough; the panel holds
+ * it so that "Resend code" can ask again and the second step can send it.
+ *
+ * The answer is the same whether or not the address already has an account,
+ * so it says nothing about who uses Plume. Someone who already has one gets
+ * an email saying so instead of a code.
+ */
+async function signUpStart(email, password) {
+  const data = await call('/auth/signup/start', {
+    method: 'POST', json: { email: String(email).trim(), password }, auth: false,
+  });
+  return {
+    verify: data.verify !== false,
+    minutes: Number.isFinite(data.minutes) ? data.minutes : null,
+    note: noteOf(data),
+  };
+}
+
+/**
+ * The second step: the code from the email, with the password, creates the
+ * account and signs in.
+ *
+ * The account gets the password sent here, not whatever was sent when the code
+ * was asked for. Anyone can start a sign-up for any address, so the code only
+ * proves the mailbox; tying the password to this step means a code that
+ * reaches the owner always creates the owner's account, with the owner's
+ * password, whoever asked for it.
+ */
+async function signUpVerify(email, code, password) {
+  const json = { email: String(email).trim(), code: cleanCode(code), password };
+  const data = await call('/auth/signup/verify', { method: 'POST', json, auth: false });
+  return adopt(data);
+}
+
 async function signIn(email, password) {
   const data = await call('/auth/login', { method: 'POST', json: { email, password }, auth: false });
-  session = { token: data.token, email: data.account.email, account: data.account };
-  saveSession();
-  return publicState();
+  return adopt(data);
+}
+
+/**
+ * Asks for a password-reset email: a code to type here, and a link that does
+ * the same thing in a browser. The vault answers alike for every address, and
+ * its note says so; that note is passed on as it is.
+ */
+async function forgot(email) {
+  const data = await call('/auth/forgot', { method: 'POST', json: { email: String(email).trim() }, auth: false });
+  return { note: noteOf(data) };
+}
+
+/**
+ * Sets a new password with the code from that email, and signs in with it.
+ * Every other device is signed out by the vault as part of the change.
+ */
+async function resetWithCode(email, code, password) {
+  const data = await call('/auth/reset/code', {
+    method: 'POST', json: { email: String(email).trim(), code: cleanCode(code), password }, auth: false,
+  });
+  return { state: adopt(data), note: noteOf(data) };
 }
 
 function signOut() {
@@ -482,8 +563,12 @@ function isSyncable(localPath) {
 module.exports = {
   API,
   publicState,
-  signUp,
+  signUpStart,
+  signUpVerify,
   signIn,
+  forgot,
+  resetWithCode,
+  cleanCode,
   signOut,
   refresh,
   list,

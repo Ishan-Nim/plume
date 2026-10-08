@@ -3,7 +3,8 @@
 // Captures the website screenshots the documentation uses: the web vault,
 // its graph and the API tokens panel, plus the public pages.
 //
-//   set PLUME_SITE=http://localhost:3001
+//   set PLUME_SITE=http://127.0.0.1:8098
+//   set PLUME_MAIL_LOG=path\to\vault-stdout.log
 //   set PLUME_SHOTS=docs\screenshots
 //   npx electron scripts/shoot-web.js
 //
@@ -37,6 +38,28 @@ if (/plume-md\.com/i.test(SITE)) {
 
 const { app, BrowserWindow } = require('electron');
 app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'plume-web-shots-')));
+
+// Signing up needs the code the vault mails. plume-vault's
+// scripts/dev-server-memory.js prints its mail instead of sending it; send
+// that output to a file and name it here.
+const MAIL_LOG = process.env.PLUME_MAIL_LOG;
+if (!MAIL_LOG) {
+  say('PLUME_MAIL_LOG is required: the file a local vault with MAIL_TRANSPORT=log writes its output to');
+  process.exit(2);
+}
+
+/** The newest sign-up code mailed to `to`, waiting a little for it to arrive. */
+async function mailedCode(to) {
+  for (let i = 0; i < 100; i += 1) {
+    let text = '';
+    try { text = fs.readFileSync(MAIL_LOG, 'utf8'); } catch (err) { /* not written yet */ }
+    const sent = [...text.matchAll(/\[mail:log\] to (\S+)\r?\n\[mail:log\] subject: Your Plume code is (\d{6})/g)]
+      .filter((m) => m[1] === to);
+    if (sent.length) return sent[sent.length - 1][2];
+    await sleep(150);
+  }
+  return null;
+}
 
 const EMAIL = 'you-' + Date.now() + '@example.com';
 const PASSWORD = 'a-good-long-password-1';
@@ -89,12 +112,23 @@ app.whenReady().then(async () => {
     await sleep(1400);
     await shoot('web-signin');
 
-    // ---- create an account ----
+    // ---- create an account: the address, then the code mailed to it ----
     await run(
       "document.getElementById('tab-signup').click();"
       + "document.getElementById('email').value = " + JSON.stringify(EMAIL) + ';'
       + "document.getElementById('password').value = " + JSON.stringify(PASSWORD) + ';'
       + "document.getElementById('auth-submit').click();",
+    );
+    if (!(await until('!document.getElementById("verify-form").hidden', 30000))) {
+      throw new Error('no code step: ' + (await read('(document.getElementById("gate-msg")||{}).textContent')));
+    }
+    const code = await mailedCode(EMAIL);
+    if (!code) throw new Error('no code in PLUME_MAIL_LOG for ' + EMAIL);
+    // Six digits submit the step by themselves.
+    await run(
+      "var box = document.getElementById('verify-code');"
+      + 'box.value = ' + JSON.stringify(code) + ';'
+      + "box.dispatchEvent(new Event('input', { bubbles: true }));",
     );
     if (!(await until('!document.getElementById("vault").hidden', 30000))) {
       throw new Error('could not sign up: ' + (await read('(document.getElementById("gate-msg")||{}).textContent')));

@@ -27,6 +27,36 @@ function when(iso) {
   return d.toLocaleDateString();
 }
 
+// The vault will not send a second code to an address within a minute of the
+// first, so "Resend code" waits that long too rather than pretending to send.
+const RESEND_SECONDS = 60;
+const PASSWORD_HINT = 'At least 10 characters, with a number or symbol.';
+const CODE_PROBLEM = 'Enter the 6-digit code from the email.';
+
+// The vault answers a mistyped address exactly as it answers a real one, so
+// this is the only place "someone@typo" can be caught before somebody waits
+// for an email that is never coming. The same check as the website's.
+const looksLikeEmail = text => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+
+/**
+ * Six digits out of whatever was typed or pasted: "123 456", "123-456",
+ * full-width digits from a Japanese input method, or the whole line copied out
+ * of the email. The main process checks again; this only keeps the box tidy.
+ */
+export function codeDigits(raw) {
+  const squeezed = String(raw == null ? '' : raw)
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/[\s-]/g, '');
+  const run = /(?<!\d)\d{6}(?!\d)/.exec(squeezed);
+  return run ? run[0] : squeezed.replace(/\D/g, '').slice(0, 6);
+}
+
+/** Whole seconds until another code may be asked for. */
+export function resendWait(sentAt, now = Date.now()) {
+  if (!Number.isFinite(sentAt)) return 0;
+  return Math.max(0, Math.ceil((sentAt + RESEND_SECONDS * 1000 - now) / 1000));
+}
+
 export class Vault {
   /**
    * @param {HTMLElement} root   the sidebar panel to draw into
@@ -44,6 +74,15 @@ export class Vault {
     this.getRoot = getRoot || (() => null);
 
     this.mode = 'signin';
+    // How far each tab has got, so switching tabs and back does not lose a
+    // code that is already on its way:
+    //   signup  null, or { email, password, note, minutes, sentAt } once sent
+    //   reset   null, { stage: 'email' }, or { stage: 'code', email, note, sentAt }
+    // The password is only here for "Resend code" and for the code step, which
+    // creates the account with it, and goes when the step does.
+    this.flow = { signup: null, reset: null };
+    this.draft = { email: '' };
+    this.notice = null;
     this.state = null;
     this.files = [];
     this.links = {};
@@ -73,7 +112,13 @@ export class Vault {
     await this.load();
   }
 
-  async load() {
+  /**
+   * @param {object} [options]
+   * @param {string} [options.notice]  something the vault said that should stay
+   *   on screen until the next reload, such as "every other device was signed out"
+   */
+  async load({ notice = null } = {}) {
+    this.notice = notice;
     this.state = await this.api.vault.state(this.getRoot());
     this.sync = await this.api.sync.state();
     this.loaded = true;
@@ -82,6 +127,11 @@ export class Vault {
       this.drawAuth();
       return;
     }
+    // Signed in: nothing typed into the signed-out forms is wanted any more,
+    // and whoever signs out again has an account, so they come back to sign in.
+    this.mode = 'signin';
+    this.flow = { signup: null, reset: null };
+    this.draft = { email: '' };
     const res = await this.api.vault.list();
     if (!res.ok) {
       this.files = [];
@@ -95,8 +145,28 @@ export class Vault {
   }
 
   // ---------- signed out ----------
+  //
+  // Five small forms behind two tabs. "Sign in" also leads to "forgot
+  // password" and then to the code that sets a new one; "Create account" leads
+  // to the code that finishes creating it. Every code arrives by email, and the
+  // vault answers the same whether or not an address has an account, so these
+  // forms pass its sentences on rather than guessing at what happened.
 
   drawAuth(message) {
+    if (this.mode === 'signup' && this.flow.signup) return this.drawSignUpCode(message);
+    if (this.mode === 'signin' && this.flow.reset) {
+      return this.flow.reset.stage === 'code' ? this.drawResetCode(message) : this.drawForgot(message);
+    }
+    return this.drawCredentials(message);
+  }
+
+  /**
+   * What every signed-out form shares: the two tabs, a line saying what this
+   * step is for, and the error line. That line is on the page from the start,
+   * empty: a live region has to exist before it changes for a screen reader to
+   * announce the change.
+   */
+  authForm(intro, message) {
     const form = el('form', { class: 'vault-form' });
 
     const tabs = el('div', { class: 'vault-tabs' });
@@ -104,69 +174,397 @@ export class Vault {
       const b = el('button', { type: 'button', text: label });
       b.setAttribute('aria-pressed', String(this.mode === key));
       b.addEventListener('click', () => {
+        if (this.busy) return;
+        // The tab you are on leads back to its first form; the other one
+        // picks up where it was left.
+        if (this.mode === key) this.flow[key === 'signup' ? 'signup' : 'reset'] = null;
         this.mode = key;
         this.drawAuth();
+        // The button that was pressed has just been redrawn, which drops the
+        // cursor on the page itself. A code step puts it in its own box; the
+        // first form gets it here.
+        if (!this.root.contains(document.activeElement)) this.focusCredentials();
       });
       return b;
     };
     tabs.append(mk('signin', 'Sign in'), mk('signup', 'Create account'));
 
-    const intro = el('p', { class: 'vault-note' });
-    intro.textContent = this.mode === 'signup'
-      ? 'A free account gives you a 100 MB vault for syncing documents between your computers.'
-      : 'Sign in to sync documents between your computers.';
+    const error = el('p', { class: 'vault-error', role: 'alert', text: message || '' });
+    form.append(tabs, el('p', { class: 'vault-note', text: intro }), error);
+    return { form, error };
+  }
 
-    const email = el('input', {
+  /**
+   * The cursor in the first form, where the next thing is typed: the address,
+   * or the password once the address is there.
+   */
+  focusCredentials() {
+    const email = this.root.querySelector('#vault-email');
+    const password = this.root.querySelector('#vault-password');
+    const target = email && email.value && password ? password : email;
+    if (target) target.focus();
+  }
+
+  /** Puts a sentence in a form's error line, and the cursor where it can be fixed. */
+  say(error, text, field) {
+    error.textContent = text || 'The vault is not available.';
+    if (field) field.focus();
+  }
+
+  /**
+   * Runs one request from a form: its button says what is happening, and a
+   * second press while it runs does nothing. Resolves to the main process's
+   * answer, or null when another request was already running.
+   */
+  async attempt(button, busyLabel, ask) {
+    if (this.busy) return null;
+    this.busy = true;
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = busyLabel;
+    try {
+      return await ask();
+    } finally {
+      this.busy = false;
+      button.disabled = false;
+      button.textContent = label;
+    }
+  }
+
+  /** The address box, remembering what was typed from one step to the next. */
+  emailInput() {
+    const input = el('input', {
       type: 'email', id: 'vault-email', autocomplete: 'email',
-      placeholder: 'you@example.com', required: true,
+      placeholder: 'you@example.com', required: true, value: this.draft.email || null,
     });
-    const password = el('input', {
+    input.addEventListener('input', () => { this.draft.email = input.value.trim(); });
+    return input;
+  }
+
+  passwordInput(fresh) {
+    return el('input', {
       type: 'password', id: 'vault-password', placeholder: '••••••••••', required: true,
-      autocomplete: this.mode === 'signup' ? 'new-password' : 'current-password',
-      'aria-describedby': this.mode === 'signup' ? 'vault-pw-hint' : null,
+      autocomplete: fresh ? 'new-password' : 'current-password',
+      'aria-describedby': fresh ? 'vault-pw-hint' : null,
+    });
+  }
+
+  /**
+   * The box a code from an email goes in. One field rather than six: it takes
+   * a paste in one go, the system can fill it from the message, and a screen
+   * reader announces it as what it is.
+   */
+  codeInput() {
+    const input = el('input', {
+      type: 'text', id: 'vault-code', class: 'vault-code',
+      inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '6',
+      placeholder: '6 digits', required: true, spellcheck: 'false',
+      'aria-describedby': 'vault-code-hint',
+    });
+    const tidy = () => {
+      const clean = codeDigits(input.value);
+      if (clean !== input.value) input.value = clean;
+    };
+    // Rewriting the box mid-composition would break an input method's word.
+    input.addEventListener('input', ev => { if (!ev.isComposing) tidy(); });
+    input.addEventListener('compositionend', tidy);
+    // maxlength would cut a pasted "123 456" to "123 45" before tidy saw it.
+    input.addEventListener('paste', ev => {
+      const text = ev.clipboardData ? ev.clipboardData.getData('text') : '';
+      if (!text) return;
+      ev.preventDefault();
+      input.value = codeDigits(text);
+    });
+    return input;
+  }
+
+  /**
+   * Where to look for the code, under the box it goes in. A sign-up for an
+   * address that already has a vault gets an email saying so instead of a
+   * code, and the vault answers the same either way, so the hint says that
+   * too — or whoever forgot they had an account waits for a code for ever.
+   */
+  codeHint(flow, { signup = false } = {}) {
+    const life = flow.minutes ? ` The code works for ${flow.minutes} minutes.` : '';
+    const taken = signup ? ' If that address already has a vault, the email says how to sign in instead.' : '';
+    return el('span', {
+      class: 'vault-hint', id: 'vault-code-hint',
+      text: `Look in the inbox for ${flow.email}, and in spam if it is not there after a minute.${life}${taken}`,
+    });
+  }
+
+  /**
+   * "Resend code". It waits out the minute in which the vault would ignore a
+   * second request anyway, and counts down so the wait does not look broken.
+   * Each button owns its countdown and stops it once the form is gone.
+   */
+  resendButton(flow, ask, error, status) {
+    const button = el('button', { class: 'vault-btn ghost small', type: 'button' });
+
+    const paint = () => {
+      const left = resendWait(flow.sentAt);
+      button.disabled = left > 0;
+      button.textContent = left > 0 ? `Resend code (${left})` : 'Resend code';
+      return left;
+    };
+    const arm = () => {
+      if (!paint()) return;
+      const timer = setInterval(() => {
+        if (!button.isConnected || !paint()) clearInterval(timer);
+      }, 1000);
+    };
+
+    button.addEventListener('click', async () => {
+      const res = await this.attempt(button, 'Sending…', ask);
+      if (!res) return;
+      if (!res.ok) {
+        paint();
+        return this.say(error, res.error);
+      }
+      flow.sentAt = Date.now();
+      if (res.note) flow.note = res.note;
+      error.textContent = '';
+      status.textContent = 'Sent again. Only the newest code works.';
+      // To the box the new code goes in, before the countdown disables this
+      // button and renames it every second under a screen reader's cursor.
+      const box = this.root.querySelector('#vault-code');
+      if (box) box.focus();
+      arm();
     });
 
+    arm();
+    return button;
+  }
+
+  /** Sign in, or the first step of creating an account. */
+  drawCredentials(message) {
+    const signup = this.mode === 'signup';
+    const { form, error } = this.authForm(signup
+      ? 'A free account gives you a 100 MB vault for syncing documents between your computers.'
+      : 'Sign in to sync documents between your computers.', message);
+
+    const email = this.emailInput();
+    const password = this.passwordInput(signup);
     const submit = el('button', {
       class: 'vault-btn primary', type: 'submit',
-      text: this.mode === 'signup' ? 'Create my vault' : 'Sign in',
+      text: signup ? 'Create my vault' : 'Sign in',
     });
 
-    form.append(tabs, intro);
-    if (message) form.append(el('p', { class: 'vault-error', text: message }));
     form.append(
       el('label', { for: 'vault-email', class: 'vault-label', text: 'Email' }),
       email,
       el('label', { for: 'vault-password', class: 'vault-label', text: 'Password' }),
       password,
     );
-    if (this.mode === 'signup') {
-      form.append(el('span', {
-        class: 'vault-hint', id: 'vault-pw-hint',
-        text: 'At least 10 characters, with a number or symbol.',
-      }));
-    }
+    if (signup) form.append(el('span', { class: 'vault-hint', id: 'vault-pw-hint', text: PASSWORD_HINT }));
     form.append(submit);
+
+    if (!signup) {
+      const forgot = el('button', { class: 'vault-link', type: 'button', text: 'Forgot password?' });
+      forgot.addEventListener('click', () => {
+        if (this.busy) return;
+        this.draft.email = email.value.trim();
+        this.flow.reset = { stage: 'email' };
+        this.drawAuth();
+      });
+      form.append(forgot);
+    }
 
     form.addEventListener('submit', async ev => {
       ev.preventDefault();
-      if (this.busy) return;
-      this.busy = true;
-      submit.disabled = true;
-      submit.textContent = this.mode === 'signup' ? 'Creating…' : 'Signing in…';
+      const address = email.value.trim();
+      const secret = password.value;
+      const res = await this.attempt(submit, signup ? 'Sending a code…' : 'Signing in…', () => (signup
+        ? this.api.vault.signUpStart(address, secret)
+        : this.api.vault.signIn(address, secret)));
+      if (!res) return;
+      if (!res.ok) return this.say(error, res.error, signup ? null : password);
 
-      const call = this.mode === 'signup' ? this.api.vault.signUp : this.api.vault.signIn;
-      const res = await call(email.value.trim(), password.value);
-
-      this.busy = false;
-      if (!res.ok) {
-        this.drawAuth(res.error);
+      if (signup) {
+        this.flow.signup = {
+          email: address, password: secret, note: res.note, minutes: res.minutes, sentAt: Date.now(),
+        };
+        this.drawAuth();
         return;
       }
-      this.toast(this.mode === 'signup' ? 'Vault created' : 'Signed in to your vault');
+      this.toast('Signed in to your vault');
       await this.load();
     });
 
     this.render(form);
+  }
+
+  /** The second step of creating an account: the code from the email. */
+  drawSignUpCode(message) {
+    const flow = this.flow.signup;
+    const { form, error } = this.authForm(
+      flow.note || 'We sent a 6-digit code to that address. Enter it to finish creating your vault.',
+      message,
+    );
+    const status = el('p', { class: 'vault-status', role: 'status' });
+
+    const code = this.codeInput();
+    const submit = el('button', { class: 'vault-btn primary', type: 'submit', text: 'Create my vault' });
+    const resend = this.resendButton(flow, () => this.api.vault.signUpStart(flow.email, flow.password), error, status);
+    const other = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Use a different email' });
+
+    form.append(
+      el('label', { for: 'vault-code', class: 'vault-label', text: 'Code from the email' }),
+      code,
+      this.codeHint(flow, { signup: true }),
+      submit,
+      el('div', { class: 'vault-row-acts' }, resend, other),
+      status,
+    );
+
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const digits = codeDigits(code.value);
+      if (digits.length !== 6) return this.say(error, CODE_PROBLEM, code);
+
+      // The account is made with the password sent here, alongside the code.
+      const res = await this.attempt(submit, 'Checking…', () => (
+        this.api.vault.signUpVerify(flow.email, digits, flow.password)
+      ));
+      if (!res) return;
+      if (!res.ok) {
+        if (res.status === 409) {
+          // The account exists after all — made on another computer while
+          // this code was on its way, most likely. Signing in is the way on.
+          this.flow = { signup: null, reset: null };
+          this.draft.email = flow.email;
+          this.mode = 'signin';
+          this.drawAuth(res.error);
+          this.focusCredentials();
+          return;
+        }
+        // Left in the box, selected: one wrong digit is the usual mistake, and
+        // the code is good for a few more tries.
+        this.say(error, res.error, code);
+        code.select();
+        return;
+      }
+      this.flow.signup = null;
+      this.toast('Vault created');
+      await this.load();
+    });
+
+    other.addEventListener('click', () => {
+      if (this.busy) return;
+      this.draft.email = flow.email;
+      this.flow.signup = null;
+      this.drawAuth();
+      const box = this.root.querySelector('#vault-email');
+      if (box) box.focus();
+    });
+
+    this.render(form);
+    code.focus();
+  }
+
+  /** "Forgot password?": which address to send the code to. */
+  drawForgot(message) {
+    const { form, error } = this.authForm(
+      'Enter the address you signed up with. Plume will email you a 6-digit code for choosing a new password.',
+      message,
+    );
+
+    const email = this.emailInput();
+    const submit = el('button', { class: 'vault-btn primary', type: 'submit', text: 'Email me a code' });
+    const back = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Back to sign in' });
+
+    form.append(
+      el('label', { for: 'vault-email', class: 'vault-label', text: 'Email' }),
+      email,
+      submit,
+      el('div', { class: 'vault-row-acts' }, back),
+    );
+
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const address = email.value.trim();
+      if (!looksLikeEmail(address)) {
+        return this.say(error, address ? 'That email address does not look right.' : 'Type your email address.', email);
+      }
+      const res = await this.attempt(submit, 'Sending…', () => this.api.vault.forgot(address));
+      if (!res) return;
+      if (!res.ok) return this.say(error, res.error, email);
+      this.flow.reset = { stage: 'code', email: address, note: res.note, sentAt: Date.now() };
+      this.drawAuth();
+    });
+
+    back.addEventListener('click', () => {
+      if (this.busy) return;
+      this.flow.reset = null;
+      this.drawAuth();
+      this.focusCredentials();
+    });
+
+    this.render(form);
+    email.focus();
+  }
+
+  /** The code from the reset email, and the new password it unlocks. */
+  drawResetCode(message) {
+    const flow = this.flow.reset;
+    const { form, error } = this.authForm(
+      flow.note || 'If there is an account for that address, a 6-digit code and a link are on their way.',
+      message,
+    );
+    const status = el('p', { class: 'vault-status', role: 'status' });
+
+    const code = this.codeInput();
+    const password = this.passwordInput(true);
+    const submit = el('button', { class: 'vault-btn primary', type: 'submit', text: 'Set password and sign in' });
+    const resend = this.resendButton(flow, () => this.api.vault.forgot(flow.email), error, status);
+    const other = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Use a different email' });
+
+    form.append(
+      el('label', { for: 'vault-code', class: 'vault-label', text: 'Code from the email' }),
+      code,
+      this.codeHint(flow),
+      el('label', { for: 'vault-password', class: 'vault-label', text: 'New password' }),
+      password,
+      el('span', { class: 'vault-hint', id: 'vault-pw-hint', text: PASSWORD_HINT }),
+      submit,
+      el('div', { class: 'vault-row-acts' }, resend, other),
+      status,
+    );
+
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const digits = codeDigits(code.value);
+      if (digits.length !== 6) return this.say(error, CODE_PROBLEM, code);
+
+      const res = await this.attempt(submit, 'Saving…', () => (
+        this.api.vault.resetWithCode(flow.email, digits, password.value)
+      ));
+      if (!res) return;
+      if (!res.ok) {
+        // The vault checks the password before it spends the code, so a
+        // password it would not take leaves the code good: keep it, and put
+        // the cursor on the password instead.
+        if (/\bcode\b/i.test(res.error || '')) {
+          this.say(error, res.error, code);
+          code.select();
+          return;
+        }
+        return this.say(error, res.error, password);
+      }
+      this.flow.reset = null;
+      this.toast('New password set');
+      await this.load({ notice: res.note });
+    });
+
+    other.addEventListener('click', () => {
+      if (this.busy) return;
+      this.draft.email = flow.email;
+      this.flow.reset = { stage: 'email' };
+      this.drawAuth();
+    });
+
+    this.render(form);
+    code.focus();
   }
 
   // ---------- signed in ----------
@@ -202,6 +600,7 @@ export class Vault {
 
     const parts = [head, meter];
     if (message) parts.push(el('p', { class: 'vault-error', text: message }));
+    if (this.notice) parts.push(el('p', { class: 'vault-status', role: 'status', text: this.notice }));
     parts.push(this.drawFolder(), this.drawCurrent(), this.drawFiles());
 
     this.render(...parts);
