@@ -176,15 +176,6 @@
       }
 
       say(data.error || 'That could not be sent. Try again in a moment.', 'bad');
-      // The service can be up with no mail provider. Say where to go instead of
-      // leaving somebody locked out with nothing to act on.
-      if (res.status === 501) {
-        var link = document.createElement('a');
-        link.href = 'contact.html';
-        link.textContent = 'Open the contact form';
-        msg.append(document.createTextNode(' '));
-        msg.append(link);
-      }
       submit.disabled = false;
       submit.textContent = 'Send the reset link';
     } catch (err) {
