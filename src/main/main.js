@@ -1188,11 +1188,17 @@ handle('git:connect', async (ctx, remote, branch) => {
   if (!signedIn()) return { ok: false, error: NEEDS_ACCOUNT, locked: true };
   const folder = settings.get().gitFolder;
   if (!folder) return { ok: false, error: 'Choose a folder first.' };
+  const account = vault.publicState();
   const result = await git.connect(localPath(ctx, folder), str(remote, 2048), {
     branch: branch ? str(branch, 200) : undefined,
+    // Only used if the repository Plume creates has no identity of its own.
+    who: account.email ? { email: account.email } : null,
   });
   gitSchedule();
-  return { ...result, ...(await gitState()) };
+  const state = await gitState();
+  // The vault keeps the fact, not the credentials — see src/gitlink.js there.
+  vault.reportGit({ connected: Boolean(state.repo && state.remote), remote: state.remote, branch: state.branch });
+  return { ...result, ...state };
 });
 
 handle('git:sync', async (_ctx, message) => {
@@ -1225,6 +1231,7 @@ handle('git:forget', async () => {
   settings.update({ gitFolder: null, gitAuto: false });
   broadcastSettings();
   gitSchedule();
+  vault.reportGit({ connected: false });
   // The folder and its repository stay exactly as they are.
   return { folder: null, repo: false };
 });

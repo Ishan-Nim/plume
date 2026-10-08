@@ -1,6 +1,12 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no workspace to import, no project to set up, no editor chrome.
 
-**1.0.3 adds four colour palettes.** Starless, Greenwood, Commit and Lapis sit beside Plume's own under **Reading settings → Palette**. A palette recolours whichever of light or dark is in force rather than replacing that choice, so Auto still follows the system inside every one of them. The same five are on the website and the web app, in the footer. They are derived from four MIT-licensed Obsidian community themes, credited in the README.
+**1.1.0 adds Git sync, and four colour palettes.**
+
+**Git sync** keeps a folder of notes in a Git repository: pull what changed elsewhere, commit what changed here, push. It is in **⋯ → Git sync…**, and it is part of having a Plume Vault account. Plume never asks for a token and never stores one — it drives the Git already on your machine, so your credentials stay in your credential helper or SSH agent, and conflicts, submodules, LFS and signing behave exactly as they do in your terminal.
+
+**Starless, Greenwood, Commit and Lapis** sit beside Plume's own under **Reading settings → Palette**. A palette recolours whichever of light or dark is in force rather than replacing that choice.
+
+**1.0.3 added four colour palettes.** Starless, Greenwood, Commit and Lapis sit beside Plume's own under **Reading settings → Palette**. A palette recolours whichever of light or dark is in force rather than replacing that choice, so Auto still follows the system inside every one of them. The same five are on the website and the web app, in the footer. They are derived from four MIT-licensed Obsidian community themes, credited in the README.
 
 **1.0.2 fixed the updater, which could not install an update.** "Install and restart" started the install *and* a second download at the same time, and the second one deleted the installer the first had just handed to Windows. Nothing was installed, Plume reopened on the old version, and offered the same update again — a loop with no way out of it.
 
@@ -78,10 +84,10 @@ Worth saying plainly: **Plume is not code-signed.** Those checksums come from th
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.0.3.exe` |
-| macOS, Apple silicon | `Plume-1.0.3-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.0.3-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.0.3-linux-x86_64.AppImage` or `Plume-1.0.3-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.1.0.exe` |
+| macOS, Apple silicon | `Plume-1.1.0-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.1.0-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.1.0-linux-x86_64.AppImage` or `Plume-1.1.0-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html), which offers the right build for your system.
 
@@ -89,7 +95,7 @@ Or get them from [plume-md.com/download](https://plume-md.com/download.html), wh
 
 ### Windows
 
-Run `Plume-Setup-1.0.3.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
+Run `Plume-Setup-1.1.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 
 To make Plume the default for `.md`, right-click a Markdown file and choose **Open with → Choose another app → Plume → Always**, or use **⋯ → Make Plume the default for .md** inside Plume.
 
@@ -102,5 +108,5 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 ### Linux
 
-- **AppImage:** make it executable with `chmod +x Plume-1.0.3-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.0.3-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+- **AppImage:** make it executable with `chmod +x Plume-1.1.0-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.1.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.

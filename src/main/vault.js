@@ -479,9 +479,28 @@ function isSyncable(localPath) {
   return SYNCABLE.has(path.extname(localPath || '').toLowerCase());
 }
 
+/**
+ * Tells the vault that this account syncs a folder with Git, and which
+ * repository — so the web vault can say so too. Never a credential: the server
+ * strips anything before the "@" of a remote, and nothing here sends a token
+ * because nothing here has one.
+ *
+ * Best effort. Git sync works whether or not the vault hears about it, so a
+ * failure is logged and forgotten rather than surfaced.
+ */
+async function reportGit(status) {
+  if (!session) return null;
+  try {
+    return await call('/git/status', { method: 'PUT', json: status });
+  } catch (err) {
+    return null;
+  }
+}
+
 module.exports = {
   API,
   publicState,
+  reportGit,
   signUp,
   signIn,
   signOut,

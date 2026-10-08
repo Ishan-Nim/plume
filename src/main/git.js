@@ -220,14 +220,18 @@ async function sync(dir, { message } = {}) {
     }
   }
 
-  const branch = state.branch && state.branch !== 'HEAD' ? state.branch : null;
-  const pushArgs = state.upstream || !branch
+  // Read again rather than trusting what was read at the top. In a repository
+  // with no commits yet there is no branch to name until the commit above
+  // makes one, and pushing the one that was there a moment ago asks git to
+  // send a ref that does not exist.
+  const after = await inspect(dir);
+  const branch = after.branch && after.branch !== 'HEAD' ? after.branch : null;
+  const pushArgs = after.upstream
     ? ['push']
-    : ['push', '--set-upstream', 'origin', branch];
+    : (branch ? ['push', '--set-upstream', 'origin', branch] : ['push']);
   const push = note('push', await run(dir, pushArgs));
   if (!push.ok) return { ok: false, error: explain(push), steps };
 
-  const after = await inspect(dir);
   return {
     ok: true,
     steps,
@@ -244,7 +248,26 @@ async function sync(dir, { message } = {}) {
  * remote to the repository already there. Never touches a folder that is a
  * different repository already.
  */
-async function connect(dir, remoteUrl, { branch } = {}) {
+/**
+ * Gives a repository an identity to commit with, but only one Plume made and
+ * only when nothing else supplies one. Plenty of people set user.name per
+ * repository rather than globally, and then a folder Plume initialises has no
+ * identity at all and the first commit fails with git's own "Please tell me who
+ * you are" — fine advice for somebody who lives in a terminal, and a dead end
+ * for somebody who does not.
+ *
+ * Repository-local, never --global, and never over an identity already there.
+ */
+async function ensureIdentity(dir, who) {
+  if (!who || !who.email) return;
+  const email = await run(dir, ['config', 'user.email']);
+  const name = await run(dir, ['config', 'user.name']);
+  if (email.ok && email.out && name.ok && name.out) return;
+  if (!email.ok || !email.out) await run(dir, ['config', 'user.email', who.email]);
+  if (!name.ok || !name.out) await run(dir, ['config', 'user.name', who.name || who.email.split('@')[0]]);
+}
+
+async function connect(dir, remoteUrl, { branch, who } = {}) {
   const url = validRemote(remoteUrl);
   if (!url) return { ok: false, error: 'That does not look like a Git remote. Use an https:// or SSH address.' };
 
@@ -274,6 +297,7 @@ async function connect(dir, remoteUrl, { branch } = {}) {
     const add = await run(dir, ['remote', 'add', 'origin', '--', url]);
     if (!add.ok) return { ok: false, error: explain(add) };
     if (branch) await run(dir, ['checkout', '-B', branch]);
+    await ensureIdentity(dir, who);
     return { ok: true, cloned: false, ...(await inspect(dir)) };
   }
 
@@ -282,7 +306,8 @@ async function connect(dir, remoteUrl, { branch } = {}) {
   args.push('--', url, '.');
   const clone = await run(dir, args, { timeout: 10 * 60 * 1000 });
   if (!clone.ok) return { ok: false, error: explain(clone) };
+  await ensureIdentity(dir, who);
   return { ok: true, cloned: true, ...(await inspect(dir)) };
 }
 
-module.exports = { available, inspect, sync, connect, validRemote, explain };
+module.exports = { available, inspect, sync, connect, validRemote, explain, ensureIdentity };

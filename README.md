@@ -51,6 +51,7 @@
 - **Updates that ask first.** Plume tells you when a new version is out and installs it when you say so. Every download is checked against the release's published checksum.
 - **Find in page**, back/forward between linked notes, image lightbox, copy buttons on code blocks.
 - **Light / dark / auto theme**, text size, reading width, sans/serif.
+- **Git sync.** Keep a folder of notes in a Git repository — pull, commit, push — from **⋯ → Git sync…**, for Plume Vault account holders. It drives the Git already on your machine, so Plume never asks for a token and never stores one, and conflicts, submodules, LFS and signing behave as they do in your terminal.
 - **Five colour palettes** — Plume, Starless, Greenwood, Commit and Lapis. A palette recolours whichever of light or dark is in force rather than replacing that choice, so auto still follows the system inside every one of them. The same five are on the website and the web app.
 - **Print** and **Export to PDF** (with a PDF outline from your headings).
 - **Open in editor** (VS Code or Cursor if installed, otherwise the system text editor), **Open in Obsidian** for vault files, **Open with…** (Windows), **Show in folder**.

@@ -209,3 +209,52 @@ test('what git says is turned into something a person can act on', () => {
   }
   assert.match(git.explain({ err: '', out: '', killed: true }), /took too long/i);
 });
+
+test('a folder adopted into a brand-new repository pushes its first commit', { skip: needsGit }, async () => {
+  // The case that broke against a real remote: before that first commit there
+  // is no branch to name, so reading it at the top of sync() and pushing it at
+  // the bottom asks git to send a ref that does not exist —
+  // "src refspec refs/heads/main does not match any".
+  const remote = temp('fresh-remote');
+  run(remote, 'init', '--bare', '--initial-branch=main');
+
+  const notes = temp('fresh-notes');
+  fs.writeFileSync(path.join(notes, 'Note.md'), '# A note\n');
+
+  // Set up by hand rather than through connect(), which only accepts https and
+  // ssh addresses — a bare path on disk is not a remote anybody should be able
+  // to name. The state it leaves behind is the same one connect() leaves.
+  run(notes, 'init', '--initial-branch=main');
+  run(notes, 'remote', 'add', 'origin', remote);
+  run(notes, 'config', 'user.email', 'tester@example.com');
+  run(notes, 'config', 'user.name', 'Tester');
+
+  const res = await git.sync(notes, { message: 'first from Plume' });
+  assert.strictEqual(res.ok, true, res.error);
+
+  const listed = execFileSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'],
+    { cwd: remote, encoding: 'utf8' });
+  assert.match(listed, /Note\.md/, 'the first commit reached the remote');
+});
+
+test('a repository Plume creates can commit even with no global identity', { skip: needsGit }, async () => {
+  // Plenty of people set user.name per repository rather than globally. A
+  // folder Plume initialises then has no identity at all, and the first commit
+  // fails with git's own "Please tell me who you are" — fine for somebody who
+  // lives in a terminal, a dead end for anybody else.
+  const dir = temp('identity');
+  run(dir, 'init', '--initial-branch=main');
+
+  await git.ensureIdentity(dir, { email: 'someone@example.com' });
+  assert.strictEqual(run(dir, 'config', 'user.email').trim(), 'someone@example.com');
+  assert.strictEqual(run(dir, 'config', 'user.name').trim(), 'someone');
+
+  // And it is never written over an identity that is already there.
+  const other = temp('identity-kept');
+  run(other, 'init', '--initial-branch=main');
+  run(other, 'config', 'user.email', 'mine@example.com');
+  run(other, 'config', 'user.name', 'Mine');
+  await git.ensureIdentity(other, { email: 'someone@example.com' });
+  assert.strictEqual(run(other, 'config', 'user.email').trim(), 'mine@example.com');
+  assert.strictEqual(run(other, 'config', 'user.name').trim(), 'Mine');
+});

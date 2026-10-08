@@ -1,8 +1,22 @@
-# Plume 1.0.3
+# Plume 1.1.0
 
 **Released 8 October 2026** · [plume-md.com](https://plume-md.com) · MIT licence
 
-> **1.0.3 adds four colour palettes.** Starless, Greenwood, Commit and Lapis
+> **1.1.0 adds Git sync, and four colour palettes.**
+>
+> **Git sync** keeps a folder of notes in a Git repository: pull what changed
+> elsewhere, commit what changed here, push. It is in **⋯ → Git sync…**, and it
+> is part of having a Plume Vault account. Plume never asks for a token and
+> never stores one — it drives the Git already on your machine, so your
+> credentials stay in your credential helper or SSH agent, and conflicts,
+> submodules, LFS and signing behave exactly as they do in your terminal.
+>
+> **Starless, Greenwood, Commit and Lapis** sit beside Plume's own under
+> **Reading settings → Palette**. A palette recolours whichever of light or dark
+> is in force rather than replacing that choice, so Auto still follows the
+> system inside every one. The same five are on the website and the web vault.
+>
+> **1.0.3 added four colour palettes.** Starless, Greenwood, Commit and Lapis
 > sit beside Plume's own under **Reading settings → Palette**. A palette
 > recolours whichever of light or dark is in force rather than replacing that
 > choice, so Auto still follows the system inside every one of them. The same
@@ -179,22 +193,22 @@ vault, and no way to forge a session.
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.0.3.exe` |
-| macOS, Apple silicon | `Plume-1.0.3-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.0.3-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.0.3-linux-x86_64.AppImage` or `Plume-1.0.3-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.1.0.exe` |
+| macOS, Apple silicon | `Plume-1.1.0-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.1.0-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.1.0-linux-x86_64.AppImage` or `Plume-1.1.0-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html),
 which offers the right build for your system.
 
 Checksums for every file are in `SHA256SUMS.txt` on the
-[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.0.3).
+[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.1.0).
 
 ## Installing
 
 ### Windows
 
-Run `Plume-Setup-1.0.3.exe`. Plume installs for all users in
+Run `Plume-Setup-1.1.0.exe`. Plume installs for all users in
 `C:\Program Files\Plume`, so Windows asks for administrator approval once. The
 installer is not code-signed yet: if SmartScreen shows "Windows protected your
 PC", choose **More info → Run anyway**.
@@ -216,8 +230,8 @@ so macOS blocks the first launch. Use either of these:
 ### Linux
 
 - **AppImage:** make it executable with
-  `chmod +x Plume-1.0.3-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.0.3-linux-amd64.deb`. On
+  `chmod +x Plume-1.1.0-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.1.0-linux-amd64.deb`. On
   Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that
   Electron apps need to start there.
 

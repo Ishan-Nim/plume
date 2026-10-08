@@ -226,6 +226,7 @@
     <a href="#sync">Syncing</a>
     <a href="#web">The web vault</a>
     <a href="#editing">Editing</a>
+    <a href="#git">Git sync</a>
     <a href="#updates">Updates</a>
     <a href="#graph">The graph</a>
     <a href="#tokens">API tokens</a>
@@ -549,6 +550,48 @@ people/notes.md                 who said what, and when</code></pre>
       <li><b>A file changed elsewhere cannot overwrite you.</b> If something else writes to the document while you are editing it — another editor, or a sync from another machine — Plume stops, tells you, and lets you choose which version to keep.</li>
       <li><b>Saving does not fight live reload.</b> Plume recognises its own write, so the editor is not reloaded out from under you.</li>
     </ul>
+
+    <h2 id="git">Git sync</h2>
+    <p>
+      Keep a folder of notes in a Git repository: pull what changed elsewhere,
+      commit what changed here, push. It is in <b>&ctdot; &rarr; Git sync…</b>, and it is
+      part of having a <a href="#vault">Plume Vault</a> account.
+    </p>
+    <figure>
+      <img src="assets/shots/git-sync.png" width="1180" height="800" loading="lazy" alt="The Git sync panel in Plume, showing a folder, its GitHub remote, the branch and the last commit">
+      <figcaption>A folder of notes, its remote, and what state it is in.</figcaption>
+    </figure>
+    <ol class="steps">
+      <li>Open <b>&ctdot; &rarr; Git sync…</b> and choose the folder your notes are in.</li>
+      <li>Paste the repository address — <code>https://github.com/you/notes.git</code> or
+        <code>git@github.com:you/notes.git</code> — and press <b>Connect</b>. An empty folder is
+        cloned into; a folder that already has notes in it keeps them and gains a remote.</li>
+      <li>Press <b>Sync now</b>. Plume commits what changed, rebases on whatever arrived, and pushes.</li>
+    </ol>
+    <p>
+      <b>Plume never asks for a token, and never stores one.</b> It drives the <code>git</code>
+      already on your machine, so your credentials stay where you already put them — the system
+      credential helper, an SSH agent, a deploy key. That is also why conflicts, submodules, LFS,
+      hooks and commit signing all behave exactly as they do in your terminal: it is the same git.
+      The one requirement is that Git is installed; the panel says so plainly if it is not.
+    </p>
+    <p>
+      It rebases rather than merges, so a folder of notes does not collect a merge commit every
+      few minutes. If the two sides genuinely conflict, Plume stops and tells you — resolve it in
+      the folder the way you normally would, then sync again. A repository left half-way through
+      somebody else's merge or rebase is never touched.
+    </p>
+    <p>
+      Git sync and <a href="#sync">vault sync</a> can point at the same folder. Neither knows about
+      the other, and neither needs to: one keeps a copy in your vault, the other keeps a history in
+      your repository.
+    </p>
+    <p>
+      If Git has no name and email configured — common if you set them per repository rather than
+      globally — Plume gives a repository <em>it</em> created an identity from your vault account,
+      so the first commit does not fail. It never changes your global configuration, and never
+      overwrites an identity that is already there.
+    </p>
 
     <h2 id="updates">Updates</h2>
     <p>
