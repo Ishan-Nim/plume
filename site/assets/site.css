@@ -408,7 +408,8 @@ p { margin: 0; }
   background: var(--bg-2); box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
-.shot-frame img { width: 100%; }
+.shot-frame img,
+.shot-frame video { width: 100%; height: auto; display: block; }
 
 /* ---------- sections ---------- */
 

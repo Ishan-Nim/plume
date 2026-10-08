@@ -15,11 +15,15 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+// The vault shots need somewhere to sign up; the reading shots do not. Without
+// an API only the local ones are taken, which is what you want after a change
+// to how a document renders.
 const API = process.env.PLUME_VAULT_API;
-if (!API || /plume-md\.com/i.test(API)) {
-  console.error('shoot-app: set PLUME_VAULT_API to a vault of your own');
+if (API && /plume-md\.com/i.test(API)) {
+  console.error('shoot-app: PLUME_VAULT_API must be a vault of your own, never production');
   process.exit(2);
 }
+const VAULT_SHOTS = Boolean(API);
 
 const ROOT = path.join(__dirname, '..');
 const SHOTS = process.env.PLUME_SHOTS || path.join(ROOT, 'docs', 'screenshots');
@@ -38,8 +42,8 @@ fs.writeFileSync(path.join(tmp, 'settings.json'), JSON.stringify({
 
 // A copy of the demo notebook, so syncing does not touch the repository.
 const notebook = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-demo-'));
-fs.cpSync(path.join(ROOT, 'docs', 'demo-notebook'), notebook, { recursive: true });
-const opener = path.join(notebook, 'A field guide to Plume.md');
+fs.cpSync(path.join(ROOT, 'docs', process.env.PLUME_NOTEBOOK || 'demo-notebook'), notebook, { recursive: true });
+const opener = path.join(notebook, process.env.PLUME_OPEN || 'A field guide to Plume.md');
 process.argv.push(opener);
 
 const EMAIL = `you-${Date.now()}@example.com`;
@@ -99,6 +103,11 @@ async function main(win) {
   await shoot(win, 'editing');
   await run("document.getElementById('btn-edit').click();");
   await sleep(700);
+
+  if (!VAULT_SHOTS) {
+    console.log('\n(no PLUME_VAULT_API — the vault and graph shots were skipped)');
+    return;
+  }
 
   // ---- the vault, signed out ----
   await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);

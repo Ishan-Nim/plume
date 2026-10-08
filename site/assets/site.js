@@ -61,6 +61,32 @@
     picker.addEventListener('change', function () { applyPalette(picker.value); });
   }
 
+  // ---------- the hero film ----------
+  //
+  // preload="none" in the markup, so the page costs nothing extra to anybody
+  // who never scrolls to it. It starts when it is actually on screen, and not
+  // at all for a reader who has asked their system for less motion — they keep
+  // the poster, which is the film's own first frame.
+
+  var tour = document.getElementById('hero-tour');
+  if (tour && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    var start = function () {
+      tour.preload = 'auto';
+      var playing = tour.play();
+      if (playing && playing.catch) playing.catch(function () { /* a browser that would rather not */ });
+    };
+    if ('IntersectionObserver' in window) {
+      var watcher = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) { start(); watcher.disconnect(); }
+        });
+      }, { threshold: 0.25 });
+      watcher.observe(tour);
+    } else {
+      start();
+    }
+  }
+
   // ---------- header shadow ----------
 
   var header = document.querySelector('.site-header');

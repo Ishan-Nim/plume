@@ -1,0 +1,217 @@
+'use strict';
+
+// Films a short tour of the real app for the website hero.
+//
+//   npx electron scripts/film-app.js
+//   (then) ffmpeg, which this prints the command for, or run with PLUME_ENCODE=1
+//
+// Frames come from the same capturePage() the screenshots use, so what is in
+// the video is the actual app rendering an actual notebook — not a mockup.
+// Nothing here touches a vault: the tour is reading, the outline, the palettes
+// and the editor, all local.
+
+const { app, BrowserWindow } = require('electron');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const ROOT = path.join(__dirname, '..');
+const OUT = process.env.PLUME_FILM || path.join(ROOT, 'site', 'assets', 'shots');
+const FPS = Number(process.env.PLUME_FPS || 15);
+
+const frames = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-film-'));
+fs.mkdirSync(OUT, { recursive: true });
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-film-data-'));
+app.setPath('userData', tmp);
+
+// Even dimensions, because H.264 wants them.
+const [w, h] = (process.env.PLUME_SIZE || '1280x832').split('x').map(Number);
+fs.writeFileSync(path.join(tmp, 'settings.json'), JSON.stringify({
+  theme: 'light',
+  palette: 'plume',
+  bounds: { x: 40, y: 40, width: w, height: h },
+  sidebar: true,
+  sidebarWidth: 262,
+  autoUpdate: false,
+}));
+
+// A copy, so filming never writes to the repository.
+const notebook = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-demo-'));
+fs.cpSync(path.join(ROOT, 'docs', 'film-notebook'), notebook, { recursive: true });
+process.argv.push(path.join(notebook, 'A tour of Plume.md'));
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Show without stealing focus or flashing on the desktop.
+BrowserWindow.prototype.show = function show() {
+  this.setOpacity(0);
+  this.setSkipTaskbar(true);
+  this.showInactive();
+};
+BrowserWindow.prototype.maximize = function maximize() {};
+
+let n = 0;
+let filming = false;
+
+/**
+ * Grabs frames on a fixed interval for as long as the tour runs. JPEG rather
+ * than PNG: a PNG of this window takes longer than the frame interval, and a
+ * recorder that cannot keep up produces a video that stutters where the app
+ * does not.
+ */
+async function record(win) {
+  const every = 1000 / FPS;
+  while (filming) {
+    const started = Date.now();
+    try {
+      const img = await win.webContents.capturePage();
+      fs.writeFileSync(path.join(frames, `f${String(++n).padStart(5, '0')}.jpg`), img.toJPEG(92));
+    } catch (err) { /* a frame lost to a resize is not worth stopping for */ }
+    const spent = Date.now() - started;
+    if (spent < every) await sleep(every - spent);
+  }
+}
+
+async function main(win) {
+  const wc = win.webContents;
+  const run = (js) => wc.executeJavaScript(`(async () => { ${js} })()`);
+  const read = (expr) => wc.executeJavaScript(`(async () => (${expr}))()`);
+
+  async function until(expr, timeout = 20000) {
+    const deadline = Date.now() + timeout;
+    for (;;) {
+      if (await read(expr)) return true;
+      if (Date.now() > deadline) return false;
+      await sleep(150);
+    }
+  }
+
+  // Eased scrolling, in the page, so the motion is the browser's rather than a
+  // series of jumps a frame apart.
+  const glide = (to, ms) => run(`
+    const el = document.getElementById('viewer') || document.scrollingElement;
+    const from = el.scrollTop;
+    const dist = (${to}) - from;
+    const start = performance.now();
+    await new Promise((done) => {
+      function step(now) {
+        const t = Math.min(1, (now - start) / ${ms});
+        // easeInOutCubic: starts and stops gently, like a hand on a wheel.
+        const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        el.scrollTop = from + dist * e;
+        if (t < 1) requestAnimationFrame(step); else done();
+      }
+      requestAnimationFrame(step);
+    });
+  `);
+
+  await until('document.body.dataset.ready === "1"');
+  await sleep(1500);
+
+  filming = true;
+  const recorder = record(win);
+
+  // ---- 1. the document, as you meet it ----
+  await sleep(1800);
+
+  // ---- 2. read down the page ----
+  const far = await read("(document.getElementById('viewer')||document.scrollingElement).scrollHeight");
+  await glide(Math.round(far * 0.28), 2600);
+  await sleep(900);
+  await glide(Math.round(far * 0.55), 2600);
+  await sleep(1000);
+
+  // ---- 3. the outline ----
+  await run(`document.querySelector('.sidebar-tab[data-tab="outline"]').click();`);
+  await sleep(1700);
+  await run(`document.querySelector('.sidebar-tab[data-tab="files"]').click();`);
+  await sleep(700);
+
+  await glide(0, 1800);
+  await sleep(600);
+
+  // ---- 4. the palettes, one after another ----
+  await run(`document.getElementById('btn-reading').click();`);
+  await sleep(1100);
+  for (const palette of ['greenwood', 'commit', 'lapis', 'starless']) {
+    await run(`document.querySelector('[data-set="palette:${palette}"]').click();`);
+    // Starless is the one that wants the dark side to make its point.
+    if (palette === 'lapis') {
+      await run(`document.querySelector('[data-set="theme:dark"]').click();`);
+    }
+    await sleep(1250);
+  }
+  await sleep(500);
+  await run(`document.querySelector('[data-set="palette:plume"]').click();`);
+  await sleep(900);
+  await run(`document.querySelector('[data-set="theme:light"]').click();`);
+  await sleep(700);
+  await run(`document.getElementById('btn-reading').click();`);
+  await sleep(900);
+
+  // ---- 5. it edits, when you ask it to ----
+  await run(`document.getElementById('btn-edit').click();`);
+  await sleep(2200);
+  await run(`document.getElementById('btn-edit').click();`);
+  await sleep(1600);
+
+  filming = false;
+  await recorder;
+  console.log(`\n${n} frames at ${FPS}fps — ${(n / FPS).toFixed(1)}s`);
+  return frames;
+}
+
+function encode() {
+  const mp4 = path.join(OUT, 'tour.mp4');
+  const webm = path.join(OUT, 'tour.webm');
+  const poster = path.join(OUT, 'tour-poster.jpg');
+  const input = path.join(frames, 'f%05d.jpg');
+  const ff = (args) => execFileSync('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+
+  // yuv420p and even dimensions, or Safari and most Android players show black.
+  ff(['-y', '-framerate', String(FPS), '-i', input,
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '27',
+    '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', mp4]);
+
+  ff(['-y', '-framerate', String(FPS), '-i', input,
+    '-c:v', 'libvpx-vp9', '-crf', '36', '-b:v', '0', '-row-mt', '1',
+    '-pix_fmt', 'yuv420p', webm]);
+
+  // The first frame, for the poster: what somebody sees before it plays, and
+  // what they keep seeing if they have asked for less motion.
+  ff(['-y', '-i', path.join(frames, 'f00001.jpg'), '-q:v', '4', poster]);
+
+  for (const f of [mp4, webm, poster]) {
+    console.log(`  ${path.basename(f)}  ${(fs.statSync(f).size / 1048576).toFixed(2)} MB`);
+  }
+}
+
+app.on('browser-window-created', (_e, win) => {
+  win.webContents.on('console-message', () => {});
+});
+
+app.whenReady().then(async () => {
+  await sleep(1800);
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win) {
+    console.error('film-app: no window');
+    app.exit(2);
+    return;
+  }
+  try {
+    await main(win);
+    console.log('\nencoding…');
+    encode();
+    console.log('\ndone');
+    app.exit(0);
+  } catch (err) {
+    filming = false;
+    console.error('film-app failed:', err && err.message);
+    app.exit(1);
+  }
+});
+
+require('../src/main/main.js');

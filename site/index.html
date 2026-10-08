@@ -301,8 +301,17 @@
       </div>
 
       <div class="shot-frame">
-        <img src="assets/shots/reading-light.png" width="1340" height="880"
-             alt="Plume showing a note with its folder tree, a callout and a table">
+        <!-- The real app, filmed by scripts/film-app.js. It does not load or play
+             until it is on screen, and never when less motion has been asked for:
+             the poster is the first frame, so the hero looks the same either way. -->
+        <video id="hero-tour" width="1280" height="832" preload="none" muted loop playsinline
+               poster="assets/shots/tour-poster.jpg"
+               aria-label="A tour of Plume: reading a note, its outline, the colour palettes, and the editor">
+          <source src="assets/shots/tour.webm" type="video/webm">
+          <source src="assets/shots/tour.mp4" type="video/mp4">
+          <img src="assets/shots/reading-light.png" width="1380" height="880"
+               alt="Plume showing a note with its folder tree, a callout and a table">
+        </video>
       </div>
     </div>
   </div>
@@ -349,7 +358,7 @@
 
       <div class="shots">
         <figure class="shot">
-          <img src="assets/shots/reading-dark.png" width="1340" height="880" loading="lazy" alt="Plume rendering a note in dark mode">
+          <img src="assets/shots/reading-dark.png" width="1380" height="880" loading="lazy" alt="Plume rendering a note in dark mode">
           <figcaption><b>Dark mode.</b> Follows your system, or pin it either way.</figcaption>
         </figure>
         <figure class="shot">
@@ -357,7 +366,7 @@
           <figcaption><b>Code, diagrams and outline.</b> Mermaid and KaTeX render inline.</figcaption>
         </figure>
         <figure class="shot">
-          <img src="assets/shots/editing.png" width="1340" height="880" loading="lazy" alt="Editing the raw Markdown of a note inside Plume">
+          <img src="assets/shots/editing.png" width="1380" height="880" loading="lazy" alt="Editing the raw Markdown of a note inside Plume">
           <figcaption><b>Editing.</b> Reading and writing are one keystroke apart.</figcaption>
         </figure>
         <figure class="shot">
