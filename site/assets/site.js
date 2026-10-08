@@ -68,48 +68,57 @@
   // at all for a reader who has asked their system for less motion — they keep
   // the poster, which is the film's own first frame.
 
-  var tour = document.getElementById('hero-tour');
-  if (tour && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    var settled = false;
+  // Every film on the page — the hero and the how-to clips in the docs — gets
+  // the same treatment: nothing loads until it is on screen, nothing plays for
+  // a reader who has asked for less motion, and a browser that refuses to
+  // autoplay gets controls rather than a frame that looks broken.
 
-    var attempt = function () {
-      tour.preload = 'auto';
-      var playing = tour.play();
-      if (!playing || !playing.then) { settled = true; return; }
-      playing.then(function () {
-        settled = true;
-        tour.controls = false;
-        tour.classList.remove('needs-a-press');
-      }).catch(function () {
-        // Brave, Safari in low-power mode, and anything with autoplay turned
-        // off refuse this. Giving up silently leaves a frame that looks broken,
-        // so the controls come out and the next thing the reader does — a
-        // click, a key, a touch — is taken as permission to start.
-        if (settled) return;
-        tour.controls = true;
-        tour.classList.add('needs-a-press');
-      });
-    };
+  var quiet = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var films = [].slice.call(document.querySelectorAll('video.film'));
 
+  if (films.length && !quiet) {
+    films.forEach(function (film) {
+      var settled = false;
+
+      var attempt = function () {
+        film.preload = 'auto';
+        var playing = film.play();
+        if (!playing || !playing.then) { settled = true; return; }
+        playing.then(function () {
+          settled = true;
+          film.controls = false;
+          film.classList.remove('needs-a-press');
+        }).catch(function () {
+          if (settled) return;
+          film.controls = true;
+          film.classList.add('needs-a-press');
+        });
+      };
+
+      film.addEventListener('click', function () { if (film.paused) attempt(); });
+      film._attempt = attempt;
+
+      if ('IntersectionObserver' in window) {
+        var watcher = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            attempt();
+            watcher.disconnect();
+          });
+        }, { threshold: 0.25 });
+        watcher.observe(film);
+      } else {
+        attempt();
+      }
+    });
+
+    // The first gesture anywhere is the permission those browsers wanted.
     var onGesture = function () {
-      if (settled) return;
-      attempt();
+      films.forEach(function (f) { if (f.paused && f._attempt) f._attempt(); });
     };
     ['pointerdown', 'keydown', 'touchstart'].forEach(function (type) {
-      document.addEventListener(type, onGesture, { once: false, passive: true });
+      document.addEventListener(type, onGesture, { passive: true });
     });
-    tour.addEventListener('click', function () { if (tour.paused) attempt(); });
-
-    if ('IntersectionObserver' in window) {
-      var watcher = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) { attempt(); watcher.disconnect(); }
-        });
-      }, { threshold: 0.25 });
-      watcher.observe(tour);
-    } else {
-      attempt();
-    }
   }
 
   // ---------- header shadow ----------
