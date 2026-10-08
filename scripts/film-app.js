@@ -42,9 +42,8 @@ const TOPICS = [
   'katex-math', 'mermaid-diagrams', 'task-lists', 'footnotes', 'definition-lists',
   'outline-panel', 'find-in-page', 'live-reload', 'the-editor', 'printing',
   'pdf-export', 'palettes', 'dark-mode', 'reading-width', 'serif-and-sans',
-  'the-vault', 'folder-sync', 'conflicts', 'quotas', 'api-tokens',
-  'mcp-server', 'the-graph', 'backlinks', 'tags', 'search',
-  'updates', 'checksums', 'keyboard', 'privacy', 'file-types', 'default-app',
+  'the-vault', 'folder-sync', 'api-tokens', 'mcp-server', 'the-graph',
+  'backlinks', 'tags', 'search', 'updates', 'keyboard',
 ];
 const title = (slug) => slug.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
 TOPICS.forEach((slug, i) => {
@@ -146,10 +145,13 @@ async function main(win) {
   await sleep(1500);
 
   filming = true;
-  const recorder = record(win);
+  let recorder = record(win);
 
   // ---- 1. the document, as you meet it ----
-  await sleep(1800);
+  //
+  // Short: a long still opening is exactly what makes a film look like a
+  // screenshot to somebody who glances at it.
+  await sleep(600);
 
   // ---- 2. read down the page ----
   const far = await read("(document.getElementById('viewer')||document.scrollingElement).scrollHeight");
@@ -197,9 +199,15 @@ async function main(win) {
   // Only when there is somewhere to sign up to. Without PLUME_VAULT_API the
   // tour simply ends after the editor, which is still a tour.
   if (process.env.PLUME_VAULT_API) {
+    // The camera stops for the setup. Signing up and uploading thirty
+    // documents is a minute of a progress line moving, which is not a tour —
+    // and leaving it in is what made the first cut fifty-six seconds long.
+    filming = false;
+    await recorder;
+
     await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
     await until('!!document.getElementById("vault-email")');
-    await sleep(1200);
+    await sleep(600);
 
     await run(`
       document.querySelector('.vault-tabs button:last-child').click();
@@ -211,31 +219,61 @@ async function main(win) {
     if (!(await until('!!document.querySelector(".vault-account")', 30000))) {
       throw new Error('could not sign up to the vault');
     }
-    await sleep(1400);
+    await sleep(900);
 
-    // The folder is already in settings, so this syncs the whole notebook in
-    // one action rather than a file at a time.
+    // One at a time, through the tree, so the renderer's own state follows
+    // along — calling the IPC directly moves the document without telling it,
+    // and every sync would then send the same file.
+    const notes = fs.readdirSync(notebook).filter((f) => f.endsWith('.md'));
+    process.stdout.write(`  syncing ${notes.length} notes `);
+    for (const note of notes) {
+      const name = path.basename(note, '.md');
+      await run(`
+        document.querySelector('.sidebar-tab[data-tab="files"]').click();
+        await new Promise(r => setTimeout(r, 180));
+        const row = [...document.querySelectorAll('.tree-row')].find(r => r.textContent.trim() === ${JSON.stringify(name)});
+        if (row) row.click();
+      `);
+      await sleep(550);
+      await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+      await sleep(320);
+      await run(`
+        const send = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Sync to vault');
+        if (send) send.click();
+      `);
+      await sleep(900);
+      process.stdout.write('.');
+    }
+    console.log(' done');
+
+    // Back to the hub, and roll again for the graph itself.
     await run(`
-      const sync = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Sync now');
-      if (sync) sync.click();
+      document.querySelector('.sidebar-tab[data-tab="files"]').click();
+      await new Promise(r => setTimeout(r, 250));
+      const row = [...document.querySelectorAll('.tree-row')].find(r => r.textContent.trim() === 'A tour of Plume');
+      if (row) row.click();
     `);
-    // Forty-odd documents, each checked and uploaded.
-    await until('!!document.querySelector(".vault-btn") && !/Syncing/i.test(document.body.textContent)', 180000);
-    await sleep(2500);
+    await sleep(1200);
+    await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+    await sleep(800);
+
+    filming = true;
+    recorder = record(win);
+    await sleep(900);
 
     await run(`
       const graph = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Graph');
       if (graph) graph.click();
     `);
     if (await until('!document.getElementById("graph-view").hidden', 30000)) {
-      // Let the force layout settle, fit it, then hold while it breathes.
-      await sleep(5000);
+      // Let the force layout settle, fit it, then let it breathe.
+      await sleep(4500);
       await run(`document.getElementById('graph-view-fit').click();`);
-      await sleep(3200);
+      await sleep(3000);
       await run(`document.getElementById('graph-view-shake').click();`);
-      await sleep(4000);
+      await sleep(3800);
       await run(`document.getElementById('graph-view-fit').click();`);
-      await sleep(2600);
+      await sleep(2400);
     }
   }
 
