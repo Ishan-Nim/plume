@@ -487,7 +487,9 @@ section { padding-block: clamp(64px, 9vw, 108px); }
   overflow: hidden; background: var(--bg-3); box-shadow: var(--shadow);
   margin: 0;
 }
-.shot img { width: 100%; }
+.shot img,
+.shot video { width: 100%; height: auto; display: block; }
+.shot video.needs-a-press { cursor: pointer; }
 .shot figcaption {
   padding: 13px 17px; font-size: .88rem; color: var(--text-2);
   border-top: 1px solid var(--line); background: var(--card);
