@@ -1,6 +1,10 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no workspace to import, no project to set up, no editor chrome.
 
-**1.0.1 fixes folder sync on a large notebook.** Syncing stopped partway through and reported a number of failures with no reason. The vault asks a caller to slow down after six hundred requests a minute, and a thousand documents sent as fast as the network allows tripped that a few hundred in — everything after it failed. Sync now paces itself and waits when asked, plans against the 100 MB quota before it starts, and says *why* when a document is left out. The list of skipped files is also bounded, so pointing it at a folder full of things it will never send no longer costs memory on every rescan. **If you sync a folder, please update.**
+**1.0.2 fixes the updater, which could not install an update.** "Install and restart" started the install *and* a second download at the same time, and the second one deleted the installer the first had just handed to Windows. Nothing was installed, Plume reopened on the old version, and offered the same update again — a loop with no way out of it.
+
+> **If you are on 1.0.0 or 1.0.1, updating from inside Plume will not work,** because the broken updater is the one you are running. Download 1.0.2 below or from [plume-md.com/download](https://plume-md.com/download.html) and run it over the top — your files and settings are untouched. Updating from inside Plume works again from 1.0.2 onward.
+
+**1.0.1 fixed folder sync on a large notebook.** Syncing stopped partway through and reported a number of failures with no reason. The vault asks a caller to slow down after six hundred requests a minute, and a thousand documents sent as fast as the network allows tripped that a few hundred in — everything after it failed. Sync now paces itself and waits when asked, plans against the 100 MB quota before it starts, and says *why* when a document is left out. The list of skipped files is also bounded, so pointing it at a folder full of things it will never send no longer costs memory on every rescan.
 
 ## What it does
 
@@ -72,10 +76,10 @@ Worth saying plainly: **Plume is not code-signed.** Those checksums come from th
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.0.1.exe` |
-| macOS, Apple silicon | `Plume-1.0.1-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.0.1-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.0.1-linux-x86_64.AppImage` or `Plume-1.0.1-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.0.2.exe` |
+| macOS, Apple silicon | `Plume-1.0.2-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.0.2-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.0.2-linux-x86_64.AppImage` or `Plume-1.0.2-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html), which offers the right build for your system.
 
@@ -83,7 +87,7 @@ Or get them from [plume-md.com/download](https://plume-md.com/download.html), wh
 
 ### Windows
 
-Run `Plume-Setup-1.0.1.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
+Run `Plume-Setup-1.0.2.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 
 To make Plume the default for `.md`, right-click a Markdown file and choose **Open with → Choose another app → Plume → Always**, or use **⋯ → Make Plume the default for .md** inside Plume.
 
@@ -96,5 +100,5 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 ### Linux
 
-- **AppImage:** make it executable with `chmod +x Plume-1.0.1-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.0.1-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+- **AppImage:** make it executable with `chmod +x Plume-1.0.2-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.0.2-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.

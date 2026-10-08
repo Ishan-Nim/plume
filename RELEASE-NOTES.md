@@ -1,14 +1,25 @@
-# Plume 1.0.1
+# Plume 1.0.2
 
 **Released 8 October 2026** · [plume-md.com](https://plume-md.com) · MIT licence
 
-> **1.0.1 fixes folder sync on a large notebook.** Syncing stopped partway
+> **1.0.2 fixes the updater, which could not install an update.**
+> "Install and restart" started the install *and* a second download at the same
+> time, and the second one deleted the installer the first had just handed to
+> Windows. Nothing was installed, Plume reopened on the old version, and
+> offered the same update again — a loop with no way out of it.
+>
+> **If you are on 1.0.0 or 1.0.1, updating from inside Plume will not work,**
+> because the broken updater is the one you are running. Download 1.0.2 from
+> [plume-md.com/download](https://plume-md.com/download.html) and run it over
+> the top — your files and settings are untouched. Updating from inside Plume
+> works again from 1.0.2 onward.
+>
+> **1.0.1 fixed folder sync on a large notebook.** Syncing stopped partway
 > through and reported a number of failures with no reason. The vault asks a
 > caller to slow down after six hundred requests a minute; a thousand documents
 > sent as fast as the network allows tripped that a few hundred in, and
 > everything after it failed. Sync now paces itself and waits when asked, plans
 > against the 100 MB quota up front, and says *why* when something is left out.
-> If you sync a folder, please update.
 
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens
 straight into a clean reading view: no workspace to import, no project to set
@@ -161,22 +172,22 @@ vault, and no way to forge a session.
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.0.1.exe` |
-| macOS, Apple silicon | `Plume-1.0.1-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.0.1-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.0.1-linux-x86_64.AppImage` or `Plume-1.0.1-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.0.2.exe` |
+| macOS, Apple silicon | `Plume-1.0.2-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.0.2-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.0.2-linux-x86_64.AppImage` or `Plume-1.0.2-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html),
 which offers the right build for your system.
 
 Checksums for every file are in `SHA256SUMS.txt` on the
-[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.0.1).
+[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.0.2).
 
 ## Installing
 
 ### Windows
 
-Run `Plume-Setup-1.0.1.exe`. Plume installs for all users in
+Run `Plume-Setup-1.0.2.exe`. Plume installs for all users in
 `C:\Program Files\Plume`, so Windows asks for administrator approval once. The
 installer is not code-signed yet: if SmartScreen shows "Windows protected your
 PC", choose **More info → Run anyway**.
@@ -198,8 +209,8 @@ so macOS blocks the first launch. Use either of these:
 ### Linux
 
 - **AppImage:** make it executable with
-  `chmod +x Plume-1.0.1-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.0.1-linux-amd64.deb`. On
+  `chmod +x Plume-1.0.2-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.0.2-linux-amd64.deb`. On
   Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that
   Electron apps need to start there.
 
