@@ -410,6 +410,9 @@ p { margin: 0; }
 }
 .shot-frame img,
 .shot-frame video { width: 100%; height: auto; display: block; }
+/* Only when the browser refused to start it on its own: says, without words,
+   that there is something here to press. */
+.shot-frame video.needs-a-press { cursor: pointer; }
 
 /* ---------- sections ---------- */
 

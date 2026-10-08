@@ -70,20 +70,45 @@
 
   var tour = document.getElementById('hero-tour');
   if (tour && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    var start = function () {
+    var settled = false;
+
+    var attempt = function () {
       tour.preload = 'auto';
       var playing = tour.play();
-      if (playing && playing.catch) playing.catch(function () { /* a browser that would rather not */ });
+      if (!playing || !playing.then) { settled = true; return; }
+      playing.then(function () {
+        settled = true;
+        tour.controls = false;
+        tour.classList.remove('needs-a-press');
+      }).catch(function () {
+        // Brave, Safari in low-power mode, and anything with autoplay turned
+        // off refuse this. Giving up silently leaves a frame that looks broken,
+        // so the controls come out and the next thing the reader does — a
+        // click, a key, a touch — is taken as permission to start.
+        if (settled) return;
+        tour.controls = true;
+        tour.classList.add('needs-a-press');
+      });
     };
+
+    var onGesture = function () {
+      if (settled) return;
+      attempt();
+    };
+    ['pointerdown', 'keydown', 'touchstart'].forEach(function (type) {
+      document.addEventListener(type, onGesture, { once: false, passive: true });
+    });
+    tour.addEventListener('click', function () { if (tour.paused) attempt(); });
+
     if ('IntersectionObserver' in window) {
       var watcher = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
-          if (entry.isIntersecting) { start(); watcher.disconnect(); }
+          if (entry.isIntersecting) { attempt(); watcher.disconnect(); }
         });
       }, { threshold: 0.25 });
       watcher.observe(tour);
     } else {
-      start();
+      attempt();
     }
   }
 

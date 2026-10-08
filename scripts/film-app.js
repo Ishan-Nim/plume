@@ -28,6 +28,41 @@ app.setPath('userData', tmp);
 
 // Even dimensions, because H.264 wants them.
 const [w, h] = (process.env.PLUME_SIZE || '1280x832').split('x').map(Number);
+
+// A copy, so filming never writes to the repository.
+const notebook = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-demo-'));
+fs.cpSync(path.join(ROOT, 'docs', 'film-notebook'), notebook, { recursive: true });
+
+// The graph is only worth filming with something to draw. Five notes make a
+// star; a few dozen that link to each other as well as to the hub make the mesh
+// a real vault has. These are generated rather than committed because nobody
+// needs to read them — they exist to be edges.
+const TOPICS = [
+  'reading-view', 'wiki-links', 'callouts', 'front-matter', 'syntax-highlighting',
+  'katex-math', 'mermaid-diagrams', 'task-lists', 'footnotes', 'definition-lists',
+  'outline-panel', 'find-in-page', 'live-reload', 'the-editor', 'printing',
+  'pdf-export', 'palettes', 'dark-mode', 'reading-width', 'serif-and-sans',
+  'the-vault', 'folder-sync', 'conflicts', 'quotas', 'api-tokens',
+  'mcp-server', 'the-graph', 'backlinks', 'tags', 'search',
+  'updates', 'checksums', 'keyboard', 'privacy', 'file-types', 'default-app',
+];
+const title = (slug) => slug.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
+TOPICS.forEach((slug, i) => {
+  // Two siblings each, picked at a stride, so the web is woven rather than
+  // chained — a chain draws as a ring, which is not what a vault looks like.
+  const a = TOPICS[(i + 7) % TOPICS.length];
+  const b = TOPICS[(i + 13) % TOPICS.length];
+  fs.writeFileSync(path.join(notebook, `${title(slug)}.md`), [
+    '---', 'tags: [reference]', '---', '',
+    `# ${title(slug)}`, '',
+    `Part of [[A tour of Plume]].`, '',
+    `See also [[${title(a)}]] and [[${title(b)}]].`, '',
+  ].join('\n'));
+});
+// The hub links out to all of them, which is what makes it the centre.
+const hub = path.join(notebook, 'A tour of Plume.md');
+fs.appendFileSync(hub, `\n\n## Reference\n\n${TOPICS.map((s) => `- [[${title(s)}]]`).join('\n')}\n`);
+
 fs.writeFileSync(path.join(tmp, 'settings.json'), JSON.stringify({
   theme: 'light',
   palette: 'plume',
@@ -35,12 +70,12 @@ fs.writeFileSync(path.join(tmp, 'settings.json'), JSON.stringify({
   sidebar: true,
   sidebarWidth: 262,
   autoUpdate: false,
+  // Set here so the tour never has to open a native folder dialog, which is
+  // the one thing in this app a script cannot drive.
+  vaultFolder: notebook,
 }));
 
-// A copy, so filming never writes to the repository.
-const notebook = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-demo-'));
-fs.cpSync(path.join(ROOT, 'docs', 'film-notebook'), notebook, { recursive: true });
-process.argv.push(path.join(notebook, 'A tour of Plume.md'));
+process.argv.push(hub);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -156,6 +191,53 @@ async function main(win) {
   await sleep(2200);
   await run(`document.getElementById('btn-edit').click();`);
   await sleep(1600);
+
+  // ---- 6. the vault, and the graph of what is in it ----
+  //
+  // Only when there is somewhere to sign up to. Without PLUME_VAULT_API the
+  // tour simply ends after the editor, which is still a tour.
+  if (process.env.PLUME_VAULT_API) {
+    await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+    await until('!!document.getElementById("vault-email")');
+    await sleep(1200);
+
+    await run(`
+      document.querySelector('.vault-tabs button:last-child').click();
+      await new Promise(r => setTimeout(r, 250));
+      document.getElementById('vault-email').value = ${JSON.stringify(`you-${Date.now()}@example.com`)};
+      document.getElementById('vault-password').value = 'a-good-long-password-1';
+      document.querySelector('.vault-form button[type="submit"]').click();
+    `);
+    if (!(await until('!!document.querySelector(".vault-account")', 30000))) {
+      throw new Error('could not sign up to the vault');
+    }
+    await sleep(1400);
+
+    // The folder is already in settings, so this syncs the whole notebook in
+    // one action rather than a file at a time.
+    await run(`
+      const sync = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Sync now');
+      if (sync) sync.click();
+    `);
+    // Forty-odd documents, each checked and uploaded.
+    await until('!!document.querySelector(".vault-btn") && !/Syncing/i.test(document.body.textContent)', 180000);
+    await sleep(2500);
+
+    await run(`
+      const graph = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Graph');
+      if (graph) graph.click();
+    `);
+    if (await until('!document.getElementById("graph-view").hidden', 30000)) {
+      // Let the force layout settle, fit it, then hold while it breathes.
+      await sleep(5000);
+      await run(`document.getElementById('graph-view-fit').click();`);
+      await sleep(3200);
+      await run(`document.getElementById('graph-view-shake').click();`);
+      await sleep(4000);
+      await run(`document.getElementById('graph-view-fit').click();`);
+      await sleep(2600);
+    }
+  }
 
   filming = false;
   await recorder;
