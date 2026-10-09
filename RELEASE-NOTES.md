@@ -1,7 +1,33 @@
-# Plume 1.6.0
+# Plume 1.7.0
 
 **Released 9 October 2026** · [plume-md.com](https://plume-md.com) · MIT licence
 
+> **1.7.0 lets you organise them too.**
+>
+> 1.6.0 made notes. This moves them. Right-click anything in the **Files**
+> sidebar and there is a menu: open, open in a new window, **rename**, **move to
+> trash**, copy path, show in folder — and on a folder, a new note or a new
+> folder inside it. `F2` renames without the menu, and dragging a note onto a
+> folder moves it there.
+>
+> **Renaming rewrites the links that pointed at the note.** This is the half
+> that makes renaming worth doing, and it is the half most editors skip:
+> `[[Plan]]`, `![[Plan]]`, `[[Plan#Heading|alias]]`, `[the plan](Plan.md)` and
+> `[[work/Plan]]` all follow the note to its new name or its new folder, across
+> every note in the folder the sidebar is showing. A heading or an alias is kept
+> exactly as it was written, a pipe escaped for a Markdown table stays escaped,
+> and `[[Planning]]` is left alone — it is a different note. Plume says how many
+> links in how many notes it changed, rather than leaving you to find out.
+>
+> **Deleting goes to the system trash, never off the disk**, and it asks first.
+> Links to a deleted note are deliberately *not* rewritten: a link that has
+> stopped working is how you find out something was deleted, and quietly
+> removing them would hide it.
+>
+> **Nothing is ever overwritten.** A name already taken is reported back, a name
+> Windows cannot open is refused on every platform, and a folder cannot be
+> dropped inside itself.
+>
 > **1.6.0 makes notes.**
 >
 > Plume opened what was already there. Every note in the sidebar had to be

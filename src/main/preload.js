@@ -28,6 +28,9 @@ contextBridge.exposeInMainWorld('plume', {
   listDir: dir => invoke('dir:list', dir),
   createNote: (dir, name) => invoke('note:create', dir, name),
   createFolder: (dir, name) => invoke('note:create', dir, name, 'folder'),
+  renameNote: (p, name, root) => invoke('note:rename', p, name, root),
+  moveNote: (p, dir, root) => invoke('note:move', p, dir, root),
+  trashNote: p => invoke('note:trash', p),
 
   setSettings: patch => invoke('settings:set', patch),
   removeRecent: p => invoke('recent:remove', p),

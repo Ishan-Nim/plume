@@ -14,6 +14,7 @@ const { pathToFileURL, fileURLToPath } = require('node:url');
 const { spawn, execFile } = require('node:child_process');
 const settings = require('./settings');
 const files = require('./files');
+const links = require('./links');
 const vault = require('./vault');
 const sync = require('./sync');
 const git = require('./git');
@@ -739,6 +740,149 @@ handle('note:create', async (ctx, dir, rawName, kind) => {
     return { error: friendlyError(err) };
   }
   return { path: target, name, dir: folder, folder: folderWanted };
+});
+
+// A path below `root`, as the vault writes it: forward slashes, no leading
+// one. Null when it is not below `root` at all.
+function vaultRel(root, abs) {
+  const rel = path.relative(root, abs);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return null;
+  return rel.split(path.sep).join('/');
+}
+
+/**
+ * Points every link in the folder at a note that has just moved.
+ *
+ * This is the half of renaming that makes renaming worth having, and it is
+ * also an edit to documents nobody asked about, so it is bounded: Markdown
+ * files under the one folder the tree is rooted on, nothing above it, and the
+ * same walk limits as the wiki index. A document that cannot be read or
+ * written is skipped rather than failing the rename that already happened.
+ */
+async function repointLinks(root, fromAbs, toAbs) {
+  const fromRel = vaultRel(root, fromAbs);
+  const toRel = vaultRel(root, toAbs);
+  if (!fromRel || !toRel) return { files: 0, links: 0 };
+  let changedFiles = 0;
+  let changedLinks = 0;
+  for (const note of await files.walkMarkdown(root)) {
+    let doc;
+    try {
+      doc = await files.readDocument(note);
+    } catch {
+      continue;
+    }
+    const res = links.rewriteLinks(doc.content, fromRel, toRel, vaultRel(root, note));
+    if (!res.count) continue;
+    try {
+      await writeFileAtomic(note, res.text);
+    } catch {
+      continue;
+    }
+    changedFiles++;
+    changedLinks += res.count;
+  }
+  return { files: changedFiles, links: changedLinks };
+}
+
+async function writeFileAtomic(target, content) {
+  const tmp = `${target}.${process.pid}.plume-tmp`;
+  try {
+    await fs.promises.writeFile(tmp, content, 'utf8');
+    await fs.promises.rename(tmp, target);
+  } catch (err) {
+    await fs.promises.rm(tmp, { force: true }).catch(() => {});
+    throw err;
+  }
+}
+
+/**
+ * Renames a note or a folder, or moves one into another folder, and points
+ * the links in the tree's folder at where it went.
+ *
+ * `root` is the folder the sidebar is showing: it bounds the link rewrite and
+ * nothing outside it is read or written. The move itself is a plain rename,
+ * which never overwrites — an existing name comes back as an error.
+ */
+async function moveEntry(ctx, from, to, root) {
+  if (files.isForeignUnc(to, ctx.filePath)) throw new Error('That path is on another computer.');
+  // A rename that only changes capitalisation is still a rename worth doing,
+  // and on Windows the two names are the same file, so it is not a clash.
+  const sameName = path.resolve(from) === path.resolve(to);
+  const caseOnly = !sameName && files.samePath(from, to);
+  if (sameName) return { path: from, moved: false, relinked: { files: 0, links: 0 } };
+  if (!caseOnly && (await files.isFile(to) || await files.isDir(to))) {
+    return { error: `“${path.basename(to)}” is already there.` };
+  }
+  try {
+    await fs.promises.rename(from, to);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  files.clearCaches();
+  let relinked = { files: 0, links: 0 };
+  if (root && files.isWithin(root, from) && files.isWithin(root, to)) {
+    try {
+      relinked = await repointLinks(root, from, to);
+    } catch {
+      relinked = { files: 0, links: 0 };
+    }
+  }
+  // The window keeps following the document it had open.
+  if (ctx.filePath && files.samePath(ctx.filePath, from)) {
+    ctx.filePath = to;
+    startWatching(ctx, to, ctx.stamp);
+    settings.removeRecent(from);
+    settings.addRecent(to);
+    broadcastSettings();
+  }
+  return { path: to, moved: true, relinked };
+}
+
+handle('note:rename', async (ctx, p, rawName, rootDir) => {
+  const abs = localPath(ctx, p);
+  const root = rootDir ? localPath(ctx, rootDir) : null;
+  const dir = await files.isDir(abs);
+  if (!dir && !(await files.isFile(abs))) return { error: 'That is no longer there.' };
+  const name = dir ? files.folderName(rawName) : files.noteFileName(rawName);
+  if (!name) {
+    return { error: 'A name cannot be empty, start with a dot, or use : * ? " < > | or a slash.' };
+  }
+  return moveEntry(ctx, abs, path.join(path.dirname(abs), name), root);
+});
+
+handle('note:move', async (ctx, p, destDir, rootDir) => {
+  const abs = localPath(ctx, p);
+  const dest = localPath(ctx, destDir);
+  const root = rootDir ? localPath(ctx, rootDir) : null;
+  if (!(await files.isDir(dest))) return { error: 'That folder no longer exists.' };
+  if (files.samePath(path.dirname(abs), dest)) return { path: abs, moved: false };
+  // A folder cannot be dropped inside itself, which would take it off the disk.
+  if (await files.isDir(abs) && files.isWithin(abs, dest)) {
+    return { error: 'A folder cannot be moved inside itself.' };
+  }
+  return moveEntry(ctx, abs, path.join(dest, path.basename(abs)), root);
+});
+
+/**
+ * Deletes a note or a folder — to the system's own trash, never straight off
+ * the disk. Links that pointed at it are left exactly as they were: a broken
+ * link says something was deleted, and rewriting them would make the deletion
+ * unrecoverable even though the file itself is not.
+ */
+handle('note:trash', async (ctx, p) => {
+  const abs = localPath(ctx, p);
+  const dir = await files.isDir(abs);
+  if (!dir && !(await files.isFile(abs))) return { error: 'That is no longer there.' };
+  try {
+    await shell.trashItem(abs);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  files.clearCaches();
+  settings.removeRecent(abs);
+  broadcastSettings();
+  return { path: abs, folder: dir, name: path.basename(abs) };
 });
 
 // Classify a link the user clicked. The renderer passes the absolute URL the

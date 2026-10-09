@@ -1,12 +1,13 @@
 // Sidebar: a lazy folder tree of Markdown files around the open document,
 // and an outline of its headings.
 
-import { el, pathKey, samePath, relativeSegments, dirname, joinPath } from './util.js';
+import { el, pathKey, samePath, relativeSegments, dirname, basename, joinPath } from './util.js';
 import { icon } from './icons.js';
 
 export class FileTree {
   constructor({ container, title, upButton, newButton, newFolderButton,
-    listDir, createNote, createFolder, onOpen, onOpenNew, onCreate, onError }) {
+    listDir, createNote, createFolder, renameEntry, moveEntry,
+    onOpen, onOpenNew, onCreate, onMenu, onError }) {
     this.container = container;
     this.title = title;
     this.upButton = upButton;
@@ -15,6 +16,9 @@ export class FileTree {
     this.listDir = listDir;
     this.createNote = createNote;
     this.createFolder = createFolder;
+    this.renameEntry = renameEntry;
+    this.moveEntry = moveEntry;
+    this.onMenu = onMenu;
     this.onOpen = onOpen;
     this.onOpenNew = onOpenNew;
     this.onCreate = onCreate;
@@ -37,6 +41,20 @@ export class FileTree {
       }
     });
     container.addEventListener('keydown', e => this.onKey(e));
+    container.addEventListener('contextmenu', e => {
+      const row = e.target.closest('.tree-row');
+      if (!this.onMenu || (row && row.classList.contains('tree-draft'))) return;
+      e.preventDefault();
+      if (row) row.focus({ preventScroll: true });
+      this.onMenu({
+        path: row ? row.dataset.path : this.root,
+        dir: row ? row.classList.contains('is-dir') : true,
+        root: !row,
+        x: e.clientX,
+        y: e.clientY,
+      });
+    });
+    this.wireDrag();
     upButton.addEventListener('click', () => {
       if (this.parent) this.setRoot(this.parent, this.active);
     });
@@ -112,6 +130,7 @@ export class FileTree {
         class: `tree-row ${entry.dir ? 'is-dir' : 'is-file'}`,
         role: 'treeitem',
         tabindex: '-1',
+        draggable: 'true',
         title: entry.name,
         dataset: { path: entry.path },
       });
@@ -303,6 +322,127 @@ export class FileTree {
     item.remove();
   }
 
+  /**
+   * Renames in the tree, in the row the note is already in — the name becomes
+   * an input holding what it is called now, with the part you are likely to
+   * change selected. Enter renames, Escape puts the name back.
+   */
+  beginRename(filePath) {
+    const row = this.rows.get(pathKey(filePath));
+    if (!row || !this.renameEntry || row.querySelector('.tree-draft-name')) return;
+    this.cancelDraft();
+    const label = row.querySelector('.tree-name');
+    if (!label) return;
+    const full = basename(filePath);
+    // `.md` is not shown in the tree, so it is not shown here either; any
+    // other extension is part of the name and stays visible.
+    const shown = /\.md$/i.test(full) ? full.slice(0, -3) : full;
+    const input = el('input', {
+      type: 'text',
+      class: 'tree-draft-name',
+      spellcheck: 'false',
+      autocomplete: 'off',
+      'aria-label': `Rename ${full}`,
+    });
+    input.value = shown;
+    label.hidden = true;
+    row.classList.add('tree-renaming');
+    label.after(input);
+    input.focus();
+    input.setSelectionRange(0, shown.lastIndexOf('.') > 0 ? shown.lastIndexOf('.') : shown.length);
+
+    let done = false;
+    const finish = async commit => {
+      if (done) return;
+      done = true;
+      const typed = input.value.trim();
+      input.remove();
+      label.hidden = false;
+      row.classList.remove('tree-renaming');
+      if (!commit || !typed || typed === shown) return;
+      const res = await this.renameEntry(filePath, typed);
+      if (res && !res.error) await this.refresh();
+    };
+
+    input.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        finish(false);
+      }
+    });
+    input.addEventListener('blur', () => finish(true));
+  }
+
+  /**
+   * Dragging a note onto a folder moves it there, the way the file explorer
+   * it looks like would. The drop target is a folder row, or the tree's own
+   * background for the folder it is rooted on.
+   */
+  wireDrag() {
+    const container = this.container;
+    let dragging = null;
+
+    const dropDir = target => {
+      const row = target.closest && target.closest('.tree-row.is-dir');
+      if (row) return row.dataset.path;
+      return container.contains(target) ? this.root : null;
+    };
+    const clearMarks = () => {
+      for (const r of container.querySelectorAll('.drop-into')) r.classList.remove('drop-into');
+      container.classList.remove('drop-into');
+    };
+
+    container.addEventListener('dragstart', e => {
+      const row = e.target.closest('.tree-row');
+      if (!row || row.classList.contains('tree-draft') || !this.moveEntry) return;
+      dragging = row.dataset.path;
+      // A plain-text path as well, so dropping outside Plume is at worst
+      // pasting a path rather than nothing at all.
+      e.dataTransfer.setData('text/plain', dragging);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    container.addEventListener('dragend', () => {
+      dragging = null;
+      clearMarks();
+    });
+    container.addEventListener('dragover', e => {
+      if (!dragging) return;
+      const dir = dropDir(e.target);
+      if (!dir || samePath(dir, dragging) || samePath(dir, dirname(dragging))) return;
+      // Dropping a folder inside itself would take it off the tree.
+      if (relativeSegments(dragging, dir)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      clearMarks();
+      const row = e.target.closest('.tree-row.is-dir');
+      if (row) row.classList.add('drop-into');
+      else container.classList.add('drop-into');
+    });
+    container.addEventListener('dragleave', e => {
+      if (e.target.closest) {
+        const row = e.target.closest('.tree-row.is-dir');
+        if (row) row.classList.remove('drop-into');
+      }
+    });
+    container.addEventListener('drop', async e => {
+      if (!dragging) return;
+      const dir = dropDir(e.target);
+      const moved = dragging;
+      dragging = null;
+      clearMarks();
+      if (!dir || samePath(dir, moved) || samePath(dir, dirname(moved))) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const res = await this.moveEntry(moved, dir);
+      if (res && !res.error) await this.refresh();
+    });
+  }
+
   onClick(e) {
     const add = e.target.closest('.tree-add');
     if (add) {
@@ -332,6 +472,7 @@ export class FileTree {
     else if (e.key === 'ArrowRight' && row.classList.contains('is-dir')) this.expand(row, true);
     else if (e.key === 'ArrowLeft' && row.classList.contains('is-dir')) this.expand(row, false);
     else if (e.key === 'Enter') row.click();
+    else if (e.key === 'F2') this.beginRename(row.dataset.path);
     else return;
     e.preventDefault();
   }

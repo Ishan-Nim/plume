@@ -12,7 +12,7 @@ import { GitPanel } from './git.js';
 import { Editor } from './editor.js';
 import { LivePreview } from './live.js';
 import { icon, LOGO } from './icons.js';
-import { el, debounce, basename, dirname, samePath, readingStats, slugify, relativeSegments } from './util.js';
+import { el, debounce, basename, dirname, samePath, readingStats, slugify, relativeSegments, joinPath } from './util.js';
 
 const api = window.plume;
 const $ = sel => document.querySelector(sel);
@@ -67,6 +67,7 @@ const ui = {
   lightbox: $('#lightbox'),
   readingPop: $('#pop-reading'),
   moreMenu: $('#menu-more'),
+  treeMenu: $('#menu-tree'),
   gitPop: $('#pop-git'),
 };
 
@@ -855,8 +856,11 @@ let openPopover = null;
 function closePopover() {
   if (!openPopover) return;
   openPopover.pop.hidden = true;
-  openPopover.button.classList.remove('pressed');
-  openPopover.button.setAttribute('aria-expanded', 'false');
+  // A context menu is opened by a right-click rather than by a button.
+  if (openPopover.button) {
+    openPopover.button.classList.remove('pressed');
+    openPopover.button.setAttribute('aria-expanded', 'false');
+  }
   openPopover = null;
 }
 
@@ -878,7 +882,8 @@ function togglePopover(button, pop) {
 
 document.addEventListener('pointerdown', e => {
   if (!openPopover) return;
-  if (openPopover.pop.contains(e.target) || openPopover.button.contains(e.target)) return;
+  if (openPopover.pop.contains(e.target)) return;
+  if (openPopover.button && openPopover.button.contains(e.target)) return;
   closePopover();
 });
 
@@ -935,6 +940,117 @@ function menuItem(label, iconName, action, { shortcut = '', disabled = false } =
     action();
   });
   return btn;
+}
+
+// A menu where the pointer is, rather than under a button: the file tree's
+// right-click menu. It joins the same one-popover-at-a-time machinery, so a
+// click anywhere else closes it.
+function showMenuAt(x, y, items) {
+  closePopover();
+  const pop = ui.treeMenu;
+  pop.replaceChildren(...items);
+  pop.hidden = false;
+  const w = pop.offsetWidth;
+  const h = pop.offsetHeight;
+  pop.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, x))}px`;
+  pop.style.top = `${Math.max(8, Math.min(window.innerHeight - h - 8, y))}px`;
+  openPopover = { button: null, pop };
+  const first = pop.querySelector('button:not([disabled])');
+  if (first) first.focus({ preventScroll: true });
+}
+
+// The file tree's own menu. What it offers depends on what was clicked: a
+// folder can hold new things, a note can be opened in a window of its own,
+// and the tree's background is the folder it is rooted on.
+function showTreeMenu({ path: target, dir, root, x, y }) {
+  if (!target) return;
+  const sep = () => el('div', { class: 'menu-sep', role: 'separator' });
+  const items = [];
+  if (dir) {
+    items.push(
+      menuItem('New note', 'filePlus', () => fileTree.newEntry(target)),
+      menuItem('New folder', 'folderPlus', () => fileTree.newEntry(target, 'folder')),
+      sep(),
+    );
+  } else {
+    items.push(
+      menuItem('Open', 'file', () => openDoc(target)),
+      menuItem('Open in new window', 'window', () => api.openPaths([target])),
+      sep(),
+    );
+  }
+  if (!root) {
+    items.push(
+      menuItem('Rename…', 'pencil', () => fileTree.beginRename(target), { shortcut: 'F2' }),
+      menuItem('Move to trash', 'close', () => trashEntry(target, dir)),
+      sep(),
+    );
+  }
+  items.push(
+    menuItem('Copy path', 'link', () => api.copyText(target).then(() => toast('File path copied'))),
+    menuItem(isMac() ? 'Show in Finder' : 'Show in folder', 'folder', () => api.showInFolder(target)),
+  );
+  showMenuAt(x, y, items);
+}
+
+// Renaming and moving both end here: the window follows the document it had
+// open, and the links that were rewritten are reported rather than left to be
+// noticed.
+async function afterMove(from, res, verb) {
+  if (!res || !res.moved) return;
+  let followed = null;
+  if (state.doc) {
+    if (samePath(state.doc.path, from)) followed = res.path;
+    else {
+      // The open document was inside a folder that moved: it is the same
+      // document, at the same place within it, somewhere else.
+      const segs = relativeSegments(from, state.doc.path);
+      if (segs) followed = segs.reduce((acc, seg) => joinPath(acc, seg), res.path);
+    }
+  }
+  if (followed) await openDoc(followed, { push: false, position: readingPosition() });
+  const n = res.relinked || { files: 0, links: 0 };
+  const links = n.links
+    ? ` — ${n.links} link${n.links === 1 ? '' : 's'} in ${n.files} note${n.files === 1 ? '' : 's'} updated`
+    : '';
+  toast(`${verb}${links}`);
+}
+
+async function renameEntry(p, name) {
+  const res = await api.renameNote(p, name, fileTree.root);
+  if (!res || res.error) {
+    toast((res && res.error) || 'Nothing was renamed.', 'error');
+    return res;
+  }
+  await afterMove(p, res, `Renamed to ${basename(res.path)}`);
+  return res;
+}
+
+async function moveEntry(p, dir) {
+  const res = await api.moveNote(p, dir, fileTree.root);
+  if (!res || res.error) {
+    toast((res && res.error) || 'Nothing was moved.', 'error');
+    return res;
+  }
+  await afterMove(p, res, `Moved to ${basename(dir)}`);
+  return res;
+}
+
+// Deleting is the one thing here that cannot be undone from inside Plume, so
+// it asks, and it goes to the system's trash rather than off the disk.
+async function trashEntry(target, isDir) {
+  const what = isDir ? 'folder' : 'note';
+  if (!window.confirm(`Move the ${what} “${basename(target)}” to the trash?${isDir ? '\n\nEverything inside it goes too.' : ''}`)) return;
+  const res = await api.trashNote(target);
+  if (!res || res.error) {
+    toast((res && res.error) || 'Nothing was deleted.', 'error');
+    return;
+  }
+  if (state.doc && (samePath(state.doc.path, target) || relativeSegments(target, state.doc.path))) {
+    showBanner('This document was moved to the trash.');
+  }
+  await fileTree.refresh();
+  toast(`${res.name} is in the trash`);
 }
 
 function buildMoreMenu() {
@@ -1384,6 +1500,9 @@ const fileTree = new FileTree({
   listDir: dir => api.listDir(dir),
   createNote: (dir, name) => api.createNote(dir, name),
   createFolder: (dir, name) => api.createFolder(dir, name),
+  renameEntry,
+  moveEntry,
+  onMenu: showTreeMenu,
   onOpen: p => {
     if (!state.doc || !samePath(p, state.doc.path)) openDoc(p);
   },

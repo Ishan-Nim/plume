@@ -356,6 +356,37 @@ async function resolveWiki(fromFile, raw) {
   return hit ? { path: hit, hash, isMarkdown: isMarkdown(hit) } : null;
 }
 
+/**
+ * Every Markdown file under `root`, for a change that has to touch all of
+ * them — rewriting the links that point at a note being renamed. Same walk as
+ * the wiki index: dot-folders and node_modules are left out, and it stops at
+ * the same depth and file count rather than walking a whole disk.
+ */
+async function walkMarkdown(root, { max = INDEX_MAX_FILES, maxDepth = INDEX_MAX_DEPTH } = {}) {
+  const out = [];
+  const queue = [[path.resolve(root), 0]];
+  while (queue.length && out.length < max) {
+    const [dir, depth] = queue.shift();
+    let dirents;
+    try {
+      dirents = await fsp.readdir(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const d of dirents) {
+      if (d.name.startsWith('.') || SKIP_DIRS.has(d.name.toLowerCase())) continue;
+      const full = path.join(dir, d.name);
+      if (d.isDirectory()) {
+        if (depth < maxDepth) queue.push([full, depth + 1]);
+      } else if (d.isFile() && isMarkdown(d.name)) {
+        out.push(full);
+        if (out.length >= max) break;
+      }
+    }
+  }
+  return out;
+}
+
 function clearCaches() {
   vaultCache.clear();
   indexCache.clear();
@@ -441,6 +472,7 @@ module.exports = {
   isFile,
   isDir,
   listDir,
+  walkMarkdown,
   findVaultRoot,
   parseWikiTarget,
   resolveWiki,

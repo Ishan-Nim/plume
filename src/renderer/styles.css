@@ -634,7 +634,8 @@ kbd {
 .tree-add:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* The row a new note is named in. */
-.tree-row.tree-draft { background: var(--chrome-2); }
+.tree-row.tree-draft,
+.tree-row.tree-renaming { background: var(--chrome-2); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .tree-draft-name {
   flex: 1;
   min-width: 0;
@@ -647,6 +648,10 @@ kbd {
   outline: none;
 }
 .tree-draft-name::placeholder { color: var(--text-3); }
+
+/* Where a dragged note would land. */
+.tree-row.drop-into { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-soft); }
+.tree.drop-into { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 8px; }
 
 .outline-item {
   display: block;
