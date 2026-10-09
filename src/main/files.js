@@ -377,10 +377,51 @@ function isSavable(p) {
   return Boolean(ext) && SAVABLE_EXTS.has(ext);
 }
 
+// Device names Windows still reserves: a file called CON.md cannot be opened
+// there, and nor can one whose name ends in a dot or a space.
+const WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
+/**
+ * One name typed into the sidebar, cleaned up, or null when that text cannot
+ * be a file or folder name.
+ *
+ * Windows' rules are applied on every platform on purpose: a note named
+ * "Q3: plan" would be fine on Linux and then arrive unopenable on the Windows
+ * machine syncing the same vault. Only the name is decided here — never the
+ * folder it goes in, which the tree supplies.
+ */
+function safeSegment(raw) {
+  if (typeof raw !== 'string') return null;
+  // Windows drops trailing dots and spaces, so they come off here rather
+  // than leaving a name on disk that is not the one the user typed.
+  const typed = raw.trim().replace(/[. ]+$/, '');
+  if (!typed || typed.length > 120) return null;
+  if (/[\\/:*?"<>|\u0000-\u001f]/.test(typed)) return null;
+  if (typed.startsWith('.')) return null;  // the tree never lists dot-files
+  return typed;
+}
+
+// The file name a new note is written under: what the user typed, with `.md`
+// added unless they named a Markdown extension themselves.
+function noteFileName(raw) {
+  const typed = safeSegment(raw);
+  if (!typed) return null;
+  const name = isMarkdown(typed) ? typed : `${typed}.md`;
+  if (WIN_RESERVED.test(name.slice(0, name.length - path.extname(name).length))) return null;
+  return name;
+}
+
+function folderName(raw) {
+  const typed = safeSegment(raw);
+  return typed && !WIN_RESERVED.test(typed) ? typed : null;
+}
+
 module.exports = {
   MD_EXTS,
   SAVABLE_EXTS,
   isSavable,
+  noteFileName,
+  folderName,
   MD_LIKE_EXTS,
   OPENABLE_EXTS,
   isAmbiguousWindowsName,
@@ -398,6 +439,7 @@ module.exports = {
   decode,
   readDocument,
   isFile,
+  isDir,
   listDir,
   findVaultRoot,
   parseWikiTarget,

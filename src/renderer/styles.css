@@ -612,6 +612,42 @@ kbd {
 .tree-row.open .tree-chevron { transform: rotate(90deg); }
 .tree-empty { padding: 6px 12px 6px calc(26px + var(--depth, 0) * 14px); font-size: 12px; color: var(--text-3); }
 
+/* The + a folder shows on hover: a note inside it, without opening it first. */
+.tree-add {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-3);
+  opacity: 0;
+  cursor: default;
+}
+.tree-row:hover .tree-add,
+.tree-add:focus-visible { opacity: 1; }
+.tree-add:hover { background: var(--chrome); color: var(--text); }
+.tree-add:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* The row a new note is named in. */
+.tree-row.tree-draft { background: var(--chrome-2); }
+.tree-draft-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.tree-draft-name::placeholder { color: var(--text-3); }
+
 .outline-item {
   display: block;
   padding: 4px 10px 4px calc(10px + var(--level, 0) * 14px);

@@ -1,5 +1,32 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no workspace to import, no project to set up, no editor chrome.
 
+**1.6.0 makes notes.**
+
+Plume opened what was already there. Every note in the sidebar had to be
+written by something else first, which is a strange gap in an app you keep a
+folder of notes open in all day — the thought you want to write down does not
+wait for you to go and find a file manager.
+
+So the **Files** tab makes them now, the way Obsidian's file explorer does.
+The `+` in its header starts a note in the folder the tree is showing. Hover
+any folder and it has a `+` of its own, which starts the note inside that
+folder without opening it first. `Ctrl+Shift+N` does the first of those from
+the keyboard. The button beside the `+` makes a folder the same way.
+
+**You name it in the tree, where the note will be.** No dialog box over your
+document: a row appears where the note is about to go, you type the name, and
+`Enter` creates it, opens it and leaves you in the editor ready to type.
+`Esc` leaves nothing behind — nothing is written to disk until the name is.
+`.md` is added unless you name an extension yourself.
+
+**It will not make a mess of your notes.** A name that Windows cannot open —
+`Q3: plan` — is refused rather than written, on every platform, because a
+vault is shared between computers and a file one of them cannot open is worse
+than a file that was never made. A name that already exists is reported back,
+never overwritten; the only thing Plume decides is the name, and the folder
+always comes from the tree. If the folder is synced, the new note goes up with
+everything else.
+
 **1.5.1 shows a folder by its name.**
 
 The vault panel named a folder by splitting its path on `/`, which does

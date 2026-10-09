@@ -48,6 +48,7 @@
 - **Sidebar** with the folder tree around the file (the whole vault when the file is inside one) and an outline of headings with reading time.
 - **Live preview.** Click a paragraph and it becomes editable where it sits; move away and it is a paragraph again. The rest of the page stays rendered. Inside the block you are editing, the Markdown markers hide themselves: `**bold**` reads as bold until the caret is in the word, then the stars are back to be edited — the same for italics, strikethrough, inline code, links, images and headings. The file is the Markdown you typed either way. A list, table or code block opens whole; diagrams, maths and images stay rendered. Editing a block rewrites only that block's own lines. Turn it off in **Reading settings → Live preview**.
 - **Or the whole file as text.** Press the pencil, or `Ctrl+E`, for the raw Markdown in a plain editor — no hidden formatting model. Both ways of typing share one buffer, so `Ctrl+E` loses nothing. Nothing is written until you save, an unsaved change is never dropped silently, and a file changed elsewhere cannot overwrite your work.
+- **New notes from the sidebar.** The `+` in the **Files** header starts one in the folder the tree is showing; every folder has a `+` of its own for a note inside it, and `Ctrl+Shift+N` does the first of those from the keyboard. You name it in the tree where the note will be — `Enter` creates it, opens it and leaves you ready to type, `Esc` leaves nothing behind. The button beside it makes a folder. A name Windows cannot open is refused on every platform, and an existing note is never overwritten.
 - **Open a folder** of notes from the welcome screen or **⋯ → Open folder…**: the sidebar roots itself there and stays there, and Plume remembers it for next time.
 - **Live reload** — save the file in any editor and Plume updates in place, keeping your scroll position.
 - **Updates that ask first.** Plume tells you when a new version is out and installs it when you say so. Every download is checked against the release's published checksum.
@@ -146,6 +147,7 @@ On macOS, use `⌘` in place of `Ctrl` and `⌥` in place of `Alt`.
 |---|---|
 | Open file | `Ctrl+O` |
 | New window | `Ctrl+N` |
+| New note in the folder shown | `Ctrl+Shift+N` |
 | Close window | `Ctrl+W` |
 | Find / next / previous | `Ctrl+F`, `Enter` / `F3`, `Shift+Enter` / `Shift+F3` |
 | Back / forward | `Alt+←` / `Alt+→`, mouse side buttons |

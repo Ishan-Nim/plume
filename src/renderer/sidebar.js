@@ -5,18 +5,26 @@ import { el, pathKey, samePath, relativeSegments, dirname, joinPath } from './ut
 import { icon } from './icons.js';
 
 export class FileTree {
-  constructor({ container, title, upButton, listDir, onOpen, onOpenNew }) {
+  constructor({ container, title, upButton, newButton, newFolderButton,
+    listDir, createNote, createFolder, onOpen, onOpenNew, onCreate, onError }) {
     this.container = container;
     this.title = title;
     this.upButton = upButton;
+    this.newButton = newButton;
+    this.newFolderButton = newFolderButton;
     this.listDir = listDir;
+    this.createNote = createNote;
+    this.createFolder = createFolder;
     this.onOpen = onOpen;
     this.onOpenNew = onOpenNew;
+    this.onCreate = onCreate;
+    this.onError = onError || (() => {});
     this.root = null;
     this.parent = null;
     this.active = null;
     this.rows = new Map();      // pathKey -> row element (dirs and files)
     this.expanded = new Set();  // pathKey of expanded dirs
+    this.draft = null;          // the row being named, if any
     this.loading = null;
 
     container.addEventListener('click', e => this.onClick(e));
@@ -32,9 +40,12 @@ export class FileTree {
     upButton.addEventListener('click', () => {
       if (this.parent) this.setRoot(this.parent, this.active);
     });
+    if (newButton) newButton.addEventListener('click', () => this.newEntry(this.root));
+    if (newFolderButton) newFolderButton.addEventListener('click', () => this.newEntry(this.root, 'folder'));
   }
 
   clear() {
+    this.cancelDraft();
     this.root = null;
     this.parent = null;
     this.active = null;
@@ -44,6 +55,12 @@ export class FileTree {
     this.title.textContent = '';
     this.title.title = '';
     this.upButton.disabled = true;
+    this.setCanCreate(false);
+  }
+
+  setCanCreate(on) {
+    if (this.newButton) this.newButton.disabled = !on;
+    if (this.newFolderButton) this.newFolderButton.disabled = !on;
   }
 
   async show(root, activePath) {
@@ -61,6 +78,7 @@ export class FileTree {
   }
 
   async setRoot(root, activePath) {
+    this.cancelDraft();
     this.root = root;
     this.expanded.clear();
     await this.renderRoot();
@@ -76,6 +94,7 @@ export class FileTree {
     this.upButton.disabled = !this.parent;
     this.title.textContent = res.name || root;
     this.title.title = root;
+    this.setCanCreate(!res.error);
     if (res.error) {
       this.container.replaceChildren(el('div', { class: 'tree-empty', text: res.error }));
       return;
@@ -101,6 +120,18 @@ export class FileTree {
         ? `<span class="tree-chevron">${icon('chevron', 14)}</span>${icon('folder', 15)}`
         : `<span class="tree-chevron"></span>${icon('file', 15)}`;
       row.append(el('span', { class: 'tree-name', text: entry.dir ? entry.name : entry.name.replace(/\.(md|markdown)$/i, '') }));
+      // A folder carries its own way of starting a note inside it, the way
+      // Obsidian's file explorer does, so no folder needs to be opened first.
+      if (entry.dir) {
+        row.append(el('button', {
+          class: 'tree-add',
+          type: 'button',
+          tabindex: '-1',
+          title: `New note in ${entry.name}`,
+          'aria-label': `New note in ${entry.name}`,
+          html: icon('plus', 14),
+        }));
+      }
       if (!entry.dir && this.active && samePath(entry.path, this.active)) row.classList.add('active');
       this.rows.set(pathKey(entry.path), row);
       const item = el('div', { class: 'tree-item' }, row);
@@ -170,6 +201,10 @@ export class FileTree {
   // Re-list the tree after a change on disk, keeping folders open.
   async refresh() {
     if (!this.root) return;
+    // A name being typed is taken off the tree before it is rebuilt and put
+    // back afterwards, so a save elsewhere does not swallow it.
+    const draft = this.draft && { dir: this.draft.dir, kind: this.draft.kind, value: this.draft.input.value };
+    this.cancelDraft();
     const keep = new Set(this.expanded);
     const scroll = this.container.scrollTop;
     await this.renderRoot();
@@ -179,11 +214,104 @@ export class FileTree {
     }
     this.setActive(this.active);
     this.container.scrollTop = scroll;
+    if (draft) {
+      await this.newEntry(draft.dir, draft.kind);
+      if (this.draft) this.draft.input.value = draft.value;
+    }
+  }
+
+  /**
+   * Names a new note — or folder — in the tree itself, where it will appear,
+   * rather than in a dialog box. Enter creates it, Escape leaves nothing
+   * behind, and a note is opened as soon as it exists.
+   */
+  async newEntry(dir, kind = 'note') {
+    if (!dir || !this.createNote) return;
+    this.cancelDraft();
+    let children = this.container.querySelector(':scope > .tree-children');
+    let depth = 0;
+    if (!samePath(dir, this.root)) {
+      const parentRow = this.rows.get(pathKey(dir));
+      if (!parentRow) return;
+      await this.expand(parentRow, true);
+      children = parentRow.parentElement.querySelector(':scope > .tree-children');
+      depth = Number(parentRow.style.getPropertyValue('--depth')) + 1;
+    }
+    if (!children) return;
+
+    const folderWanted = kind === 'folder';
+    const row = el('div', {
+      class: `tree-row tree-draft ${folderWanted ? 'is-dir' : 'is-file'}`,
+      html: `<span class="tree-chevron"></span>${icon(folderWanted ? 'folder' : 'file', 15)}`,
+    });
+    row.style.setProperty('--depth', depth);
+    const input = el('input', {
+      type: 'text',
+      class: 'tree-draft-name',
+      placeholder: folderWanted ? 'Folder name' : 'Note name',
+      spellcheck: 'false',
+      autocomplete: 'off',
+      'aria-label': folderWanted ? 'Name for the new folder' : 'Name for the new note',
+    });
+    row.append(input);
+    const item = el('div', { class: 'tree-item' }, row);
+    children.hidden = false;
+    children.prepend(item);
+    this.draft = { dir, kind, item, input };
+    input.focus();
+
+    const finish = async commit => {
+      if (!this.draft || this.draft.item !== item) return;
+      const typed = input.value.trim();
+      this.cancelDraft();
+      if (!commit || !typed) return;
+      const res = folderWanted ? await this.createFolder(dir, typed) : await this.createNote(dir, typed);
+      if (!res || res.error) {
+        this.onError((res && res.error) || 'Nothing was created.');
+        return;
+      }
+      await this.refresh();
+      if (res.folder) {
+        const made = this.rows.get(pathKey(res.path));
+        if (made) await this.expand(made, true);
+      } else {
+        // A note that has only just been made has nothing to read, so it is
+        // handed over as new: the window opens it ready to type in.
+        (this.onCreate || this.onOpen)(res.path);
+      }
+    };
+
+    input.addEventListener('keydown', e => {
+      // Arrows and Enter belong to the name here, not to the tree around it.
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        finish(false);
+      }
+    });
+    // Clicking away keeps what was typed, the way renaming in a file manager does.
+    input.addEventListener('blur', () => finish(true));
+  }
+
+  cancelDraft() {
+    if (!this.draft) return;
+    const { item } = this.draft;
+    this.draft = null;
+    item.remove();
   }
 
   onClick(e) {
+    const add = e.target.closest('.tree-add');
+    if (add) {
+      const dirRow = add.closest('.tree-row');
+      if (dirRow) this.newEntry(dirRow.dataset.path);
+      return;
+    }
     const row = e.target.closest('.tree-row');
-    if (!row) return;
+    if (!row || row.classList.contains('tree-draft')) return;
     row.focus({ preventScroll: true });
     if (row.classList.contains('is-dir')) {
       this.expand(row, !row.classList.contains('open'));

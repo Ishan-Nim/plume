@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('plume', {
   openExternal: url => invoke('link:external', url),
   resolveWiki: (fromFile, targets) => invoke('wiki:resolve', fromFile, targets),
   listDir: dir => invoke('dir:list', dir),
+  createNote: (dir, name) => invoke('note:create', dir, name),
+  createFolder: (dir, name) => invoke('note:create', dir, name, 'folder'),
 
   setSettings: patch => invoke('settings:set', patch),
   removeRecent: p => invoke('recent:remove', p),

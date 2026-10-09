@@ -713,6 +713,34 @@ handle('doc:read', async (ctx, p) => {
   }
 });
 
+/**
+ * Makes a new note, or a new folder, where the sidebar tree says.
+ *
+ * This is the one place Plume creates a file rather than writing back one it
+ * already has open, so it is deliberately narrow: the folder comes from the
+ * tree, the name is whatever `noteFileName` will allow, and the write uses
+ * 'wx' so a name already taken comes back as an error instead of replacing
+ * somebody's note.
+ */
+handle('note:create', async (ctx, dir, rawName, kind) => {
+  const folder = localPath(ctx, dir);
+  const folderWanted = kind === 'folder';
+  const name = folderWanted ? files.folderName(rawName) : files.noteFileName(rawName);
+  if (!name) {
+    return { error: 'A name cannot be empty, start with a dot, or use : * ? " < > | or a slash.' };
+  }
+  if (!(await files.isDir(folder))) return { error: 'That folder no longer exists.' };
+  const target = path.join(folder, name);
+  try {
+    if (folderWanted) await fs.promises.mkdir(target);
+    else await fs.promises.writeFile(target, '', { flag: 'wx' });
+  } catch (err) {
+    if (err && err.code === 'EEXIST') return { error: `“${name}” is already there.` };
+    return { error: friendlyError(err) };
+  }
+  return { path: target, name, dir: folder, folder: folderWanted };
+});
+
 // Classify a link the user clicked. The renderer passes the absolute URL the
 // browser resolved against the document's folder.
 handle('link:resolve', async (ctx, href) => {

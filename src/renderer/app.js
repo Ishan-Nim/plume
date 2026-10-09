@@ -1275,6 +1275,18 @@ async function openFolder() {
   await fileTree.setRoot(res.folder, state.doc ? state.doc.path : null);
 }
 
+// A new note where the sidebar is looking. The tree has to be showing a
+// folder for there to be a place to put one.
+async function newNote() {
+  if (!fileTree.root) {
+    toast('Open a folder of notes first');
+    return;
+  }
+  if (!state.settings.sidebar) await updateSettings({ sidebar: true });
+  showSidebarTab('files');
+  await fileTree.newEntry(fileTree.root);
+}
+
 async function forgetFolder() {
   await api.forgetFolder();
   state.settings = { ...state.settings, folder: null };
@@ -1367,11 +1379,19 @@ const fileTree = new FileTree({
   container: $('#tree'),
   title: $('#tree-title'),
   upButton: $('#btn-tree-up'),
+  newButton: $('#btn-tree-new'),
+  newFolderButton: $('#btn-tree-new-folder'),
   listDir: dir => api.listDir(dir),
+  createNote: (dir, name) => api.createNote(dir, name),
+  createFolder: (dir, name) => api.createFolder(dir, name),
   onOpen: p => {
     if (!state.doc || !samePath(p, state.doc.path)) openDoc(p);
   },
   onOpenNew: p => api.openPaths([p]),
+  onCreate: async p => {
+    if (await openDoc(p)) toggleEdit();
+  },
+  onError: message => toast(message, 'error'),
 });
 
 const outlineView = new Outline({
@@ -1613,6 +1633,10 @@ function wireKeys() {
         handled();
       }
       return;
+    }
+    if (ctrl && e.shiftKey && lower === 'n') {
+      e.preventDefault();
+      return newNote();
     }
     if (ctrl && e.shiftKey && lower === 'g') {
       e.preventDefault();

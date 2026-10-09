@@ -10,6 +10,7 @@ const files = require('../src/main/files.js');
 const VAULT = path.join(__dirname, 'fixtures', 'vault');
 const SINK = path.join(VAULT, 'kitchen-sink.md');
 const OTHER = path.join(VAULT, 'notes', 'Other Note.md');
+const SEP = String.fromCharCode(92);  // a backslash, spelled out
 
 test('decode handles UTF-8, BOMs and Shift_JIS', () => {
   assert.equal(files.decode(Buffer.from('héllo 日本', 'utf8')), 'héllo 日本');
@@ -52,6 +53,35 @@ test('readDocument refuses binary content but reads UTF-16', async () => {
   const utf16 = path.join(dir, 'NOTES');
   fs.writeFileSync(utf16, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('# Hi', 'utf16le')]));
   assert.equal((await files.readDocument(utf16)).content, '# Hi');
+});
+
+test('noteFileName takes a name and gives back a file name', () => {
+  assert.equal(files.noteFileName('Q3 review'), 'Q3 review.md');
+  assert.equal(files.noteFileName('  Ideas  '), 'Ideas.md');
+  // A Markdown extension the user typed is kept; anything else is a name.
+  assert.equal(files.noteFileName('Notes.markdown'), 'Notes.markdown');
+  assert.equal(files.noteFileName('shopping.txt'), 'shopping.txt.md');
+  assert.equal(files.noteFileName('日本語'), '日本語.md');
+  // Windows drops trailing dots and spaces, so Plume does not write them.
+  assert.equal(files.noteFileName('Draft.'), 'Draft.md');
+});
+
+test('noteFileName refuses names that are not names', () => {
+  for (const bad of ['', '   ', '.', '..', '.hidden', 'a/b', `a${SEP}b`, 'Q3: plan', 'what?',
+    'a*b', 'a"b', 'a<b', 'a>b', 'a|b', 'x'.repeat(121), 'CON', 'con.md', 'NUL', 'lpt1',
+    `line${String.fromCharCode(10)}break`, null, undefined, 42]) {
+    assert.equal(files.noteFileName(bad), null, JSON.stringify(bad));
+  }
+});
+
+test('folderName allows a folder but not a path', () => {
+  assert.equal(files.folderName('Projects'), 'Projects');
+  assert.equal(files.folderName('Reading list.'), 'Reading list');
+  // A folder name is never given an extension of its own.
+  assert.equal(files.folderName('Notes.md'), 'Notes.md');
+  for (const bad of ['', '..', '.git', `a${SEP}b`, 'a/b', 'aux', 'x'.repeat(121)]) {
+    assert.equal(files.folderName(bad), null, JSON.stringify(bad));
+  }
 });
 
 test('isPlainFolder keeps app bundles and shell folders out of link opening', () => {
