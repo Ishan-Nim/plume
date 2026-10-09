@@ -27,6 +27,22 @@ function when(iso) {
   return d.toLocaleDateString();
 }
 
+/**
+ * The last part of a path, for showing a folder by its name.
+ *
+ * Both separators. The path arrives as the operating system gave it, so on
+ * Windows splitting on "/" alone leaves the whole of C:\Users\…\Notes where a
+ * folder name was meant to go — which is what the panel showed until now.
+ */
+export function folderName(p) {
+  const given = String(p || '');
+  // A root is all separator, so trimming it leaves nothing to name it by.
+  // Whatever was given is then the best name there is.
+  const trimmed = given.replace(/[\\/]+$/, '');
+  if (!trimmed) return given;
+  return trimmed.split(/[\\/]/).pop() || trimmed;
+}
+
 /** The vault's paths as a tree of folders, so it can be read as a folder. */
 function treeOf(files) {
   const root = { folders: new Map(), files: [] };
@@ -267,7 +283,7 @@ export class Vault {
       // cloud is a thing somebody decides about a folder they can see.
       const candidate = sync.candidate;
       if (candidate) {
-        const name = candidate.replace(/[\/]+$/, '').split(/[\/]/).pop() || candidate;
+        const name = folderName(candidate);
         const useOpen = el('button', {
           class: 'vault-btn primary small', type: 'button', text: `Sync “${name}”`,
         });
@@ -295,7 +311,7 @@ export class Vault {
 
     const others = el('div', { class: 'vault-existing' });
 
-    const name = sync.folder.replace(/[\/]+$/, '').split(/[\/]/).pop() || sync.folder;
+    const name = folderName(sync.folder);
     const info = el('div', { class: 'vault-current-info' });
     const title = el('b', { text: name });
     title.title = sync.folder;

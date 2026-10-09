@@ -1,5 +1,14 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no workspace to import, no project to set up, no editor chrome.
 
+**1.5.1 shows a folder by its name.**
+
+The vault panel named a folder by splitting its path on `/`, which does
+nothing to a Windows path: the synced folder read as
+`C:\Users\you\AppData\Local\Notes` where the word `Notes` belonged, and the
+button offering to sync a folder was wider than the sidebar it sits in. A
+name is what you read before pressing a button that sends a folder to the
+cloud, so it is worth being a name.
+
 **1.5.0 makes syncing something you ask for.**
 
 1.4.0 had signing in adopt whatever folder was open and start syncing it.
@@ -217,10 +226,10 @@ Worth saying plainly: **Plume is not code-signed.** Those checksums come from th
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.5.0.exe` |
-| macOS, Apple silicon | `Plume-1.5.0-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.5.0-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.5.0-linux-x86_64.AppImage` or `Plume-1.5.0-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.5.1.exe` |
+| macOS, Apple silicon | `Plume-1.5.1-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.5.1-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.5.1-linux-x86_64.AppImage` or `Plume-1.5.1-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html), which offers the right build for your system.
 
@@ -228,7 +237,7 @@ Or get them from [plume-md.com/download](https://plume-md.com/download.html), wh
 
 ### Windows
 
-Run `Plume-Setup-1.5.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
+Run `Plume-Setup-1.5.1.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 
 To make Plume the default for `.md`, right-click a Markdown file and choose **Open with → Choose another app → Plume → Always**, or use **⋯ → Make Plume the default for .md** inside Plume.
 
@@ -241,8 +250,8 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 ### Linux
 
-- **AppImage:** make it executable with `chmod +x Plume-1.5.0-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.5.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+- **AppImage:** make it executable with `chmod +x Plume-1.5.1-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.5.1-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
 
 ---
 

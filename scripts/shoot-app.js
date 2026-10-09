@@ -182,15 +182,34 @@ async function main(win) {
   await run(`document.getElementById('graph-view-close').click();`);
   await sleep(900);
 
-  // ---- the folder, synced ----
+  // ---- signed in, and nothing synced ----
   //
-  // The vault is the folder you are working in, so this is the shot that
-  // matters most: which folder, which notebook of the vault it is, and that
-  // it is up to date. The folder is set here rather than through the page —
-  // it is not one of the settings a renderer may change, for the same reason
-  // a web page cannot choose which folder of yours an app syncs.
+  // The state Plume is actually in after signing in: an account, a folder
+  // open, and not one file sent anywhere. This is the shot that says so —
+  // the panel offers the open folder by name and waits to be asked.
+  //
+  // The folder is set here rather than through the page: it is not one of
+  // the settings a renderer may change, for the same reason a web page
+  // cannot choose which folder of yours an app syncs.
   const settings = require('../src/main/settings');
   const sync = require('../src/main/sync');
+  settings.update({ folder: notebook, vaultFolder: null, vaultPrefix: null });
+  sync.refresh();
+  wc.reload();
+  await until('document.body.dataset.ready === "1"', 20000);
+  await sleep(1400);
+  await run(`
+    var p = document.querySelector("[data-panel=vault]");
+    if (p && p.hidden) document.getElementById("vault-bar").click();
+  `);
+  await until('[...document.querySelectorAll(".vault-btn")].some(b => /^Sync /.test(b.textContent.trim()))', 12000);
+  await sleep(900);
+  await shoot(win, 'vault-offer');
+
+  // ---- the folder, synced ----
+  //
+  // After pressing it: which folder, which notebook of the vault it is, that
+  // it is up to date, and the documents in it as a folder.
   settings.update({
     folder: notebook,
     vaultFolder: notebook,
