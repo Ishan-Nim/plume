@@ -519,8 +519,13 @@ kbd {
   transition: margin-left 0.18s ease;
 }
 .sidebar-hidden .sidebar,
-.is-welcome .sidebar { margin-left: calc(-1 * var(--sidebar-w) - 1px); }
-.is-welcome #btn-sidebar { visibility: hidden; }
+/* The welcome screen has nothing to navigate, so the sidebar is tucked away
+   and its button with it — unless a folder is open, which is the one thing on
+   that screen that puts something in the tree. Without the exception, Open
+   folder sets the root, fills the tree, and shows the reader nothing at all:
+   the only button that opens a folder lives on this screen. */
+.is-welcome:not(.has-folder) .sidebar { margin-left: calc(-1 * var(--sidebar-w) - 1px); }
+.is-welcome:not(.has-folder) #btn-sidebar { visibility: hidden; }
 .resizing,
 .resizing * { cursor: col-resize !important; user-select: none; }
 .resizing .sidebar { transition: none; }

@@ -153,6 +153,9 @@ function applySettings(s) {
   root.dataset.width = s.width;
   root.dataset.font = s.font;
   body.classList.toggle('sidebar-hidden', !s.sidebar);
+  // A folder is open, so there is a tree worth showing even with no document
+  // in the pane — which is the whole of what opening a folder does.
+  body.classList.toggle('has-folder', !!s.folder);
   showSidebarTab(s.sidebarTab);
   syncReadingControls();
   renderRecent();
@@ -1261,6 +1264,7 @@ async function openFolder() {
     return;
   }
   state.settings = { ...state.settings, folder: res.folder };
+  body.classList.add('has-folder');
   if (!state.settings.sidebar) await updateSettings({ sidebar: true });
   showSidebarTab('files');
   await fileTree.setRoot(res.folder, state.doc ? state.doc.path : null);
@@ -1269,6 +1273,7 @@ async function openFolder() {
 async function forgetFolder() {
   await api.forgetFolder();
   state.settings = { ...state.settings, folder: null };
+  body.classList.remove('has-folder');
   if (state.doc) fileTree.show(state.doc.vaultRoot || state.doc.dir, state.doc.path).catch(() => {});
   else fileTree.clear();
 }
