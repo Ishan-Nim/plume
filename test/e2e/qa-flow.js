@@ -141,7 +141,7 @@ async function main(win) {
     const a = document.querySelector('#doc .live-edit');
     if (!a) return null;
     const r = a.getBoundingClientRect();
-    return { h: Math.round(r.height), scrollH: a.scrollHeight, lines: a.value.split('\\n').length, inView: r.top >= 0 && r.bottom <= window.innerHeight };
+    return { h: Math.round(r.height), scrollH: a.scrollHeight, lines: a.plumeEdit.value.split('\\n').length, inView: r.top >= 0 && r.bottom <= window.innerHeight };
   })())`));
   record('the open block is no taller than its text', box && box.h <= box.scrollH + 2, JSON.stringify(box));
   record('the open block is on screen', box && box.inView, JSON.stringify(box));
@@ -149,11 +149,13 @@ async function main(win) {
   await shot('qa-02-live-preview');
 
   await run(`
-    const a = document.querySelector('#doc .live-edit');
-    a.value = a.value.replace('A first paragraph', 'An edited first paragraph');
-    a.dispatchEvent(new Event('input', { bubbles: true }));
+    // The open block is a CodeMirror editor: select the whole of it and put
+    // the new text in, which is one change rather than a silent swap of value.
+    const e = document.querySelector('#doc .live-edit').plumeEdit;
+    e.setSelectionRange(0, e.value.length);
+    e.insert(e.value.replace('A first paragraph', 'An edited first paragraph'));
     await new Promise(r2 => setTimeout(r2, 150));
-    a.blur();
+    e.blur();
     await new Promise(r2 => setTimeout(r2, 600));
   `);
   record('the edit renders back into the page',

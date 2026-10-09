@@ -1,7 +1,10 @@
-// Markdown-aware typing, shared by the two places Plume lets you type into a
-// textarea: source mode (the whole document) and live preview (one block).
-// Both expect Tab to indent and Enter to carry a list on, so the behaviour
-// lives here rather than in either of them.
+// Markdown-aware typing for source mode's textarea: Tab indents, Enter
+// carries a list on.
+//
+// Live preview used to share this. It is CodeMirror now, and gets the same
+// two behaviours from markdownKeymap and indentWithTab instead — so this is
+// source mode's alone, and the rest of the file (splitting lines, mapping a
+// rendered offset back to the Markdown behind it) is still shared by both.
 
 /**
  * Handles Tab and Enter in a Markdown textarea.

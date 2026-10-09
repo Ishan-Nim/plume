@@ -1909,10 +1909,11 @@ body.is-editing #welcome { display: none; }
    move the text around it. The negative gutter is the padding: the letters
    stay exactly where they were on the line.
 
-   Every rule here names the element as well as the class. A bare `.live-edit`
-   also matched <body> while a body class of the same name existed, which gave
-   the window `display: block` and collapsed the whole layout. */
-textarea.live-edit {
+   This is a CodeMirror editor, not a textarea: it carries .cm-editor as well,
+   which is what the selectors name. A bare `.live-edit` once also matched
+   <body> while a body class of the same name existed, which gave the window
+   `display: block` and collapsed the whole layout — hence naming both. */
+.cm-editor.live-edit {
   display: block;
   box-sizing: border-box;
   width: calc(100% + 20px);
@@ -1935,26 +1936,59 @@ textarea.live-edit {
   word-break: break-word;
   caret-color: var(--accent);
 }
-textarea.live-edit::selection { background: var(--selection); }
+.cm-editor.live-edit::selection { background: var(--selection); }
+
+/* Markdown shown as what it will become, while the text underneath stays the
+   Markdown you typed. mdsyntax.js hides the markers around these unless the
+   caret is inside the construct, so the two halves have to agree: whatever a
+   marker is hiding has to already look the part, or text would jump as the
+   markers come and go.
+
+   Sizes are in `em` so they compose with the heading sizing above rather than
+   fighting it — a `**bold**` inside an h2 is bold at h2's size. */
+.cm-md-strong { font-weight: 700; }
+.cm-md-em { font-style: italic; }
+.cm-md-strike { text-decoration: line-through; opacity: 0.75; }
+.cm-md-link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.cm-md-code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+}
+.cm-md-h1, .cm-md-h2, .cm-md-h3,
+.cm-md-h4, .cm-md-h5, .cm-md-h6 {
+  font-weight: 680;
+  color: var(--heading);
+  letter-spacing: -0.012em;
+}
+
+/* CodeMirror wraps the text in its own scroller and content elements; those
+   must not introduce a height or a scrollbar of their own, because the block
+   grows to its text the way the paragraph it replaced did. */
+.cm-editor.live-edit .cm-scroller,
+.cm-editor.live-edit .cm-content { min-height: 0; }
+.cm-editor.live-edit .cm-line { padding: 0; }
 
 /* Headings keep their own size while they are being typed. */
-textarea.live-edit[data-tag^="h"] {
+.cm-editor.live-edit[data-tag^="h"] {
   font-weight: 680;
   line-height: 1.3;
   letter-spacing: -0.012em;
   color: var(--heading);
   margin: 1.9em -10px 0.6em;
 }
-textarea.live-edit[data-tag="h1"] { font-size: 2em; margin-top: 1.4em; letter-spacing: -0.02em; }
-textarea.live-edit[data-tag="h2"] { font-size: 1.5em; }
-textarea.live-edit[data-tag="h3"] { font-size: 1.25em; }
-textarea.live-edit[data-tag="h4"] { font-size: 1.08em; }
-textarea.live-edit[data-tag="h5"] { font-size: 1em; }
-textarea.live-edit[data-tag="h6"] { font-size: 0.94em; }
+.cm-editor.live-edit[data-tag="h1"] { font-size: 2em; margin-top: 1.4em; letter-spacing: -0.02em; }
+.cm-editor.live-edit[data-tag="h2"] { font-size: 1.5em; }
+.cm-editor.live-edit[data-tag="h3"] { font-size: 1.25em; }
+.cm-editor.live-edit[data-tag="h4"] { font-size: 1.08em; }
+.cm-editor.live-edit[data-tag="h5"] { font-size: 1em; }
+.cm-editor.live-edit[data-tag="h6"] { font-size: 0.94em; }
 /* hr, and the empty paragraph a click past the end of the document opens. */
-textarea.live-edit[data-tag="hr"] { margin: 2.2em -10px; }
+.cm-editor.live-edit[data-tag="hr"] { margin: 2.2em -10px; }
 
-textarea.live-edit.is-code {
+.cm-editor.live-edit.is-code {
   font-family: var(--font-mono);
   font-size: calc(var(--content-size) * 0.88);
   line-height: 1.6;

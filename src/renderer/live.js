@@ -17,8 +17,9 @@
 
 import { el } from './util.js';
 import { srcRange } from './markdown.js';
+import { BlockEditor } from './blockedit.js';
 import {
-  markdownKeys, splitLines, lineEnding, sourceOffset, clickedTextOffset, blockText,
+  splitLines, lineEnding, sourceOffset, clickedTextOffset, blockText,
 } from './mdkeys.js';
 
 // Blocks whose rendered form is the whole point of them: a stray click must
@@ -197,35 +198,29 @@ export class LivePreview {
     }
   }
 
-  // Puts a textarea where the block is and hands it the block's Markdown.
+  // Puts an editor where the block is and hands it the block's Markdown.
   mount(block, { src, from, to, lines, text, temporary }) {
-    const area = el('textarea', {
-      class: 'live-edit',
-      // One row, so an empty box is one line tall: the height is set from the
-      // text, and a textarea's default two rows would be a floor under it.
-      rows: '1',
-      spellcheck: 'false',
-      autocapitalize: 'off',
-      autocomplete: 'off',
-      'aria-label': 'Edit this block',
-    });
-    area.value = src;
-    area.dataset.tag = block.tagName.toLowerCase();
-    if (block.classList.contains('code-block')) area.classList.add('is-code');
-
-    area.addEventListener('input', () => {
-      this.resize();
-      this.write(this.compose(area.value));
-    });
-    area.addEventListener('keydown', ev => this.onKey(ev));
-    area.addEventListener('blur', () => {
+    const area = new BlockEditor({
+      text: src,
+      tag: block.tagName.toLowerCase(),
+      isCode: block.classList.contains('code-block'),
+      onInput: value => this.write(this.compose(value)),
+      onKey: ev => this.onKey(ev),
       // Moving away is how you go back to reading — including by clicking
       // somewhere else entirely.
-      this.close().catch(console.error);
+      //
+      // Only while this is still the block being edited. Losing focus is
+      // reported after the event that caused it, so when the cause was a click
+      // on another block, that click has already closed this one and opened
+      // the next by the time this runs — and closing again would shut the
+      // block the reader just asked for.
+      onBlur: () => {
+        if (this.area === area) this.close().catch(console.error);
+      },
     });
 
     block.classList.add('live-hidden');
-    block.insertAdjacentElement('beforebegin', area);
+    block.insertAdjacentElement('beforebegin', area.dom);
 
     this.area = area;
     this.block = block;
@@ -239,21 +234,13 @@ export class LivePreview {
     this.temporary = temporary;
     document.body.classList.add('is-live-editing');
 
-    this.resize();
-    area.focus({ preventScroll: true });
-    area.scrollIntoView({ block: 'nearest' });
+    area.focus();
+    area.dom.scrollIntoView({ block: 'nearest' });
   }
 
   /** The whole document with the block being edited as it now stands. */
   compose(value) {
     return [...this.before, ...splitLines(value), ...this.after].join(this.eol);
-  }
-
-  resize() {
-    const area = this.area;
-    if (!area) return;
-    area.style.height = 'auto';
-    area.style.height = `${area.scrollHeight}px`;
   }
 
   /**
@@ -281,7 +268,8 @@ export class LivePreview {
     this.area = null;
     this.block = null;
     document.body.classList.remove('is-live-editing');
-    area.remove();
+    area.dom.remove();
+    area.destroy();
     // On a change the whole document is rendered again, so the stale copy of
     // this block stays hidden until it is replaced rather than flashing back.
     if (temporary) block.remove();
@@ -307,7 +295,8 @@ export class LivePreview {
     this.area = null;
     this.block = null;
     document.body.classList.remove('is-live-editing');
-    area.remove();
+    area.dom.remove();
+    area.destroy();
     if (temporary) block.remove();
     else block.classList.remove('live-hidden');
   }
@@ -341,10 +330,9 @@ export class LivePreview {
       return;
     }
 
-    if (markdownKeys(area, ev)) {
-      this.resize();
-      this.write(this.compose(area.value));
-    }
+    // Everything else — Enter carrying a list on, Tab indenting, undo — is
+    // CodeMirror's, and reaches this.write through the editor's own change
+    // listener rather than from here.
   }
 
   async toNeighbour(dir) {

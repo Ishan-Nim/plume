@@ -106,10 +106,14 @@ test('the window is a grid of the title bar and everything else', () => {
   assert.match(css, /grid-template-rows:\s*var\(--titlebar-h\)\s+minmax\(0,\s*1fr\)/);
 });
 
-test('live preview styles the textarea, not whatever else shares its class', () => {
+test('live preview styles its own editor, not whatever else shares its class', () => {
+  // A bare `.live-edit` once also matched <body>, which had the class at the
+  // time, and gave the window `display: block` — the whole layout collapsed.
+  // The surface is a CodeMirror editor now rather than a textarea, so what
+  // qualifies the class has changed; that it is qualified at all has not.
   for (const { selector } of rules()) {
     if (!/\blive-edit\b/.test(selector)) continue;
-    assert.match(selector, /^textarea\.live-edit/,
+    assert.match(selector, /^\.cm-editor\.live-edit\b/,
       `${selector} should name the element it is for`);
   }
 });

@@ -91,13 +91,14 @@ async function main(win) {
     await new Promise(r2 => setTimeout(r2, 250));
   `);
 
+  // The open block is a CodeMirror editor, reached through the handle
+  // blockedit.js leaves on its element. Typing goes in as a real change, so
+  // everything downstream — the unsaved mark, the buffer — sees what it would
+  // see from a keystroke.
   const type = text => run(`
     const area = document.querySelector('#doc .live-edit');
     if (!area) throw new Error('nothing is open for editing');
-    const at = area.selectionStart;
-    area.value = area.value.slice(0, at) + ${JSON.stringify(text)} + area.value.slice(at);
-    area.setSelectionRange(at + ${JSON.stringify(text)}.length, at + ${JSON.stringify(text)}.length);
-    area.dispatchEvent(new Event('input', { bubbles: true }));
+    area.plumeEdit.insert(${JSON.stringify(text)});
     await new Promise(r2 => setTimeout(r2, 120));
   `);
 
@@ -115,15 +116,15 @@ async function main(win) {
   const open = await until('!!document.querySelector("#doc .live-edit")', 4000);
   record('clicking a paragraph opens that paragraph', open);
   record('it holds the Markdown of that block alone',
-    (await read('document.querySelector("#doc .live-edit").value'))
+    (await read('document.querySelector("#doc .live-edit").plumeEdit.value'))
       === 'The first paragraph, which is **the one** to click.',
-    JSON.stringify(await read('document.querySelector("#doc .live-edit") && document.querySelector("#doc .live-edit").value')));
+    JSON.stringify(await read('document.querySelector("#doc .live-edit") && document.querySelector("#doc .live-edit").plumeEdit.value')));
   record('the rendered copy steps aside', await read('!!document.querySelector("#doc .live-hidden")'));
   record('the rest of the document is still rendered',
     await read('!!document.querySelector("#doc h1") && !!document.querySelector("#doc ul")'));
   // The click lands about 60px into the line, so the caret belongs among the
   // first few words rather than at either end of the block.
-  const caret = await read('document.querySelector("#doc .live-edit").selectionStart');
+  const caret = await read('document.querySelector("#doc .live-edit").plumeEdit.selectionStart');
   record('the caret lands where the click did', caret > 2 && caret < 22, `offset ${caret}`);
   await shot('02-editing-a-block');
 
@@ -135,7 +136,7 @@ async function main(win) {
   record('nothing is written to disk before saving', fs.readFileSync(DOC, 'utf8') === ORIGINAL);
 
   // ---- move away: it renders again ----
-  await run('document.querySelector("#doc .live-edit").blur();');
+  await run('document.querySelector("#doc .live-edit").plumeEdit.blur();');
   const closed = await until('!document.querySelector("#doc .live-edit")', 4000);
   record('moving away closes the block', closed);
   await sleep(400);
@@ -164,31 +165,75 @@ async function main(win) {
   await clickOn('#doc h1');
   await until('!!document.querySelector("#doc .live-edit")', 4000);
   record('a heading opens as its own line',
-    (await read('document.querySelector("#doc .live-edit").value')) === '# Notes',
-    JSON.stringify(await read('document.querySelector("#doc .live-edit") && document.querySelector("#doc .live-edit").value')));
+    (await read('document.querySelector("#doc .live-edit").plumeEdit.value')) === '# Notes',
+    JSON.stringify(await read('document.querySelector("#doc .live-edit") && document.querySelector("#doc .live-edit").plumeEdit.value')));
   record('the heading keeps its size while being typed',
     (await read('document.querySelector("#doc .live-edit").dataset.tag')) === 'h1');
   await shot('04-heading');
 
+  // ---- the markers get out of the way ----
+  //
+  // The point of live preview: `**` is hidden while you are typing elsewhere
+  // in the block and back the moment the caret is in the word it marks, with
+  // the Markdown underneath untouched the whole time.
+  await clickOn('#doc p');
+  await until('!!document.querySelector("#doc .live-edit")', 4000);
+  // What is on screen, which is not the same as what the document holds: the
+  // hidden markers are decorations, so they are absent from the DOM text.
+  const onScreen = () => read('document.querySelector("#doc .live-edit .cm-content").textContent');
+  const caretTo = at => run(`
+    document.querySelector('#doc .live-edit').plumeEdit.setSelectionRange(${at}, ${at});
+    await new Promise(r2 => setTimeout(r2, 180));
+  `);
+  const markdownNow = () => read('document.querySelector("#doc .live-edit").plumeEdit.value');
+
+  const source = await markdownNow();
+  await caretTo(0);
+  const away = await onScreen();
+  record('with the caret elsewhere, the asterisks are hidden',
+    !away.includes('**'), JSON.stringify(away));
+  record('the words they marked are still on screen',
+    away.includes('the one'), JSON.stringify(away));
+
+  await caretTo(source.indexOf('the one') + 2);
+  const inside = await onScreen();
+  record('the caret inside the bold brings its asterisks back',
+    inside.includes('**the one**'), JSON.stringify(inside));
+  await shot('05-markers-revealed');
+
+  record('hiding a marker never changed the Markdown',
+    (await markdownNow()) === source);
+  await run('document.querySelector("#doc .live-edit").plumeEdit.blur();');
+  await sleep(500);
+  record('and the file on disk is untouched by any of it',
+    fs.readFileSync(DOC, 'utf8') === onDisk);
+
   // ---- a list opens whole ----
   await clickOn('#doc ul');
-  await until('(document.querySelector("#doc .live-edit") || {}).value === "- a list item\\n- another"', 4000);
+  await until('((document.querySelector("#doc .live-edit") || {}).plumeEdit || {}).value === "- a list item\\n- another"', 4000);
   record('a list opens as the whole list',
-    (await read('document.querySelector("#doc .live-edit").value')) === '- a list item\n- another',
-    JSON.stringify(await read('document.querySelector("#doc .live-edit") && document.querySelector("#doc .live-edit").value')));
+    (await read('document.querySelector("#doc .live-edit").plumeEdit.value')) === '- a list item\n- another',
+    JSON.stringify(await read('document.querySelector("#doc .live-edit") && document.querySelector("#doc .live-edit").plumeEdit.value')));
 
   // Enter carries the list on.
   await run(`
-    const area = document.querySelector('#doc .live-edit');
-    area.setSelectionRange(area.value.length, area.value.length);
-    area.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    const edit = document.querySelector('#doc .live-edit').plumeEdit;
+    edit.setSelectionRange(edit.value.length, edit.value.length);
+    // CodeMirror binds its keys on the content element, not the wrapper, so
+    // that is where a keystroke has to land to reach the keymap.
+    edit.view.contentDOM.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     await new Promise(r2 => setTimeout(r2, 150));
   `);
   record('Enter carries the list marker on',
-    /- another\n- $/.test(await read('document.querySelector("#doc .live-edit").value') || ''),
-    JSON.stringify(await read('document.querySelector("#doc .live-edit") && document.querySelector("#doc .live-edit").value')));
-  await run('document.querySelector("#doc .live-edit").blur();');
-  await sleep(500);
+    /- another\n- $/.test(await read('document.querySelector("#doc .live-edit").plumeEdit.value') || ''),
+    JSON.stringify(await read('document.querySelector("#doc .live-edit") && document.querySelector("#doc .live-edit").plumeEdit.value')));
+  await run('document.querySelector("#doc .live-edit").plumeEdit.blur();');
+  // Wait for the block to actually close rather than guessing at how long it
+  // takes: the list was typed into, so closing it renders the document again,
+  // and a click sent before that lands on blocks that are about to be replaced.
+  await until('!document.querySelector("#doc .live-edit")', 4000);
+  await sleep(250);
 
   // ---- raw HTML cannot aim a click at other lines ----
   const forged = await read(`(() => {
@@ -206,7 +251,11 @@ async function main(win) {
       }
       await new Promise(r2 => setTimeout(r2, 300));
     `);
-    record('a forged range opens nothing', await read('!document.querySelector("#doc .live-edit")'));
+    record('a forged range opens nothing',
+      await read('!document.querySelector("#doc .live-edit")'),
+      // Which block opened, if one did: the forged node's own line, or the
+      // real block its range points at.
+      JSON.stringify(await read('document.querySelector("#doc .live-edit") && document.querySelector("#doc .live-edit").plumeEdit.value')));
   }
 
   // ---- clicking past the end starts a new block ----
@@ -223,9 +272,9 @@ async function main(win) {
   const appended = await read('!!document.querySelector("#doc .live-edit")');
   record('clicking past the end starts a new block', appended);
   if (appended) {
-    record('the new block starts empty', (await read('document.querySelector("#doc .live-edit").value')) === '');
+    record('the new block starts empty', (await read('document.querySelector("#doc .live-edit").plumeEdit.value')) === '');
     await type('A line added at the end.');
-    await run('document.querySelector("#doc .live-edit").blur();');
+    await run('document.querySelector("#doc .live-edit").plumeEdit.blur();');
     await sleep(600);
     record('the new block is rendered',
       /A line added at the end\./.test(await read('document.getElementById("doc").textContent') || ''));
@@ -252,7 +301,7 @@ async function main(win) {
     }
     await new Promise(r2 => setTimeout(r2, 250));
     const area = document.querySelector('#doc .live-edit');
-    if (area) area.blur();
+    if (area) area.plumeEdit.blur();
     await new Promise(r2 => setTimeout(r2, 400));
   `);
   record('opening a new block and leaving it empty changes nothing',

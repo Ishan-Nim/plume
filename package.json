@@ -18,6 +18,13 @@
     "dist:linux": "node scripts/build.js --release && electron-builder --linux"
   },
   "devDependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.14",
+    "@lezer/highlight": "^1.2.5",
+    "@lezer/markdown": "^1.8.0",
     "dompurify": "^3.4.16",
     "electron": "^44.6.0",
     "electron-builder": "^26.15.3",
