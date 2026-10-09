@@ -404,30 +404,6 @@ p { margin: 0; }
 
 .shot-frame.has-film { position: relative; }
 
-/* Says this is moving footage before it has moved, so a reader who arrives
-   while it is still loading — or whose browser will not start it on its own —
-   does not take it for a screenshot. */
-.shot-badge {
-  position: absolute; z-index: 2; top: 14px; right: 14px;
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 5px 11px 5px 9px; border-radius: 999px;
-  background: color-mix(in srgb, #000 62%, transparent);
-  color: #fff; font-size: .74rem; font-weight: 600; letter-spacing: .02em;
-  backdrop-filter: blur(6px);
-  pointer-events: none;
-}
-.shot-badge i {
-  width: 7px; height: 7px; border-radius: 50%; background: #ff5f57;
-  animation: shot-pulse 2s ease-in-out infinite;
-}
-@keyframes shot-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: .45; transform: scale(.8); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .shot-badge { display: none; }
-}
-
 .shot-frame {
   margin-top: clamp(40px, 6vw, 64px);
   border: 1px solid var(--line); border-radius: 16px;
