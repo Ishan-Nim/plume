@@ -1,5 +1,33 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no workspace to import, no project to set up, no editor chrome.
 
+**1.3.0 hides the Markdown syntax while you are not in it.**
+
+**Live preview goes a word at a time.** Until now, the block you were editing
+was raw Markdown: every `**`, every `(url)`, on show while you typed. Now the
+markers go when the caret leaves what they mark, and come back when it
+returns — so a bold word is bold, a link is its own text, and a heading keeps
+its size, while you are still typing Markdown into the same file. It works for
+bold, italics, strikethrough, inline code, links, images and headings.
+
+A heading is the one case with a rule of its own. Live preview opens one block
+at a time and a heading is a single line, so revealing the `#` whenever the
+caret was in the heading would mean revealing it the moment you clicked one.
+It comes back when the caret is in the `#` itself: type the words and the
+heading stays a heading, click to the far left when you want to change its
+level.
+
+What is saved has not changed. The hiding is drawn over the text, never a
+rewrite of it, and the file on disk is the Markdown you typed, exactly. `Ctrl+E`
+still shows the whole file as plain text, unchanged, and **Reading settings →
+Live preview** still turns the whole thing off.
+
+**Open folder now shows you the folder.** On the welcome screen it chose a
+folder, filled the tree and then showed nothing at all: the sidebar is tucked
+away on that screen, and the welcome screen is the only place the button lives.
+The folder *was* being remembered, so it turned up on the next launch with a
+document open, which made it look intermittent rather than broken. The sidebar
+now stays where it is when a folder is open.
+
 **1.2.0 adds live preview, and a button for opening a folder of notes.**
 
 **Live preview.** Click a paragraph and it becomes the Markdown it was
@@ -114,10 +142,10 @@ Worth saying plainly: **Plume is not code-signed.** Those checksums come from th
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.2.0.exe` |
-| macOS, Apple silicon | `Plume-1.2.0-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.2.0-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.2.0-linux-x86_64.AppImage` or `Plume-1.2.0-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.3.0.exe` |
+| macOS, Apple silicon | `Plume-1.3.0-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.3.0-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.3.0-linux-x86_64.AppImage` or `Plume-1.3.0-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html), which offers the right build for your system.
 
@@ -125,7 +153,7 @@ Or get them from [plume-md.com/download](https://plume-md.com/download.html), wh
 
 ### Windows
 
-Run `Plume-Setup-1.2.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
+Run `Plume-Setup-1.3.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 
 To make Plume the default for `.md`, right-click a Markdown file and choose **Open with → Choose another app → Plume → Always**, or use **⋯ → Make Plume the default for .md** inside Plume.
 
@@ -138,8 +166,8 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 ### Linux
 
-- **AppImage:** make it executable with `chmod +x Plume-1.2.0-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.2.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+- **AppImage:** make it executable with `chmod +x Plume-1.3.0-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.3.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
 
 ---
 
