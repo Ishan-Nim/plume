@@ -1,5 +1,28 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no workspace to import, no project to set up, no editor chrome.
 
+**1.4.1 fixes a folder being synced into the wrong notebook.**
+
+Changing the synced folder moved the folder but kept the notebook name the
+old one had, so the documents went up under a name belonging to a folder they
+were not in. Opening a folder set both; choosing one in the vault panel set
+only half, which is the half nobody can see. The folder, the notebook and the
+folder shown in the sidebar now move together.
+
+**A sync that would delete a lot of documents stops and says so.** Pointing a
+folder at the wrong notebook, a drive that has not finished mounting, or a
+notebook name out of step with its folder all look from inside the sync like
+"everything here was deleted". When a sync is about to remove ten or more
+documents, and a third or more of what the notebook holds, it pauses instead
+and says what it was about to do.
+
+**Change folder…** is a button of its own, beside Stop, so moving to another
+project is one named thing rather than stopping and starting again.
+
+**Your vault reads as its folders.** A synced folder puts its whole shape up
+there, and a flat list of paths stopped being readable the moment it did.
+Folders fold, counts are on the right, and what is inside them is indented —
+in the app and in the web vault both.
+
 **1.4.0 makes the folder you are working in your vault.**
 
 **Sign in and the open folder is the vault.** There is nothing else to choose,
@@ -170,10 +193,10 @@ Worth saying plainly: **Plume is not code-signed.** Those checksums come from th
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.4.0.exe` |
-| macOS, Apple silicon | `Plume-1.4.0-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.4.0-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.4.0-linux-x86_64.AppImage` or `Plume-1.4.0-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.4.1.exe` |
+| macOS, Apple silicon | `Plume-1.4.1-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.4.1-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.4.1-linux-x86_64.AppImage` or `Plume-1.4.1-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html), which offers the right build for your system.
 
@@ -181,7 +204,7 @@ Or get them from [plume-md.com/download](https://plume-md.com/download.html), wh
 
 ### Windows
 
-Run `Plume-Setup-1.4.0.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
+Run `Plume-Setup-1.4.1.exe`. Plume installs for all users in `C:\Program Files\Plume`, so Windows asks for administrator approval once. The installer is not code-signed yet: if SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 
 To make Plume the default for `.md`, right-click a Markdown file and choose **Open with → Choose another app → Plume → Always**, or use **⋯ → Make Plume the default for .md** inside Plume.
 
@@ -194,8 +217,8 @@ Open the DMG and drag Plume into Applications. Plume is not notarized by Apple, 
 
 ### Linux
 
-- **AppImage:** make it executable with `chmod +x Plume-1.4.0-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.4.0-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
+- **AppImage:** make it executable with `chmod +x Plume-1.4.1-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.4.1-linux-amd64.deb`. On Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that Electron apps need to start there.
 
 ---
 

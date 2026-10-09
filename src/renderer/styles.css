@@ -1781,16 +1781,36 @@ summary.callout-title::-webkit-details-marker { display: none; }
 .vault-row-main span { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
 .vault-stack { display: flex; flex-direction: column; gap: 6px; }
 
-.vault-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.vault-files li { flex: 0 0 auto; }
-.vault-files li {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 8px 10px;
+
+/* The vault read as its folders. A synced folder puts its whole shape up
+   there, and a flat list of paths stops being readable the moment it does. */
+.vault-tree { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.vault-tree .vault-tree { margin-left: 10px; padding-left: 8px; border-left: 1px solid var(--border); }
+
+.vault-dir > summary {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px; border-radius: 6px; cursor: default;
+  font-size: 12.5px; font-weight: 550; color: var(--text-2);
+  list-style: none;
 }
+.vault-dir > summary::-webkit-details-marker { display: none; }
+/* A disclosure arrow of our own, so it turns with the folder. */
+.vault-dir > summary::before {
+  content: ""; flex: 0 0 auto; width: 0; height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent;
+  transition: transform 0.12s ease; transform-origin: 25% 50%;
+}
+.vault-dir[open] > summary::before { transform: rotate(90deg); }
+.vault-dir > summary:hover { background: var(--chrome-2); }
+.vault-dir-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vault-dir-count { margin-left: auto; font-size: 11px; font-weight: 500; color: var(--text-3); }
+
+.vault-file {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 4px 6px; border-radius: 6px;
+}
+.vault-file:hover { background: var(--chrome-2); }
 .vault-file-info { min-width: 0; }
 .vault-file-info b { display: block; font-size: 12.5px; font-weight: 550; word-break: break-all; }
 .vault-file-info span { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 1px; }

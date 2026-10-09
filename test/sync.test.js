@@ -168,3 +168,24 @@ test('a deep document keeps the name of the notebook it belongs to', () => {
   assert.strictEqual(parts[0], 'Journal');
   assert.strictEqual(parts[parts.length - 1], 'note.md');
 });
+
+// ---------------------------------------------------------------------------
+// The guard against a sync that is really an accident
+
+test('a sync that would remove most of a notebook is stopped', () => {
+  // The shapes this is here to catch: a folder pointed at the wrong notebook,
+  // a drive that has not finished mounting, a notebook name out of step with
+  // its folder. All of them look like "everything was deleted".
+  assert.ok(sync.alarming(47, 47), 'every document in the notebook');
+  assert.ok(sync.alarming(30, 47), 'most of it');
+  assert.ok(sync.alarming(10, 10), 'a small notebook, all of it');
+});
+
+test('ordinary tidying is not stopped', () => {
+  // Both halves of the rule have to be true, so neither a few deletions out
+  // of a large notebook nor a large share of a tiny one trips it.
+  assert.ok(!sync.alarming(9, 10), 'under the count, however large the share');
+  assert.ok(!sync.alarming(12, 200), 'a dozen out of two hundred is tidying');
+  assert.ok(!sync.alarming(3, 3), 'three documents is not an accident');
+  assert.ok(!sync.alarming(0, 47), 'nothing to delete');
+});

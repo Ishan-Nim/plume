@@ -154,9 +154,9 @@ async function main(win) {
     sync.click();
   `);
 
-  const synced = await until('document.querySelectorAll(".vault-files li").length > 0', { timeout: 25000 });
+  const synced = await until('document.querySelectorAll(".vault-tree .vault-file").length > 0', { timeout: 25000 });
   record('the document reaches the vault', synced,
-    synced ? await read('document.querySelector(".vault-files li b").textContent') : await read('(document.querySelector(".vault-error")||{}).textContent'));
+    synced ? await read('document.querySelector(".vault-tree .vault-file b").textContent') : await read('(document.querySelector(".vault-error")||{}).textContent'));
   await shot('04-synced');
 
   // ---- sync the rest, so the graph has links ----

@@ -1159,7 +1159,15 @@ handle('sync:choose', vaultResult(async ctx => {
 
   const folder = filePaths[0];
   const look = await sync.preview(folder);
-  settings.update({ vaultFolder: folder, syncPaused: false });
+  // The prefix goes with the folder. Without it a folder chosen here would be
+  // synced into whichever notebook the last one occupied — two notebooks
+  // merged into one, which is the thing the prefix exists to prevent.
+  settings.update({
+    folder,
+    vaultFolder: folder,
+    vaultPrefix: sync.prefixFor(folder),
+    syncPaused: false,
+  });
   broadcastSettings();
   sync.refresh();
   return { folder, preview: look, state: sync.publicState() };

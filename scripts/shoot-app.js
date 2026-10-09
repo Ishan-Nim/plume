@@ -1,7 +1,8 @@
 'use strict';
 
 // Captures the app screenshots the documentation uses, from the real app:
-// the reading view, the vault panel signed out and signed in, and the graph.
+// the reading view, the vault panel signed out and signed in, the synced
+// folder, the notebooks a second computer would be offered, and the graph.
 //
 //   set PLUME_VAULT_API=http://127.0.0.1:8098/api
 //   set PLUME_SHOTS=docs\screenshots
@@ -178,6 +179,54 @@ async function main(win) {
   await run(`document.getElementById('graph-view-fit').click();`);
   await sleep(1200);
   await shoot(win, 'vault-graph');
+  await run(`document.getElementById('graph-view-close').click();`);
+  await sleep(900);
+
+  // ---- the folder, synced ----
+  //
+  // The vault is the folder you are working in, so this is the shot that
+  // matters most: which folder, which notebook of the vault it is, and that
+  // it is up to date. The folder is set here rather than through the page —
+  // it is not one of the settings a renderer may change, for the same reason
+  // a web page cannot choose which folder of yours an app syncs.
+  const settings = require('../src/main/settings');
+  const sync = require('../src/main/sync');
+  settings.update({
+    folder: notebook,
+    vaultFolder: notebook,
+    vaultPrefix: sync.prefixFor(notebook),
+  });
+  sync.refresh();
+  await sleep(1200);
+  await sync.syncNow();
+
+  wc.reload();
+  await until('document.body.dataset.ready === "1"', 20000);
+  await sleep(1400);
+  await run(`
+    var p = document.querySelector("[data-panel=vault]");
+    if (p && p.hidden) document.getElementById("vault-bar").click();
+  `);
+  await until('!!document.querySelector(".vault-current-info")', 12000);
+  await sleep(900);
+  await shoot(win, 'vault-folder');
+
+  // ---- what a second computer is offered ----
+  //
+  // The same account with no folder on this machine: the notebooks already in
+  // the vault, each with a way to put it here.
+  settings.update({ vaultFolder: null, vaultPrefix: null, folder: null });
+  sync.refresh();
+  wc.reload();
+  await until('document.body.dataset.ready === "1"', 20000);
+  await sleep(1400);
+  await run(`
+    var p = document.querySelector("[data-panel=vault]");
+    if (p && p.hidden) document.getElementById("vault-bar").click();
+  `);
+  await until('!!document.querySelector(".vault-existing .vault-row")', 12000);
+  await sleep(900);
+  await shoot(win, 'vault-notebooks');
 
   console.log(`\naccount used: ${EMAIL}`);
 }

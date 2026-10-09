@@ -213,52 +213,124 @@
     $('v-files').textContent = account.fileCount + (account.fileCount === 1 ? ' document' : ' documents');
   }
 
+  // The vault read as its folders, the way the app reads it. A synced folder
+  // puts its whole shape up here — notebooks, sub-folders, a Journal with a
+  // year in it — and a flat list of paths stops being readable the moment it
+  // does. Which folders are open is remembered, so deleting a document does
+  // not fold everything up again.
+  var openDirs = Object.create(null);
+
+  function treeOf(files) {
+    var root = { dirs: Object.create(null), order: [], files: [] };
+    files.forEach(function (file) {
+      var parts = String(file.path).split('/').filter(Boolean);
+      var node = root;
+      for (var i = 0; i < parts.length - 1; i += 1) {
+        var seg = parts[i];
+        if (!node.dirs[seg]) {
+          node.dirs[seg] = { dirs: Object.create(null), order: [], files: [] };
+          node.order.push(seg);
+        }
+        node = node.dirs[seg];
+      }
+      node.files.push(file);
+    });
+    return root;
+  }
+
+  function countFiles(node) {
+    var total = node.files.length;
+    node.order.forEach(function (name) { total += countFiles(node.dirs[name]); });
+    return total;
+  }
+
+  function fileRow(file) {
+    var li = document.createElement('li');
+
+    var n = document.createElement('div');
+    n.className = 'n';
+    var b = document.createElement('b');
+    b.textContent = file.path.split('/').pop();
+    // The full name is still what identifies it.
+    n.title = file.path;
+    var s = document.createElement('span');
+    s.textContent = bytes(file.size) + ' · updated ' + when(file.updatedAt);
+    n.appendChild(b);
+    n.appendChild(s);
+
+    var acts = document.createElement('div');
+    acts.className = 'acts';
+
+    var view = document.createElement('button');
+    view.type = 'button';
+    view.className = 'btn btn-ghost btn-sm';
+    view.textContent = 'Open';
+    view.addEventListener('click', function () { openFile(file); });
+
+    var save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'btn btn-ghost btn-sm';
+    save.textContent = 'Save';
+    save.addEventListener('click', function () { downloadFile(file); });
+
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn btn-ghost btn-sm';
+    del.textContent = 'Delete';
+    del.addEventListener('click', function () { removeFile(file); });
+
+    acts.appendChild(view);
+    acts.appendChild(save);
+    acts.appendChild(del);
+    li.appendChild(n);
+    li.appendChild(acts);
+    return li;
+  }
+
+  function paintTree(node, into, trail) {
+    node.order.slice().sort().forEach(function (name) {
+      var child = node.dirs[name];
+      var path = trail ? trail + '/' + name : name;
+
+      var li = document.createElement('li');
+      li.className = 'dir-item';
+      var box = document.createElement('details');
+      box.className = 'dir';
+      if (openDirs[path]) box.open = true;
+      box.addEventListener('toggle', function () {
+        if (box.open) openDirs[path] = true;
+        else delete openDirs[path];
+      });
+
+      var sum = document.createElement('summary');
+      var label = document.createElement('span');
+      label.className = 'dir-name';
+      label.textContent = name;
+      var count = document.createElement('span');
+      count.className = 'dir-count';
+      count.textContent = String(countFiles(child));
+      sum.appendChild(label);
+      sum.appendChild(count);
+      box.appendChild(sum);
+
+      var inner = document.createElement('ul');
+      inner.className = 'files';
+      paintTree(child, inner, path);
+      box.appendChild(inner);
+
+      li.appendChild(box);
+      into.appendChild(li);
+    });
+
+    node.files.forEach(function (file) { into.appendChild(fileRow(file)); });
+  }
+
   function paintFiles(files) {
     state.files = files;
     var list = $('file-list');
     list.textContent = '';
     $('file-empty').hidden = files.length > 0;
-
-    files.forEach(function (file) {
-      var li = document.createElement('li');
-
-      var n = document.createElement('div');
-      n.className = 'n';
-      var b = document.createElement('b');
-      b.textContent = file.path;
-      var s = document.createElement('span');
-      s.textContent = bytes(file.size) + ' · updated ' + when(file.updatedAt);
-      n.appendChild(b);
-      n.appendChild(s);
-
-      var acts = document.createElement('div');
-      acts.className = 'acts';
-
-      var view = document.createElement('button');
-      view.type = 'button';
-      view.className = 'btn btn-ghost btn-sm';
-      view.textContent = 'Open';
-      view.addEventListener('click', function () { openFile(file); });
-
-      var save = document.createElement('button');
-      save.type = 'button';
-      save.className = 'btn btn-ghost btn-sm';
-      save.textContent = 'Save';
-      save.addEventListener('click', function () { downloadFile(file); });
-
-      var del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'btn btn-ghost btn-sm';
-      del.textContent = 'Delete';
-      del.addEventListener('click', function () { removeFile(file); });
-
-      acts.appendChild(view);
-      acts.appendChild(save);
-      acts.appendChild(del);
-      li.appendChild(n);
-      li.appendChild(acts);
-      list.appendChild(li);
-    });
+    paintTree(treeOf(files), list, '');
   }
 
   async function refresh() {

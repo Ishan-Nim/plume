@@ -152,6 +152,27 @@
   .files .n { flex: 1 1 200px; min-width: 0; }
   .files .n b { display: block; font-weight: 560; font-size: .95rem; word-break: break-all; }
   .files .n span { font-size: .81rem; color: var(--text-3); }
+
+  /* Folders, so a vault with a synced notebook in it can be read as one. */
+  .files .files { margin: 4px 0 0; padding-left: 10px; border-left: 1px solid var(--border); gap: 4px; }
+  .files li.dir-item { display: block; padding: 0; border: 0; background: none; }
+  .files .dir > summary {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 8px; cursor: pointer;
+    font-weight: 560; font-size: .95rem; color: var(--text-2);
+    list-style: none;
+  }
+  .files .dir > summary::-webkit-details-marker { display: none; }
+  .files .dir > summary::before {
+    content: ""; flex: 0 0 auto; width: 0; height: 0;
+    border-left: 5px solid currentColor;
+    border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+    transition: transform .12s ease; transform-origin: 30% 50%;
+  }
+  .files .dir[open] > summary::before { transform: rotate(90deg); }
+  .files .dir > summary:hover { background: var(--chrome-2, rgba(128,128,128,.12)); }
+  .dir-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dir-count { margin-left: auto; font-size: .78rem; font-weight: 500; color: var(--text-3); }
   .files .acts { display: flex; gap: 6px; flex: none; }
   .empty { color: var(--text-3); font-size: .93rem; text-align: center; padding: 26px 0; }
 

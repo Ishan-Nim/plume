@@ -60,6 +60,18 @@ const SKIP_DIR = /^[.]|^node_modules$|^__pycache__$|^\$RECYCLE/i;
 const TRASH_DIR = '.plume-trash';
 
 const SETTLE_MS = 1500;     // wait for an editor to finish writing
+
+// A sync that would remove this many documents, and this much of what is
+// there, stops and says so instead of doing it.
+//
+// Deleting is the only thing here that syncing again cannot undo, and the
+// ways it goes wrong are not small ones: a folder pointed at the wrong
+// notebook, a drive that has not finished mounting, a notebook name that got
+// out of step with the folder it belongs to. Every one of those looks from in
+// here exactly like "they deleted everything", and the right answer to a sync
+// that wants to delete everything is to stop and let a person look at it.
+const DELETE_ALARM_COUNT = 10;
+const DELETE_ALARM_SHARE = 0.34;
 const RESCAN_MS = 5 * 60 * 1000;
 
 let state = {
@@ -349,7 +361,13 @@ async function planSync(folder) {
     if (underPrefix(file.path, prefix)) there.set(file.path, file);
   }
 
-  const plan = { rising: [], pull: [], deleteLocal: [], deleteRemote: [], conflict: [] };
+  const plan = {
+    rising: [], pull: [], deleteLocal: [], deleteRemote: [], conflict: [],
+    // Everything either side holds, changed or not. The alarm below is about
+    // the share of a notebook a sync would remove, and documents it is
+    // leaving alone never reach the lists above.
+    known: Math.max(here.size, there.size),
+  };
 
   for (const vaultPath of new Set([...here.keys(), ...there.keys()])) {
     const local = here.get(vaultPath) || null;
@@ -419,6 +437,15 @@ async function trash(folder, localPath) {
   }
 }
 
+/**
+ * Whether a plan is removing enough of a notebook to be an accident rather
+ * than an intention. Both have to be true: ten documents is nothing out of a
+ * thousand, and a third of a notebook is nothing out of three.
+ */
+function alarming(deletes, known) {
+  return deletes >= DELETE_ALARM_COUNT && deletes >= known * DELETE_ALARM_SHARE;
+}
+
 // ---------- the sync itself ----------
 
 async function runOnce() {
@@ -465,6 +492,21 @@ async function runOnce() {
       fitting.push(file);
     }
     const fits = new Set(fitting.map(f => f.localPath));
+
+    // Before any of it is applied: is this a sync, or an accident?
+    const deletes = plan.deleteLocal.length + plan.deleteRemote.length;
+    if (alarming(deletes, plan.known)) {
+      settings.update({ syncPaused: true });
+      set({
+        status: 'paused',
+        total: 0,
+        done: 0,
+        lastError: `Paused: this sync was about to remove ${deletes} of `
+          + `${plan.known} documents. Check that the folder and the notebook `
+          + 'are the ones you meant, then start syncing again.',
+      });
+      return;
+    }
 
     const total = plan.pull.length + fitting.length
       + plan.deleteLocal.length + plan.deleteRemote.length;
@@ -663,6 +705,7 @@ async function preview(folder) {
 
 module.exports = {
   SYNC_EXT,
+  alarming,
   decide,
   localPathFor,
   vaultPathFor,

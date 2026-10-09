@@ -27,6 +27,28 @@ function when(iso) {
   return d.toLocaleDateString();
 }
 
+/** The vault's paths as a tree of folders, so it can be read as a folder. */
+function treeOf(files) {
+  const root = { folders: new Map(), files: [] };
+  for (const file of files) {
+    const parts = String(file.path).split('/').filter(Boolean);
+    let node = root;
+    for (const segment of parts.slice(0, -1)) {
+      if (!node.folders.has(segment)) node.folders.set(segment, { folders: new Map(), files: [] });
+      node = node.folders.get(segment);
+    }
+    node.files.push(file);
+  }
+  return root;
+}
+
+/** Documents anywhere below a folder, which is what its count should say. */
+function countFiles(node) {
+  let total = node.files.length;
+  for (const child of node.folders.values()) total += countFiles(child);
+  return total;
+}
+
 export class Vault {
   /**
    * @param {HTMLElement} root   the sidebar panel to draw into
@@ -49,6 +71,9 @@ export class Vault {
     this.links = {};
     this.loaded = false;
     this.busy = false;
+    // Which folders of the vault tree are open, kept across a redraw of the
+    // panel so syncing a document does not fold everything up again.
+    this.openDirs = new Set();
     this.sync = null;
 
     // The main process drives the folder sync; the panel just shows what it says.
@@ -292,6 +317,13 @@ export class Vault {
     const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open folder' });
     open.addEventListener('click', () => this.api.sync.reveal());
 
+    // Changing which folder syncs is a different act from stopping, and it
+    // is the one somebody with more than one project does often. Without a
+    // button of its own it is Stop followed by Choose, and Stop reads like
+    // breaking something rather than moving to the next project.
+    const change = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Change folder…' });
+    change.addEventListener('click', () => this.chooseFolder(change));
+
     const forget = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Stop' });
     forget.addEventListener('click', async () => {
       const warning = 'Stop syncing this folder?\n\n'
@@ -303,7 +335,7 @@ export class Vault {
       await this.load();
     });
 
-    acts.append(now, pause, open, forget);
+    acts.append(now, pause, open, change, forget);
     section.append(acts);
 
     // The other notebooks in the vault, so moving between projects is
@@ -461,38 +493,77 @@ export class Vault {
       return section;
     }
 
-    const list = el('ul', { class: 'vault-files' });
-    for (const file of this.files) {
-      const li = el('li');
-      const info = el('div', { class: 'vault-file-info' });
-      info.append(
-        el('b', { text: file.path }),
-        el('span', { text: `${bytes(file.size)} · ${when(file.updatedAt)}` }),
-      );
+    section.append(this.drawTree(treeOf(this.files)));
+    return section;
+  }
 
-      const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open' });
-      open.addEventListener('click', async () => {
-        open.disabled = true;
-        const res = await this.api.vault.pull(file.path);
-        open.disabled = false;
-        if (!res.ok) this.toast(res.error, 'error');
+  /**
+   * The vault as its folders, not as a list of paths.
+   *
+   * A flat list was readable when a vault held a handful of documents pushed
+   * one at a time. A synced folder puts its whole shape up there — notebooks,
+   * sub-folders, a Journal with a year in it — and then every row reads
+   * `Journal/2026/today.md` and two notes called `today` are told apart by
+   * squinting at a prefix. Folders fold; what is inside them is indented.
+   */
+  drawTree(node, trail = '') {
+    const list = el('ul', { class: 'vault-tree' });
+
+    for (const [name, child] of [...node.folders.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+      const path = trail ? `${trail}/${name}` : name;
+      const box = el('details', { class: 'vault-dir' });
+      // Which folders are open survives a reload of the panel, so syncing a
+      // document does not close everything the reader had opened.
+      if (this.openDirs.has(path)) box.open = true;
+      box.addEventListener('toggle', () => {
+        if (box.open) this.openDirs.add(path);
+        else this.openDirs.delete(path);
       });
 
-      const del = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Delete' });
-      del.addEventListener('click', async () => {
-        if (!window.confirm(`Delete “${file.path}” from your vault? This cannot be undone.`)) return;
-        const res = await this.api.vault.remove(file.path);
-        if (!res.ok) return this.toast(res.error, 'error');
-        this.toast('Deleted from your vault');
-        await this.load();
-      });
-
-      li.append(info, el('div', { class: 'vault-row-acts' }, open, del));
-      list.append(li);
+      const count = countFiles(child);
+      box.append(el('summary', {},
+        el('span', { class: 'vault-dir-name', text: name }),
+        el('span', { class: 'vault-dir-count', text: `${count}` }),
+      ));
+      box.append(this.drawTree(child, path));
+      list.append(el('li', {}, box));
     }
 
-    section.append(list);
-    return section;
+    for (const file of node.files) {
+      list.append(el('li', {}, this.drawFileRow(file)));
+    }
+    return list;
+  }
+
+  drawFileRow(file) {
+    const row = el('div', { class: 'vault-file' });
+    const info = el('div', { class: 'vault-file-info' });
+    info.append(
+      el('b', { text: file.path.split('/').pop() }),
+      el('span', { text: `${bytes(file.size)} · ${when(file.updatedAt)}` }),
+    );
+    // The full name is still what identifies it, so it is still reachable.
+    info.title = file.path;
+
+    const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open' });
+    open.addEventListener('click', async () => {
+      open.disabled = true;
+      const res = await this.api.vault.pull(file.path);
+      open.disabled = false;
+      if (!res.ok) this.toast(res.error, 'error');
+    });
+
+    const del = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Delete' });
+    del.addEventListener('click', async () => {
+      if (!window.confirm(`Delete “${file.path}” from your vault? This cannot be undone.`)) return;
+      const res = await this.api.vault.remove(file.path);
+      if (!res.ok) return this.toast(res.error, 'error');
+      this.toast('Deleted from your vault');
+      await this.load();
+    });
+
+    row.append(info, el('div', { class: 'vault-row-acts' }, open, del));
+    return row;
   }
 
   // ---------- pushing ----------
