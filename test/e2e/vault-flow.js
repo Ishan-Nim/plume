@@ -12,7 +12,7 @@
 // Env: PLUME_VAULT_API (required — never point this at production),
 //      PLUME_SHOTS (directory for screenshots), PLUME_SIZE, PLUME_THEME.
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -72,6 +72,17 @@ const OPEN_VAULT = 'var p = document.querySelector("[data-panel=vault]");'
 const logs = [];
 const results = [];
 let failures = 0;
+
+// Linking a vault and deleting one from the account are confirmed by the main
+// process with a native dialog, which a headless run cannot click. The answers
+// are recorded so the run can assert that the question was asked at all —
+// that confirmation is the control, so a release that quietly dropped it
+// should fail here rather than pass.
+const asked = [];
+dialog.showMessageBox = async (_win, options) => {
+  asked.push(options.title || '');
+  return { response: 0, checkboxChecked: false };
+};
 
 function record(name, ok, detail) {
   results.push({ name, ok, detail });
@@ -203,6 +214,11 @@ async function main(win) {
   );
   record('linking a vault connects it to the account', linked,
     await read('(document.querySelector(".vault-current-info span")||{}).textContent'));
+
+  // The renderer's own confirm is not the control — a compromised renderer is
+  // exactly the case it would not survive. The main process has to ask too.
+  record('linking is confirmed by the main process, not only by the panel',
+    asked.some(t => /Link this vault/i.test(t)), asked.join(' | ') || '(nothing asked)');
 
   const synced = await until('document.querySelectorAll(".vault-tree .vault-file").length > 0', { timeout: 30000 });
   record('the vault’s documents reach the account', synced,

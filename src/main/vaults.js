@@ -351,8 +351,18 @@ function unlink(root) {
  */
 function readManifest(root) {
   const found = readJson(inside(root, file.manifest), null);
-  if (!found || typeof found.files !== 'object' || !found.files) return { rev: 0, files: {} };
-  return { rev: Number(found.rev) || 0, files: found.files };
+  // No prototype, because the keys are paths the server chose. A document
+  // called `__proto__` would otherwise not be stored at all — the assignment
+  // would reparent the object — and every lookup after it would answer about
+  // the wrong file.
+  const empty = () => ({ rev: 0, files: Object.create(null) });
+  if (!found || typeof found.files !== 'object' || !found.files) return empty();
+  const clean = Object.create(null);
+  for (const [key, value] of Object.entries(found.files)) {
+    if (key === '__proto__' || !value || typeof value !== 'object') continue;
+    clean[key] = value;
+  }
+  return { rev: Number(found.rev) || 0, files: clean };
 }
 
 function writeManifest(root, manifest) {

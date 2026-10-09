@@ -37,6 +37,7 @@ const crypto = require('node:crypto');
 
 const vault = require('./vault');
 const vaults = require('./vaults');
+const files = require('./files');
 
 // The only things that go up. Anything not named here stays on this computer.
 const SYNC_EXT = new Set([
@@ -129,11 +130,50 @@ function underPrefix(vaultPath, prefix) {
   return vaultPath === prefix || vaultPath.startsWith(`${prefix}/`);
 }
 
-/** Where a remote path lives inside the vault folder. */
+/**
+ * Where a remote path lives inside the vault folder, or null when it refuses
+ * to stay there.
+ *
+ * Every path that reaches this came off the wire, so it is somebody else's
+ * string: the account's own server, or anyone who has that account's
+ * credentials. Splitting it on "/" and handing the pieces to path.join is not
+ * enough — `Notes/../../../../Windows/Temp/evil.bat` passes a prefix check and
+ * lands wherever it likes, and the file it writes is server-chosen bytes under
+ * a server-chosen extension. So the shape is validated with the same rule the
+ * push side uses, and then containment is proved against the resolved path
+ * rather than argued from the segments.
+ */
 function localPathFor(folder, vaultPath, prefix) {
-  let parts = String(vaultPath).split('/').filter(Boolean);
+  let parts;
+  try {
+    // Folds "\" to "/", refuses control characters, absolute and drive-letter
+    // forms, "." and ".." segments, and anything nested absurdly deep.
+    parts = vault.cleanVaultPath(vaultPath).split('/');
+  } catch (err) {
+    return null;
+  }
   if (prefix && parts[0] === prefix) parts = parts.slice(1);
-  return path.join(folder, ...parts);
+  if (!parts.length) return null;
+
+  // Plume's own bookkeeping is never a destination: a remote copy of
+  // `.plume/sync/state.json` must not be able to rewrite this device's cursor.
+  if (parts[0] === vaults.DIR) return null;
+
+  // Checked segment by segment, before resolving. Windows drops a trailing dot
+  // or space from a path, so by the time the whole thing has been resolved the
+  // evidence is gone — `note.md ` has quietly become `note.md`, which is a
+  // different file. A colon is worse: `README.md:hidden` writes an alternate
+  // data stream that does not appear in a directory listing at all.
+  if (process.platform === 'win32'
+    && parts.some(p => p.includes(':') || /[. ]$/.test(p) || files.isWindowsDeviceName(p))) {
+    return null;
+  }
+
+  const root = path.resolve(folder);
+  const abs = path.resolve(root, ...parts);
+  const relative = path.relative(root, abs);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return null;
+  return abs;
 }
 
 // ---------- reading the folder ----------
@@ -181,6 +221,37 @@ async function walk(dir, root, out, depth = 0) {
     out.files.push({ localPath: full, size: stat.size, mtimeMs: stat.mtimeMs });
   }
   return out;
+}
+
+/**
+ * Whether writing here really lands inside the vault.
+ *
+ * `localPathFor` proves the *name* stays inside, which is not the same thing:
+ * a junction or a symlink in the vault is a name inside it that is a place
+ * outside it. The walk refuses to read through one, which is right for
+ * uploads — but it also means everything behind the link looks to the planner
+ * like a document that exists only in the account, and the write that follows
+ * goes straight through. Junctions need no privilege to create on Windows.
+ *
+ * The leaf usually does not exist yet, so the check is on the deepest ancestor
+ * that does.
+ */
+async function landsInside(root, target) {
+  const base = path.resolve(root);
+  let probe = path.dirname(path.resolve(target));
+  for (let i = 0; i < 64; i += 1) {
+    try {
+      const real = await fsp.realpath(probe);
+      const relative = path.relative(base, real);
+      return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+    } catch (err) {
+      if (err.code !== 'ENOENT') return false;
+      const up = path.dirname(probe);
+      if (up === probe) return false;
+      probe = up;
+    }
+  }
+  return false;
 }
 
 async function sha256Of(file) {
@@ -412,10 +483,15 @@ async function planSync(info) {
   // Only this vault's own part of the account. Another vault synced from
   // another machine is none of this one's business, and must not be pulled
   // into it or deleted because it is not here.
+  // Bounded, and type-checked per row: the listing is the server's array, and
+  // one that is enormous or malformed should cost a bad sync rather than the
+  // main process.
   const listing = await vault.list();
   const there = new Map();
-  for (const file of listing.files || []) {
-    if (underPrefix(file.path, prefix)) there.set(file.path, file);
+  for (const file of (listing.files || []).slice(0, MAX_FILES)) {
+    if (file && typeof file.path === 'string' && underPrefix(file.path, prefix)) {
+      there.set(file.path, file);
+    }
   }
 
   const plan = {
@@ -430,6 +506,10 @@ async function planSync(info) {
     const local = here.get(vaultPath) || null;
     const remote = there.get(vaultPath) || null;
     const localPath = local ? local.localPath : localPathFor(root, vaultPath, prefix);
+    // A remote path that will not live inside this vault is not this vault's
+    // business. Skipped rather than refused loudly: the rest of the sync is
+    // perfectly good, and one bad name should not stop it.
+    if (!localPath) continue;
     const base = baseFrom(manifest, vaultPath);
 
     if (local && (remote || base)) {
@@ -634,7 +714,10 @@ async function runOnce(root) {
     let downloaded = 0;
     for (const item of plan.pull) {
       try {
-        const got = await vault.pull(item.vaultPath, item.localPath);
+        if (!await landsInside(abs, item.localPath)) {
+          throw new Error('that name is a link out of the vault');
+        }
+        const got = await vault.pull(item.vaultPath, item.localPath, { within: abs });
         note(item.vaultPath, {
           hash: got.sha256,
           size: got.size,
@@ -653,7 +736,11 @@ async function runOnce(root) {
     for (const item of plan.conflict) {
       if (!fits.has(item.localPath)) continue;
       try {
-        await vault.pull(item.vaultPath, conflictPath(item.localPath));
+        const beside = conflictPath(item.localPath);
+        if (!await landsInside(abs, beside)) {
+          throw new Error('that name is a link out of the vault');
+        }
+        await vault.pull(item.vaultPath, beside, { within: abs });
         conflicts += 1;
       } catch (err) { blame(err); }
     }

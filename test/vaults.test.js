@@ -183,7 +183,7 @@ test('unlinking clears the base a sync would compare against', () => {
 
   const manifest = vaults.readManifest(dir);
   assert.equal(manifest.rev, 0);
-  assert.deepEqual(manifest.files, {});
+  assert.deepEqual(Object.keys(manifest.files), []);
   assert.equal(vaults.readState(dir).lastSyncedRev, 0);
 });
 
@@ -203,7 +203,31 @@ test('the manifest survives a round trip, and a damaged one is not fatal', () =>
 
   fs.writeFileSync(path.join(dir, '.plume', 'sync', 'manifest.json'), 'not json at all');
   const repaired = vaults.readManifest(dir);
-  assert.deepEqual(repaired, { rev: 0, files: {} });
+  assert.equal(repaired.rev, 0);
+  assert.deepEqual(Object.keys(repaired.files), []);
+});
+
+test('a document the server calls __proto__ cannot reparent the manifest', () => {
+  // The keys are paths somebody else chose. Assigning to `__proto__` on an
+  // ordinary object does not store anything — it reparents the object — so
+  // every lookup after it would answer about the wrong file.
+  const dir = tempDir();
+  vaults.create(dir);
+  fs.writeFileSync(
+    path.join(dir, '.plume', 'sync', 'manifest.json'),
+    '{"rev":1,"files":{"__proto__":{"hash":"evil"},"ok.md":{"hash":"good"}}}',
+  );
+
+  const manifest = vaults.readManifest(dir);
+  assert.equal(manifest.files['ok.md'].hash, 'good');
+  assert.equal(Object.getPrototypeOf(manifest.files), null, 'no prototype to reach');
+  assert.equal(manifest.files.hash, undefined, 'nothing leaked through a prototype');
+
+  // And a document genuinely called __proto__ is stored as a key, not applied.
+  manifest.files['__proto__'] = { hash: 'later' };
+  vaults.writeManifest(dir, manifest);
+  const back = vaults.readManifest(dir);
+  assert.equal(back.files['ok.md'].hash, 'good');
 });
 
 test('pausing a sync is remembered on this computer, not in the vault itself', () => {

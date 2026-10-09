@@ -36,6 +36,7 @@ function resolveApi() {
 const API = resolveApi();
 const TIMEOUT_MS = 30_000;
 const MAX_PUSH_BYTES = 10 * 1024 * 1024;
+const MAX_PULL_BYTES = 10 * 1024 * 1024;
 
 const SYNCABLE = new Set(['.md', '.markdown', '.mdown', '.mkd', '.mkdn', '.mdwn', '.mdtxt', '.mdtext', '.txt']);
 
@@ -466,7 +467,10 @@ async function remoteVaults() {
  */
 async function removeRemote(remoteName, onProgress) {
   requireSession();
-  const name = remoteNameFrom(remoteName);
+  // Taken as given. The caller canonicalises before it confirms, so
+  // normalising again here would act on a different vault than the one the
+  // person was shown — " Notes " and ".Notes" both land on "Notes".
+  const name = String(remoteName);
   const data = await call('/vault/list');
   const mine = (data.files || []).filter(f => remoteOf(f.path) === name);
 
@@ -534,11 +538,40 @@ async function push(localPath, vaultPath, { force = false, baseSha } = {}) {
   return { file: data.file, account: data.account, unchanged: data.unchanged, localPath };
 }
 
-/** Brings a vault document down to a local path. */
-async function pull(vaultPath, destPath) {
+/**
+ * Brings a vault document down to a local path.
+ *
+ * `within` is the folder the write must land in. The caller works that out and
+ * checks it too, but this is a public function that writes server-chosen bytes
+ * to a path derived from a server-chosen string — it should not be safe only
+ * because of who happens to call it.
+ */
+async function pull(vaultPath, destPath, { within = null } = {}) {
   requireSession();
+
+  if (within) {
+    const root = path.resolve(within);
+    const abs = path.resolve(destPath);
+    const relative = path.relative(root, abs);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new Error('That document will not stay inside the vault.');
+    }
+  }
+
   const res = await call(`/vault/file?path=${encodeURIComponent(vaultPath)}`);
+
+  // A length the server declares, and then the length it actually sent. The
+  // upload side has had a ceiling all along; without one here a single reply
+  // can take the main process down, and nothing but the server decides how
+  // big it is.
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_PULL_BYTES) {
+    throw new Error(`That document is larger than the ${Math.round(MAX_PULL_BYTES / 1048576)} MB limit.`);
+  }
   const body = Buffer.from(await res.arrayBuffer());
+  if (body.length > MAX_PULL_BYTES) {
+    throw new Error(`That document is larger than the ${Math.round(MAX_PULL_BYTES / 1048576)} MB limit.`);
+  }
 
   await fsp.mkdir(path.dirname(destPath), { recursive: true });
   await fsp.writeFile(destPath, body);
@@ -628,14 +661,11 @@ module.exports = {
   graph,
   push,
   pull,
-  saveConflictCopy,
   remove,
   unlink,
   linkFor,
   isSyncable,
   suggestVaultPath,
   cleanVaultPath,
-  collectFolder,
-  pushMany,
   SYNCABLE,
 };

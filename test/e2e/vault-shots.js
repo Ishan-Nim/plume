@@ -12,7 +12,7 @@
 //
 // Never point this at production: it creates an account.
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -70,6 +70,10 @@ const PASSWORD = 'shots-flow-password-1';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const OPEN_VAULT = 'var p = document.querySelector("[data-panel=vault]");'
   + ' if (p && p.hidden) document.getElementById("vault-bar").click();';
+
+// Linking is confirmed by the main process with a native dialog, which this
+// run cannot click. Answered yes so the shots reach the linked state.
+dialog.showMessageBox = async () => ({ response: 0, checkboxChecked: false });
 
 const taken = [];
 

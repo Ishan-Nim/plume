@@ -436,6 +436,16 @@ function isSavable(p) {
 const WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 
 /**
+ * True when a file name is a Windows device rather than a file. Opening
+ * `CON.md` for writing reaches the console, not the disk, on every Windows
+ * release there has ever been.
+ */
+function isWindowsDeviceName(name) {
+  const base = String(name || '');
+  return WIN_RESERVED.test(base.slice(0, base.length - path.extname(base).length));
+}
+
+/**
  * One name typed into the sidebar, cleaned up, or null when that text cannot
  * be a file or folder name.
  *
@@ -497,6 +507,7 @@ module.exports = {
   listDir,
   walkMarkdown,
   forgetVaultRoot,
+  isWindowsDeviceName,
   findVaultRoot,
   parseWikiTarget,
   resolveWiki,

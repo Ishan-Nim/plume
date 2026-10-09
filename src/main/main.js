@@ -1460,6 +1460,23 @@ handle('vaults:link', vaultResult(async (ctx, root) => {
   const account = vault.publicState();
   if (!account.signedIn) throw new Error('Sign in to link this vault to your account.');
 
+  // Asked here rather than only in the panel. Linking is the step that sends a
+  // folder to the cloud, and the promise that nothing goes up unless somebody
+  // says so is worth nothing if the only place it is kept is the renderer —
+  // which is the thing that would have gone wrong. It happens once per vault,
+  // so the dialog costs nobody anything they will notice.
+  const ask = await dialog.showMessageBox(ctx.win, {
+    type: 'question',
+    buttons: ['Link and start syncing', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Link this vault to your account',
+    message: `Sync “${found.name}” to ${account.email}?`,
+    detail: `Every document and image in ${abs} is uploaded to your account and kept `
+      + 'in step with it from now on. It counts against your storage.',
+  });
+  if (ask.response !== 0) return { canceled: true };
+
   // A remote vault is one top-level folder of the account's store, so the
   // name has to be free: linking two vaults under one name would merge them.
   const remotes = await vault.remoteVaults();
@@ -1554,10 +1571,31 @@ handle('vaults:clone', vaultResult(async (ctx, remoteName) => {
  * folded into unlinking.
  */
 handle('vaults:deleteRemote', vaultResult(async (ctx, remoteName) => {
-  const name = str(remoteName, 200);
-  if (name.includes('/') || name.includes('\\') || name.includes('..')) {
-    throw new Error('That is not a vault in your account.');
-  }
+  // Canonicalised before it is checked, and before anybody is asked about it.
+  // Validating the raw string and normalising afterwards means the vault that
+  // gets deleted can be a different one from the vault that was named:
+  // " Notes ", ".Notes" and a 121-character name all land on "Notes".
+  const name = vault.remoteNameFrom(str(remoteName, 200));
+  const remotes = await vault.remoteVaults();
+  const target = remotes.vaults.find(v => v.name === name);
+  if (!target) throw new Error('That is not a vault in your account.');
+
+  // Irreversible, and the only thing here that frees storage. The panel asks
+  // too, but a confirmation inside the renderer is no confirmation at all if
+  // the renderer is the thing that has gone wrong.
+  const ask = await dialog.showMessageBox(ctx.win, {
+    type: 'warning',
+    buttons: ['Delete from account', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Delete a vault from your account',
+    message: `Delete “${name}” from ${vault.publicState().email}?`,
+    detail: `${target.documents} document${target.documents === 1 ? '' : 's'} are removed from `
+      + 'the cloud and the space is freed. Copies on your computers are left where '
+      + 'they are, and stop syncing.\n\nThis cannot be undone.',
+  });
+  if (ask.response !== 0) return { canceled: true };
+
   const result = await vault.removeRemote(name, progress => {
     if (!ctx.win.isDestroyed()) ctx.win.webContents.send('vault:progress', progress);
   });
