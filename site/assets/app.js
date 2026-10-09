@@ -92,7 +92,7 @@
     mode = next;
     $('tab-signup').setAttribute('aria-pressed', String(next === 'signup'));
     $('tab-login').setAttribute('aria-pressed', String(next === 'login'));
-    $('auth-submit').textContent = next === 'signup' ? 'Create my vault' : 'Sign in';
+    $('auth-submit').textContent = next === 'signup' ? 'Create my account' : 'Sign in';
     $('password').setAttribute('autocomplete', next === 'signup' ? 'new-password' : 'current-password');
     $('pw-hint').hidden = next !== 'signup';
     // Only offered where it makes sense: there is nothing to reset until there
@@ -157,7 +157,7 @@
     }
   });
 
-  // Hiding the panel is not forgetting it: the email, the file list and the
+  // Hiding the panel is not forgetting it: the email, the vault list and the
   // last opened document would otherwise still be in the DOM for whoever sits
   // down next, and would flash on screen during the next sign-in.
   function clearVaultUi() {
@@ -165,8 +165,10 @@
       $(id).textContent = '—';
     });
     $('v-bar').style.width = '0%';
-    $('file-list').textContent = '';
+    $('vault-list').textContent = '';
     $('file-empty').hidden = true;
+    paintDest([]);
+    destNew.value = '';
     $('viewer-name').textContent = '—';
     $('viewer-body').textContent = '';
     viewer.classList.remove('show');
@@ -199,9 +201,21 @@
 
   $('signout').addEventListener('click', signOut);
 
-  // ---------- the vault ----------
+  // ---------- the account, read as its vaults ----------
 
   var vaultMsg = $('vault-msg');
+
+  function vaultCount() {
+    var seen = Object.create(null);
+    var n = 0;
+    state.files.forEach(function (file) {
+      var cut = String(file.path).indexOf('/');
+      if (cut < 1) return;
+      var name = String(file.path).slice(0, cut);
+      if (!seen[name]) { seen[name] = true; n += 1; }
+    });
+    return n;
+  }
 
   function paintAccount(account) {
     state.account = account;
@@ -210,20 +224,69 @@
     var pct = account.quotaBytes > 0 ? Math.min(100, (account.usedBytes / account.quotaBytes) * 100) : 0;
     $('v-bar').style.width = pct.toFixed(1) + '%';
     $('v-used').textContent = bytes(account.usedBytes) + ' of ' + bytes(account.quotaBytes) + ' used';
-    $('v-files').textContent = account.fileCount + (account.fileCount === 1 ? ' document' : ' documents');
+
+    // Two numbers, because they are governed by different rules: documents and
+    // their bytes count against the quota, the vaults holding them do not.
+    var vaults = vaultCount();
+    var docs = account.fileCount + (account.fileCount === 1 ? ' document' : ' documents');
+    $('v-files').textContent = vaults
+      ? docs + ' in ' + vaults + (vaults === 1 ? ' vault' : ' vaults')
+      : docs;
   }
 
-  // The vault read as its folders, the way the app reads it. A synced folder
-  // puts its whole shape up here — notebooks, sub-folders, a Journal with a
-  // year in it — and a flat list of paths stops being readable the moment it
-  // does. Which folders are open is remembered, so deleting a document does
-  // not fold everything up again.
-  var openDirs = Object.create(null);
+  // A linked vault occupies one top-level folder of the account, named after
+  // the vault, so the first path segment is the vault and the rest is the
+  // document inside it: 'Field Notes/Journal/today.md' is 'Journal/today.md'
+  // in the vault 'Field Notes'. A path with no slash at all belongs to no
+  // vault — those are leftovers from before 1.8 — and is shown as what it is
+  // rather than dressed up as one.
+  function vaultsOf(files) {
+    var by = Object.create(null);
+    var order = [];
+    var loose = [];
 
-  function treeOf(files) {
+    files.forEach(function (file) {
+      var path = String(file.path);
+      var cut = path.indexOf('/');
+      if (cut < 1) { loose.push(file); return; }
+      var name = path.slice(0, cut);
+      if (!by[name]) {
+        by[name] = { name: name, loose: false, files: [], bytes: 0 };
+        order.push(name);
+      }
+      by[name].files.push(file);
+      by[name].bytes += file.size || 0;
+    });
+
+    var list = order.sort(function (a, b) { return a.localeCompare(b); })
+      .map(function (name) { return by[name]; });
+
+    if (loose.length) {
+      list.push({
+        name: 'Loose documents',
+        loose: true,
+        files: loose,
+        bytes: loose.reduce(function (sum, f) { return sum + (f.size || 0); }, 0),
+      });
+    }
+
+    return list;
+  }
+
+  // The vault read as its folders, the way the app reads it. A linked vault
+  // puts its whole shape up here — sub-folders, a Journal with a year in it —
+  // and a flat list of paths stops being readable the moment it does. Which
+  // vaults and folders are open is remembered, so deleting a document does not
+  // fold everything up again.
+  var openDirs = Object.create(null);
+  var openVaults = Object.create(null);
+
+  // `skip` drops the leading segments that the heading above the tree already
+  // says — the vault's own name, which would otherwise be a folder inside it.
+  function treeOf(files, skip) {
     var root = { dirs: Object.create(null), order: [], files: [] };
     files.forEach(function (file) {
-      var parts = String(file.path).split('/').filter(Boolean);
+      var parts = String(file.path).split('/').filter(Boolean).slice(skip || 0);
       var node = root;
       for (var i = 0; i < parts.length - 1; i += 1) {
         var seg = parts[i];
@@ -251,7 +314,8 @@
     n.className = 'n';
     var b = document.createElement('b');
     b.textContent = file.path.split('/').pop();
-    // The full name is still what identifies it.
+    // The full path, vault segment and all, is still what identifies it — and
+    // it is what every request below sends.
     n.title = file.path;
     var s = document.createElement('span');
     s.textContent = bytes(file.size) + ' · updated ' + when(file.updatedAt);
@@ -325,21 +389,144 @@
     node.files.forEach(function (file) { into.appendChild(fileRow(file)); });
   }
 
-  function paintFiles(files) {
+  function paintVaults(files) {
     state.files = files;
-    var list = $('file-list');
+    var list = $('vault-list');
     list.textContent = '';
-    $('file-empty').hidden = files.length > 0;
-    paintTree(treeOf(files), list, '');
+
+    var vaults = vaultsOf(files);
+    $('file-empty').hidden = vaults.length > 0;
+
+    vaults.forEach(function (vault) {
+      var li = document.createElement('li');
+
+      var box = document.createElement('details');
+      box.className = 'vault' + (vault.loose ? ' loose' : '');
+      // One vault on its own is the whole list, so it opens; several, and
+      // opening them all would be the flat pile again under new headings.
+      box.open = vault.name in openVaults ? openVaults[vault.name] : vaults.length === 1;
+      box.addEventListener('toggle', function () { openVaults[vault.name] = box.open; });
+
+      var sum = document.createElement('summary');
+      var name = document.createElement('span');
+      name.className = 'vault-name';
+      name.textContent = vault.name;
+      var meta = document.createElement('span');
+      meta.className = 'vault-meta';
+      meta.textContent = vault.files.length + (vault.files.length === 1 ? ' document · ' : ' documents · ')
+        + bytes(vault.bytes);
+      sum.appendChild(name);
+      sum.appendChild(meta);
+      box.appendChild(sum);
+
+      if (vault.loose) {
+        var why = document.createElement('p');
+        why.className = 'vault-note';
+        why.textContent = 'At the root of the account, in no vault. Plume synced documents this way '
+          + 'before 1.8; they are still here, and still yours to read or delete.';
+        box.appendChild(why);
+      }
+
+      var inner = document.createElement('ul');
+      inner.className = 'files';
+      paintTree(treeOf(vault.files, vault.loose ? 0 : 1), inner, vault.name);
+      box.appendChild(inner);
+
+      li.appendChild(box);
+      list.appendChild(li);
+    });
+
+    paintDest(vaults);
   }
 
   async function refresh() {
     var data = await apiJson('/vault/list');
+    paintVaults(data.files);
     paintAccount(data.account);
-    paintFiles(data.files);
     loadGraph();
     loadTokens();
   }
+
+  // ---------- where an upload lands ----------
+  //
+  // Documents belong to vaults now, so a drop with no destination has nowhere
+  // honest to go. The destination is chosen before anything is sent, and an
+  // upload with none is refused rather than guessed at.
+
+  var destSel = $('dest-vault');
+  var destNew = $('dest-new');
+  var dropWhere = $('drop-where');
+
+  function paintDest(vaults) {
+    var keep = destSel.value;
+    destSel.textContent = '';
+
+    var first = document.createElement('option');
+    first.value = '';
+    first.textContent = 'Choose a vault…';
+    destSel.appendChild(first);
+
+    vaults.forEach(function (vault) {
+      // Loose documents are a leftover, not a place to put anything new.
+      if (vault.loose) return;
+      var opt = document.createElement('option');
+      opt.value = 'v:' + vault.name;
+      opt.textContent = vault.name;
+      destSel.appendChild(opt);
+    });
+
+    var fresh = document.createElement('option');
+    fresh.value = 'n';
+    fresh.textContent = 'New vault…';
+    destSel.appendChild(fresh);
+
+    // A choice survives the refresh that follows every upload and delete.
+    destSel.value = '';
+    for (var i = 0; i < destSel.options.length; i += 1) {
+      if (destSel.options[i].value === keep) { destSel.value = keep; break; }
+    }
+    syncDest();
+  }
+
+  // A vault is one top-level folder, so its name is one path segment: no
+  // slashes, and nothing that would read as a dotfile on disk.
+  function destination() {
+    var picked = destSel.value;
+    var name = picked === 'n' ? destNew.value.trim() : (picked.slice(0, 2) === 'v:' ? picked.slice(2) : '');
+    if (!name || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.charAt(0) === '.') return '';
+    return name;
+  }
+
+  function syncDest() {
+    destNew.hidden = destSel.value !== 'n';
+    var into = destination();
+    if (into) {
+      dropWhere.textContent = 'Files land in ' + into + '.';
+    } else if (destSel.value === 'n') {
+      dropWhere.textContent = destNew.value.trim()
+        ? 'A vault name is one folder name — no slashes.'
+        : 'Name the new vault, and Plume on your computers can clone it from here.';
+    } else {
+      dropWhere.textContent = 'Pick a vault first — nothing is uploaded until a document has somewhere to go.';
+    }
+  }
+
+  function selectVault(name) {
+    for (var i = 0; i < destSel.options.length; i += 1) {
+      if (destSel.options[i].value === 'v:' + name) {
+        destSel.value = 'v:' + name;
+        destNew.value = '';
+        break;
+      }
+    }
+    syncDest();
+  }
+
+  destSel.addEventListener('change', function () {
+    syncDest();
+    if (destSel.value === 'n') destNew.focus();
+  });
+  destNew.addEventListener('input', syncDest);
 
   // ---------- API tokens ----------
 
@@ -445,7 +632,7 @@
       dot.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:99px;margin-right:6px;'
         + 'background:hsl(' + [262, 190, 36, 150, 320, 12, 212, 96][i % 8] + ' 62% 58%)';
       var label = document.createElement('b');
-      label.textContent = folder === '' ? 'Top level' : folder;
+      label.textContent = folder === '' ? 'No vault' : folder;
       item.appendChild(dot);
       item.appendChild(label);
       legend.appendChild(item);
@@ -467,7 +654,7 @@
     }
 
     if (!data.nodes.length) {
-      empty.textContent = 'Sync some documents and the links between them appear here.';
+      empty.textContent = 'Link a vault and the links between its documents appear here.';
       empty.hidden = false;
       if (graph) graph.setData([], []);
       paintLegend([]);
@@ -579,10 +766,11 @@
   }
 
   async function removeFile(file) {
-    if (!window.confirm('Delete "' + file.path + '" from your vault? This cannot be undone.')) return;
+    // Deleting here deletes from the account only. The copy in the vault on
+    // your own disk is untouched, and will be pushed back up on the next sync.
+    if (!window.confirm('Delete "' + file.path + '" from your account? This cannot be undone.')) return;
     try {
-      var data = await apiJson('/vault/file?path=' + encodeURIComponent(file.path), { method: 'DELETE' });
-      paintAccount(data.account);
+      await apiJson('/vault/file?path=' + encodeURIComponent(file.path), { method: 'DELETE' });
       await refresh();
       note(vaultMsg, 'Deleted.', 'ok');
     } catch (err) {
@@ -593,6 +781,14 @@
   // ---------- uploading ----------
 
   async function upload(files) {
+    var into = destination();
+    if (!into) {
+      note(vaultMsg, destSel.value === 'n'
+        ? 'Name the new vault first — one folder name, no slashes.'
+        : 'Choose which vault these go into first.');
+      return;
+    }
+
     var done = 0;
     var failed = [];
 
@@ -600,7 +796,7 @@
       var file = files[i];
       try {
         var buf = await file.arrayBuffer();
-        await apiJson('/vault/file?path=' + encodeURIComponent(file.name), {
+        await apiJson('/vault/file?path=' + encodeURIComponent(into + '/' + file.name), {
           method: 'PUT',
           body: buf,
         });
@@ -610,19 +806,32 @@
       }
     }
 
+    // Open the vault the files went into, so the result of the drop is on
+    // screen rather than behind a closed heading.
+    if (done) openVaults[into] = true;
     try { await refresh(); } catch (e) { /* the message below still applies */ }
+    // A vault that did not exist a moment ago is in the list now; stay pointed
+    // at it, so a second drop does not need choosing all over again.
+    if (done) selectVault(into);
 
     if (failed.length) {
       note(vaultMsg, failed.join('  ·  '));
     } else {
-      note(vaultMsg, done + (done === 1 ? ' file added.' : ' files added.'), 'ok');
+      note(vaultMsg, done + (done === 1 ? ' file added to ' : ' files added to ') + into + '.', 'ok');
     }
   }
 
   var drop = $('drop');
   var input = $('file-input');
 
-  $('pick').addEventListener('click', function () { input.click(); });
+  $('pick').addEventListener('click', function () {
+    if (!destination()) {
+      note(vaultMsg, 'Choose which vault these go into first.');
+      destSel.focus();
+      return;
+    }
+    input.click();
+  });
   input.addEventListener('change', function () {
     if (input.files.length) upload(input.files);
     input.value = '';
@@ -647,6 +856,7 @@
   // ---------- start ----------
 
   setMode('signup');
+  syncDest();
   if (state.token) {
     showVault();
   }

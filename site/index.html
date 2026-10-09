@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Plume — a feather-light Markdown viewer</title>
-<meta name="description" content="Double-click any .md file and it opens instantly. Read it, edit it, and sync a folder to a free 100 MB vault. Open source for Windows, macOS and Linux.">
+<meta name="description" content="Double-click any .md file and it opens instantly. Read it, edit it, and turn a folder into a vault when you want backlinks, a graph and sync. Open source for Windows, macOS and Linux.">
 <link rel="canonical" href="https://plume-md.com/">
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon.png">
@@ -111,11 +111,11 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "Plume",
-  "description": "A feather-light Markdown viewer and editor for Windows, macOS and Linux. Opens any .md file instantly, renders Obsidian-flavoured Markdown, Mermaid diagrams and KaTeX maths, and syncs a folder to a free 100 MB vault.",
+  "description": "A feather-light Markdown viewer and editor for Windows, macOS and Linux. Opens any .md file instantly, renders Obsidian-flavoured Markdown, Mermaid diagrams and KaTeX maths, and turns a folder into a vault with backlinks, a graph and optional sync to a free 100 MB account.",
   "applicationCategory": "Productivity",
   "applicationSubCategory": "Markdown viewer",
   "operatingSystem": "Windows 10, Windows 11, macOS 11+, Linux",
-  "softwareVersion": "1.7.0",
+  "softwareVersion": "1.8.0",
   "url": "https://plume-md.com/",
   "downloadUrl": "https://plume-md.com/download.html",
   "installUrl": "https://plume-md.com/download.html",
@@ -144,7 +144,8 @@
     "Edit and save in the same window",
     "New notes and folders from the sidebar, named in the tree",
     "Rename, move and delete in the file tree, rewriting the links that pointed there",
-    "Free 100 MB vault with folder sync",
+    "Vaults: a folder becomes one when you ask, with no account needed",
+    "Unlimited vaults; sync them to a free 100 MB account, one at a time",
     "Graph view of how documents link",
     "MCP server, so an assistant can use the vault as memory",
     "Nine languages"
@@ -203,7 +204,7 @@
       "name": "Is Plume free?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes, entirely. Plume is free and open source under the MIT licence, and the 100 MB vault costs nothing either. There is no paid tier."
+        "text": "Yes, entirely. Plume is free and open source under the MIT licence, and the 100 MB that comes with an account costs nothing either. There is no paid tier."
       }
     },
     {
@@ -211,7 +212,7 @@
       "name": "Does Plume work offline?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. Plume opens and edits Markdown files on your own computer with no account and no connection. The vault is opt-in; sign in only if you want documents on more than one machine."
+        "text": "Yes. Plume opens and edits Markdown files on your own computer with no account and no connection, and a vault works the same way: it needs no account and no network unless you link it to one. Sign in only if you want a vault on more than one machine."
       }
     },
     {
@@ -235,7 +236,7 @@
       "name": "Does Plume send my documents anywhere?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No. Plume has no telemetry, and a document only leaves your computer if you sign in to a vault and sync it on purpose."
+        "text": "No. Plume has no telemetry. A document only leaves your computer if it is in a vault you have linked to your account on purpose; a folder you merely opened cannot sync at all."
       }
     },
     {
@@ -284,13 +285,14 @@
   <div class="hero">
     <div class="wrap">
       <a class="eyebrow" href="https://github.com/Ishan-Nim/plume/releases/latest">
-        <b>New</b> Plume <span data-version>1.7.0</span> is out
+        <b>New</b> Plume <span data-version>1.8.0</span> is out
       </a>
       <h1>Markdown, <em>beautifully</em> set.</h1>
       <p class="lede">
         Double-click any <code class="inline-code">.md</code> file and it opens instantly.
-        Click a paragraph to edit it where it sits, and if you want, have it waiting on your
-        other computer.
+        Click a paragraph to edit it where it sits. Make the folder a vault when you want the
+        whole of it joined up — and link it to your account only if you want it on another
+        computer.
       </p>
       <div class="hero-cta">
         <a class="btn btn-primary btn-lg" href="download.html" data-auto-download>
@@ -348,8 +350,8 @@
 
         <article class="card">
           <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 17.6A4 4 0 0018 10h-1.3A7 7 0 104 15.9"/><path d="M12 12v9m0 0l-3.5-3.5M12 21l3.5-3.5"/></svg></div>
-          <h3>Syncs a folder</h3>
-          <p>Pick one folder and a free 100&nbsp;MB vault keeps it on your other machines.</p>
+          <h3>Vaults, when you ask</h3>
+          <p>Make a folder a vault and it gains backlinks, search and a graph across all of it — no account needed. Link it to one and it syncs.</p>
         </article>
       </div>
 
@@ -407,7 +409,7 @@
     <div class="wrap">
       <div class="section-head center">
         <h2>Read your Markdown today.</h2>
-        <p>Free, open source, and about as heavy as a feather. Version <span data-version>1.7.0</span>.</p>
+        <p>Free, open source, and about as heavy as a feather. Version <span data-version>1.8.0</span>.</p>
       </div>
       <a class="btn btn-primary btn-lg" href="download.html" data-auto-download>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>

@@ -12,6 +12,13 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
+const os = require('node:os');
+const fs = require('node:fs');
+
+// sync.js asks vaults.js which computer this is, to name a conflict copy.
+// Outside a window there is no userData folder, so it is told where to look.
+process.env.PLUME_USER_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-sync-test-'));
+
 const sync = require(path.join(__dirname, '..', 'src', 'main', 'sync.js'));
 
 const file = sha => ({ sha256: sha });
@@ -94,14 +101,59 @@ test('nothing is ever destroyed to settle a disagreement', () => {
   }
 });
 
-test('a vault path becomes a path inside the folder, and never outside it', () => {
-  const root = path.join(path.sep, 'notes');
+test('a vault path becomes a path inside the folder', () => {
+  const root = path.resolve(path.join(path.sep, 'notes'));
   assert.strictEqual(sync.localPathFor(root, 'a.md'), path.join(root, 'a.md'));
   assert.strictEqual(sync.localPathFor(root, 'Journal/2026/a.md'),
     path.join(root, 'Journal', '2026', 'a.md'));
   // Empty segments are dropped rather than producing a path that walks up.
   assert.strictEqual(sync.localPathFor(root, 'Journal//a.md'),
     path.join(root, 'Journal', 'a.md'));
+});
+
+test('a vault path that will not stay inside the folder is refused', () => {
+  // Every path here came off the wire — it is the account's server talking, or
+  // anyone holding that account's credentials. A name that walks out of the
+  // vault would write server-chosen bytes under a server-chosen extension
+  // anywhere the user can write: a Startup folder, a shell profile, a DLL
+  // beside an installed program.
+  const root = path.resolve(path.join(path.sep, 'notes'));
+  const outside = [
+    'Notes/../../../../Windows/Temp/evil.bat',
+    '../evil.md',
+    'Notes/../../evil.md',
+    // Windows reads a backslash as a separator too, so folding it must happen
+    // before the path is split rather than after.
+    'Notes/\..\..\evil.bat',
+    '/etc/cron.d/evil',
+    'C:/Windows/Temp/evil.bat',
+    // The vault's own bookkeeping is never a destination: a remote copy of
+    // state.json must not be able to rewrite this device's sync cursor.
+    '.plume/sync/state.json',
+    '',
+    '.',
+    '..',
+  ];
+  for (const name of outside) {
+    assert.strictEqual(sync.localPathFor(root, name, 'Notes'), null,
+      `${JSON.stringify(name)} must not resolve to a path`);
+  }
+});
+
+test('a name Windows would read as something else is refused', () => {
+  const root = path.resolve(path.join(path.sep, 'notes'));
+  if (process.platform !== 'win32') return;
+  // An alternate data stream is invisible in a directory listing, and a
+  // trailing dot or space reaches a different file than the name reads as.
+  assert.strictEqual(sync.localPathFor(root, 'README.md:hidden'), null);
+  assert.strictEqual(sync.localPathFor(root, 'Journal/today.md:hidden'), null);
+  assert.strictEqual(sync.localPathFor(root, 'note.md.'), null);
+  // A device, not a file: opening CON.md for writing reaches the console.
+  assert.strictEqual(sync.localPathFor(root, 'CON.md'), null);
+  assert.strictEqual(sync.localPathFor(root, 'Journal/NUL.md'), null);
+  // A trailing space is simply trimmed away, which leaves the name the reader
+  // would have written — that one is normalised rather than refused.
+  assert.strictEqual(sync.localPathFor(root, 'note.md '), path.join(root, 'note.md'));
 });
 
 test('only documents and images are ever uploaded', () => {
@@ -128,7 +180,7 @@ test('a folder takes a folder of its own inside the vault, named after itself', 
 });
 
 test('a document is named under its folder, and comes back to the same place', () => {
-  const root = path.join(path.sep, 'notes');
+  const root = path.resolve(path.join(path.sep, 'notes'));
   const file = path.join(root, 'Journal', 'today.md');
   const vaultPath = sync.vaultPathFor(file, root, 'Journal');
   assert.strictEqual(vaultPath, 'Journal/Journal/today.md');
@@ -139,7 +191,7 @@ test('a document is named under its folder, and comes back to the same place', (
 test('without a prefix, names are what they always were', () => {
   // An account syncing before vaults held more than one notebook keeps its
   // documents where it put them, rather than re-uploading the lot.
-  const root = path.join(path.sep, 'notes');
+  const root = path.resolve(path.join(path.sep, 'notes'));
   const file = path.join(root, 'a.md');
   assert.strictEqual(sync.vaultPathFor(file, root, ''), 'a.md');
   assert.strictEqual(sync.localPathFor(root, 'a.md', ''), file);
@@ -160,7 +212,7 @@ test('a folder only ever sees its own part of the vault', () => {
 test('a deep document keeps the name of the notebook it belongs to', () => {
   // The vault accepts twelve segments. The prefix is the one that cannot be
   // trimmed away, because it is what says which notebook this is.
-  const root = path.join(path.sep, 'notes');
+  const root = path.resolve(path.join(path.sep, 'notes'));
   const deep = path.join(root, ...Array.from({ length: 14 }, (_, i) => `d${i}`), 'note.md');
   const vaultPath = sync.vaultPathFor(deep, root, 'Journal');
   const parts = vaultPath.split('/');
@@ -188,4 +240,58 @@ test('ordinary tidying is not stopped', () => {
   assert.ok(!sync.alarming(12, 200), 'a dozen out of two hundred is tidying');
   assert.ok(!sync.alarming(3, 3), 'three documents is not an accident');
   assert.ok(!sync.alarming(0, 47), 'nothing to delete');
+});
+
+// ---------------------------------------------------------------------------
+// Conflict copies
+//
+// When both sides moved, both are kept. The copy that comes down has to be
+// told apart from the one that was already here, and from a conflict on
+// another machine last week — so it is named for the day and the computer.
+
+test('a conflict copy sits beside the original, named for the day and the machine', () => {
+  const made = sync.conflictPath(path.join('C:', 'Notes', 'idea.md'));
+  const name = path.basename(made);
+
+  assert.equal(path.dirname(made), path.join('C:', 'Notes'), 'beside the original');
+  assert.ok(name.startsWith('idea (conflict '), `got ${name}`);
+  assert.ok(name.endsWith('.md'), 'still a Markdown file, so it opens like one');
+  assert.match(name, /\(conflict \d{4}-\d{2}-\d{2} /, 'the day it happened');
+});
+
+test('a conflict copy never overwrites the document it is a copy of', () => {
+  const original = path.join('C:', 'Notes', 'idea.md');
+  assert.notEqual(sync.conflictPath(original), original);
+});
+
+// ---------------------------------------------------------------------------
+// Naming a vault in the account
+//
+// A remote vault is one top-level folder of the account's store. Two vaults
+// linked under one name would merge into one notebook, so a name that is
+// taken is never handed out twice.
+
+const vault = require(path.join(__dirname, '..', 'src', 'main', 'vault.js'));
+
+test('a vault name becomes a folder name the account will accept', () => {
+  assert.equal(vault.remoteNameFrom('My Notes'), 'My Notes');
+  assert.equal(vault.remoteNameFrom('Work/2026'), 'Work 2026', 'no second level smuggled in');
+  assert.equal(vault.remoteNameFrom('..'), 'Vault', 'never a step outside');
+  assert.equal(vault.remoteNameFrom('.hidden'), 'hidden');
+  assert.equal(vault.remoteNameFrom(''), 'Vault');
+  assert.equal(vault.remoteNameFrom(null), 'Vault');
+});
+
+test('a name already in use is not handed out a second time', () => {
+  assert.equal(vault.freeRemoteName('Notes', []), 'Notes');
+  assert.equal(vault.freeRemoteName('Notes', ['Notes']), 'Notes 2');
+  assert.equal(vault.freeRemoteName('Notes', ['Notes', 'Notes 2']), 'Notes 3');
+  // Case is not a distinction the store can be trusted to make.
+  assert.equal(vault.freeRemoteName('Notes', ['notes']), 'Notes 2');
+});
+
+test('a document names the vault it belongs to', () => {
+  assert.equal(vault.remoteOf('Work Notes/Projects/plan.md'), 'Work Notes');
+  // A document at the top of the store belongs to no vault at all.
+  assert.equal(vault.remoteOf('stray.md'), '');
 });

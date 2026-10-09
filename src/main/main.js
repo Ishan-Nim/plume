@@ -16,6 +16,7 @@ const settings = require('./settings');
 const files = require('./files');
 const links = require('./links');
 const vault = require('./vault');
+const vaults = require('./vaults');
 const sync = require('./sync');
 const git = require('./git');
 const updater = require('./updater');
@@ -131,9 +132,13 @@ function onReady() {
   if (paths.length) paths.forEach(openPath);
   else createWindow(null);
 
-  // The folder picks up where it left off, including anything changed while
-  // Plume was closed.
-  setTimeout(() => sync.start(), 1500);
+  // Every linked vault picks up where it left off, including anything changed
+  // while Plume was closed. An older Plume's single synced folder becomes a
+  // linked vault first, so nobody loses a sync by updating.
+  setTimeout(() => {
+    migrateLegacySync();
+    sync.start();
+  }, 1500);
 
   // The same for Git, if a folder is set: one round shortly after the window
   // is usable, so a machine that was off picks up what arrived meanwhile, then
@@ -153,6 +158,35 @@ function onReady() {
   app.on('activate', () => {
     if (!liveWindows().length) createWindow(null);
   });
+}
+
+/**
+ * Carries an older Plume's one synced folder across to being a linked vault.
+ *
+ * Runs once, and is a no-op for anybody installing Plume fresh. What it must
+ * never do is leave somebody who was syncing yesterday with nothing syncing
+ * today, so it is deliberately quiet about failure: a folder that has since
+ * been deleted, or a disk that will not take a `.plume/`, leaves the settings
+ * untouched and the question open rather than throwing on launch.
+ */
+function migrateLegacySync() {
+  const here = settings.get();
+  if (here.migratedVaults || !here.vaultFolder) return;
+  try {
+    const account = vault.publicState();
+    vaults.adoptLegacy({
+      folder: here.vaultFolder,
+      prefix: here.vaultPrefix,
+      paused: here.syncPaused,
+      accountId: account.account ? account.account.id : null,
+      accountEmail: account.email,
+    });
+    settings.update({ migratedVaults: true });
+    files.forgetVaultRoot();
+    broadcastSettings();
+  } catch (err) {
+    // Tried again next launch; nothing has been changed on either side.
+  }
 }
 
 // macOS needs an application menu for Quit, Hide and the clipboard shortcuts,
@@ -1066,18 +1100,24 @@ handle('app:openFolder', async ctx => {
     buttonLabel: 'Open folder',
   });
   if (canceled || !filePaths.length) return { canceled: true };
-  settings.update({ folder: filePaths[0] });
+  const folder = filePaths[0];
+  settings.update({ folder });
   broadcastSettings();
-  // Nothing starts syncing here. This only tells the windows what the sync
-  // state is now, so the vault panel can offer this folder by name.
-  sync.refresh();
-  return { folder: filePaths[0], vaultFolder: settings.get().vaultFolder };
+
+  // A folder opened here is loose unless it already carries a `.plume/`.
+  // Nothing is created and nothing starts syncing: this only tells the
+  // windows what the folder is, so the panel can offer to make it a vault.
+  const root = vaults.find(folder);
+  if (root) vaults.remember(root);
+  broadcastVaults();
+  return { folder, vault: root ? vaults.read(root) : null };
 });
 
-handle('app:forgetFolder', () => {
+handle('app:forgetFolder', ctx => {
   settings.update({ folder: null });
   broadcastSettings();
-  return { folder: null };
+  broadcastVaults();
+  return { folder: null, view: vaultView(ctx) };
 });
 
 // Extra windows for dropped files and Ctrl+clicked links: documents only, so
@@ -1247,7 +1287,7 @@ function vaultResult(fn) {
 function broadcastVault() {
   const state = vault.publicState();
   for (const win of liveWindows()) win.webContents.send('vault:changed', state);
-  // Signing in or out starts or stops the folder sync.
+  // Signing out stops every linked vault at once; signing in starts them.
   sync.refresh();
 }
 
@@ -1291,49 +1331,285 @@ handle('update:skip', vaultResult(async (_ctx, version) => {
   return { skipped: version };
 }));
 
-// Syncing the folder already open, which is the usual way a vault starts.
+// ---------------------------------------------------------------------------
+// Vaults
 //
-// Nothing here happens on its own. Signing in creates no vault and syncs no
-// folder: the local copy is the one that matters, and the cloud is where it
-// is carried between computers, so connecting the two is something a person
-// asks for about a folder they name. An account with no synced folder is a
-// perfectly ordinary state, and the state everybody is in to begin with.
-handle('sync:adopt', vaultResult(async () => {
-  const folder = settings.get().folder;
-  if (!folder) throw new Error('Open a folder first.');
-  const look = await sync.preview(folder);
-  settings.update({
-    vaultFolder: folder,
-    vaultPrefix: sync.prefixFor(folder),
-    syncPaused: false,
-  });
+// A folder on disk is never silently a vault. Opening one lets you read and
+// write every Markdown file in it and commits Plume to nothing: no identity,
+// no index, and nothing that could ever be uploaded. It stays loose until
+// somebody chooses Create Vault, which writes `.plume/` into it and is the
+// whole of the claim.
+//
+// Linking is a second, separate choice. Signing in links nothing and syncs
+// nothing: the copy on this disk is the real one, and connecting it to an
+// account is a decision made about one vault, by name. A local-only vault is
+// a first-class way to use Plume forever.
+
+/** The vault the window is looking at, loose folder and all. */
+function vaultHere(ctx) {
+  const folder = (ctx && ctx.filePath) ? path.dirname(ctx.filePath) : settings.get().folder;
+  const open = settings.get().folder || folder || null;
+  const root = open ? vaults.find(open) : null;
+  return {
+    folder: open,
+    vault: root ? vaults.read(root) : null,
+  };
+}
+
+function vaultView(ctx) {
+  const here = vaultHere(ctx);
+  return {
+    folder: here.folder,
+    folderName: here.folder ? path.basename(here.folder) : null,
+    vault: here.vault,
+    loose: Boolean(here.folder) && !here.vault,
+    sync: here.vault ? sync.stateFor(here.vault.root) : null,
+    known: vaults.known(),
+    account: vault.publicState(),
+  };
+}
+
+function broadcastVaults() {
+  for (const win of liveWindows()) {
+    const ctx = windows.get(win.webContents.id);
+    if (ctx) win.webContents.send('vaults:changed', vaultView(ctx));
+  }
+}
+
+handle('vaults:state', ctx => vaultView(ctx));
+
+/**
+ * Turns a folder into a vault — the one that is open, or one chosen here.
+ *
+ * The same act whether the folder is empty or already holds a pile of notes:
+ * nothing is moved, copied or rewritten, and the Markdown that was there is
+ * simply now the vault's content, indexed where it lies.
+ */
+handle('vaults:create', vaultResult(async (ctx, options) => {
+  const want = options && typeof options === 'object' ? options : {};
+  // The folder the window is actually looking at, which is the one the panel
+  // named on the button. Reading the sidebar setting instead meant that
+  // opening a single document and pressing "Create vault in Notes" popped a
+  // folder chooser — asking again for the folder it had just offered.
+  let dir = vaultHere(ctx).folder;
+
+  if (want.choose || !dir) {
+    // Making a vault somewhere new and claiming a folder that already holds
+    // notes do the same thing to the disk, but they are different questions,
+    // so the chooser asks the one that was clicked.
+    const adopting = want.mode === 'adopt';
+    const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
+      title: adopting ? 'Choose a folder of Markdown to open as a vault'
+        : 'Choose or make a folder for your vault',
+      properties: adopting ? ['openDirectory'] : ['openDirectory', 'createDirectory'],
+      buttonLabel: adopting ? 'Open as vault' : 'Create vault here',
+    });
+    if (canceled || !filePaths.length) return { canceled: true };
+    dir = filePaths[0];
+  }
+
+  const root = localPath(ctx, dir);
+  const made = vaults.create(root, { name: want.name ? str(want.name, 120) : null });
+  files.forgetVaultRoot();
+  settings.update({ folder: root });
   broadcastSettings();
-  sync.refresh();
-  return { folder, preview: look, state: sync.publicState() };
+  broadcastVaults();
+  return { vault: made, view: vaultView(ctx) };
 }));
 
-handle('sync:choose', vaultResult(async ctx => {
+handle('vaults:rename', vaultResult(async (ctx, root, name) => {
+  const renamed = vaults.rename(localPath(ctx, root), str(name, 120));
+  broadcastVaults();
+  return { vault: renamed };
+}));
+
+/** Opens a vault this computer already knows about. */
+handle('vaults:open', vaultResult(async (ctx, root) => {
+  const abs = localPath(ctx, root);
+  const found = vaults.read(abs);
+  if (!found) {
+    vaults.forget(abs);
+    throw new Error('That vault is no longer on this computer.');
+  }
+  vaults.remember(abs);
+  settings.update({ folder: abs });
+  broadcastSettings();
+  broadcastVaults();
+  return { vault: found, view: vaultView(ctx) };
+}));
+
+/** Takes a vault off this computer's list. The folder is not touched. */
+handle('vaults:forget', vaultResult(async (ctx, root) => {
+  const abs = localPath(ctx, root);
+  sync.unwatch(abs);
+  vaults.forget(abs);
+  broadcastVaults();
+  return { view: vaultView(ctx) };
+}));
+
+/**
+ * Connects a local vault to the account: a remote vault is made for it, the
+ * link is written, and the first sync pushes everything up.
+ */
+handle('vaults:link', vaultResult(async (ctx, root) => {
+  const abs = localPath(ctx, root);
+  const found = vaults.read(abs);
+  if (!found) throw new Error('That folder is not a vault.');
+  if (found.linked) return { vault: found, already: true };
+
+  const account = vault.publicState();
+  if (!account.signedIn) throw new Error('Sign in to link this vault to your account.');
+
+  // Asked here rather than only in the panel. Linking is the step that sends a
+  // folder to the cloud, and the promise that nothing goes up unless somebody
+  // says so is worth nothing if the only place it is kept is the renderer —
+  // which is the thing that would have gone wrong. It happens once per vault,
+  // so the dialog costs nobody anything they will notice.
+  const ask = await dialog.showMessageBox(ctx.win, {
+    type: 'question',
+    buttons: ['Link and start syncing', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Link this vault to your account',
+    message: `Sync “${found.name}” to ${account.email}?`,
+    detail: `Every document and image in ${abs} is uploaded to your account and kept `
+      + 'in step with it from now on. It counts against your storage.',
+  });
+  if (ask.response !== 0) return { canceled: true };
+
+  // A remote vault is one top-level folder of the account's store, so the
+  // name has to be free: linking two vaults under one name would merge them.
+  const remotes = await vault.remoteVaults();
+  const taken = remotes.vaults.map(v => v.name).filter(Boolean);
+  const remoteName = vault.freeRemoteName(found.name, taken);
+
+  const linked = vaults.link(abs, {
+    accountId: account.account ? account.account.id : null,
+    accountEmail: account.email,
+    remoteVaultId: remoteName,
+    remoteName,
+  });
+
+  sync.watch(abs);
+  broadcastVaults();
+  return { vault: linked, remoteName, preview: await sync.preview(abs) };
+}));
+
+/**
+ * Disconnects a vault from the account.
+ *
+ * Both copies survive: the folder keeps every note, and the remote vault keeps
+ * every note and goes on counting against the quota. Freeing that space is a
+ * separate, named act — see vaults:deleteRemote.
+ */
+handle('vaults:unlink', vaultResult(async (ctx, root) => {
+  const abs = localPath(ctx, root);
+  sync.unwatch(abs);
+  const now = vaults.unlink(abs);
+  broadcastVaults();
+  return { vault: now };
+}));
+
+/** The vaults in the account, whether or not they are on this computer. */
+handle('vaults:remotes', vaultResult(async () => {
+  const remotes = await vault.remoteVaults();
+  const here = vaults.known().filter(v => v.linked).map(v => v.link.remoteName);
+  return {
+    vaults: remotes.vaults.map(v => ({ ...v, onThisComputer: here.includes(v.name) })),
+    account: remotes.account,
+  };
+}));
+
+/**
+ * Brings a remote vault down to this computer: a folder for it, a `.plume/`
+ * with the link already written, and then an ordinary sync — which, with the
+ * folder empty and the remote full, is all downloads.
+ */
+handle('vaults:clone', vaultResult(async (ctx, remoteName) => {
+  const name = typeof remoteName === 'string' ? remoteName : '';
+  if (name) str(name, 200);
+  if (name.includes('/') || name.includes('\\') || name.includes('..')) {
+    throw new Error('That is not a vault in your account.');
+  }
+  if (!vault.publicState().signedIn) throw new Error('Sign in first.');
+
   const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
-    title: 'Choose the folder to keep in your vault',
+    title: name ? `Where should “${name}” live?` : 'Where should your vault live?',
     properties: ['openDirectory', 'createDirectory'],
-    buttonLabel: 'Sync this folder',
+    buttonLabel: 'Put it here',
   });
   if (canceled || !filePaths.length) return { canceled: true };
 
-  const folder = filePaths[0];
-  const look = await sync.preview(folder);
-  // The prefix goes with the folder. Without it a folder chosen here would be
-  // synced into whichever notebook the last one occupied — two notebooks
-  // merged into one, which is the thing the prefix exists to prevent.
-  settings.update({
-    folder,
-    vaultFolder: folder,
-    vaultPrefix: sync.prefixFor(folder),
-    syncPaused: false,
+  const parent = localPath(ctx, filePaths[0]);
+  // A named vault gets a folder of its own, so choosing a folder that already
+  // holds other things does not scatter a vault through it.
+  const dest = name ? path.join(parent, name) : parent;
+  fs.mkdirSync(dest, { recursive: true });
+
+  const made = vaults.create(dest, { name: name || 'Vault' });
+  const account = vault.publicState();
+  vaults.link(dest, {
+    accountId: account.account ? account.account.id : null,
+    accountEmail: account.email,
+    remoteVaultId: name,
+    remoteName: name,
   });
+  files.forgetVaultRoot();
+
+  settings.update({ folder: dest });
   broadcastSettings();
-  sync.refresh();
-  return { folder, preview: look, state: sync.publicState() };
+  sync.watch(dest);
+  await sync.syncNow(dest);
+  broadcastVaults();
+
+  return { vault: vaults.read(dest), folder: dest, name };
+}));
+
+/**
+ * Deletes a remote vault and everything in it. The only thing here that frees
+ * quota, and the only destructive one, which is why it is named rather than
+ * folded into unlinking.
+ */
+handle('vaults:deleteRemote', vaultResult(async (ctx, remoteName) => {
+  // Canonicalised before it is checked, and before anybody is asked about it.
+  // Validating the raw string and normalising afterwards means the vault that
+  // gets deleted can be a different one from the vault that was named:
+  // " Notes ", ".Notes" and a 121-character name all land on "Notes".
+  const name = vault.remoteNameFrom(str(remoteName, 200));
+  const remotes = await vault.remoteVaults();
+  const target = remotes.vaults.find(v => v.name === name);
+  if (!target) throw new Error('That is not a vault in your account.');
+
+  // Irreversible, and the only thing here that frees storage. The panel asks
+  // too, but a confirmation inside the renderer is no confirmation at all if
+  // the renderer is the thing that has gone wrong.
+  const ask = await dialog.showMessageBox(ctx.win, {
+    type: 'warning',
+    buttons: ['Delete from account', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Delete a vault from your account',
+    message: `Delete “${name}” from ${vault.publicState().email}?`,
+    detail: `${target.documents} document${target.documents === 1 ? '' : 's'} are removed from `
+      + 'the cloud and the space is freed. Copies on your computers are left where '
+      + 'they are, and stop syncing.\n\nThis cannot be undone.',
+  });
+  if (ask.response !== 0) return { canceled: true };
+
+  const result = await vault.removeRemote(name, progress => {
+    if (!ctx.win.isDestroyed()) ctx.win.webContents.send('vault:progress', progress);
+  });
+
+  // Any local vault still pointing at it is now linked to nothing.
+  for (const known of vaults.known()) {
+    if (known.linked && known.link.remoteName === name) {
+      sync.unwatch(known.root);
+      vaults.unlink(known.root);
+    }
+  }
+  broadcastVault();
+  broadcastVaults();
+  return result;
 }));
 
 // ---------------------------------------------------------------------------
@@ -1462,87 +1738,29 @@ handle('git:forget', async () => {
   return { folder: null, repo: false };
 });
 
-handle('sync:forget', vaultResult(async () => {
-  settings.update({ vaultFolder: null, syncPaused: false });
-  broadcastSettings();
-  sync.stop();
-  // Nothing is deleted anywhere: the folder stays on disk and the documents
-  // already in the vault stay in the vault.
+handle('sync:pause', vaultResult(async (ctx, root, paused) => {
+  const state = sync.pause(localPath(ctx, root), Boolean(paused));
+  broadcastVaults();
+  return { state };
+}));
+
+handle('sync:now', vaultResult(async (ctx, root) => {
+  await sync.syncNow(root ? localPath(ctx, root) : null);
+  broadcastVaults();
   return { state: sync.publicState() };
 }));
 
-handle('sync:pause', vaultResult(async (_ctx, paused) => {
-  settings.update({ syncPaused: Boolean(paused) });
-  broadcastSettings();
-  sync.refresh();
-  return { state: sync.publicState() };
+handle('sync:reveal', vaultResult(async (ctx, root) => {
+  const abs = localPath(ctx, root);
+  if (!vaults.isVault(abs)) throw new Error('That folder is not a vault.');
+  shell.openPath(abs);
+  return { folder: abs };
 }));
 
-handle('sync:now', vaultResult(async () => {
-  await sync.syncNow();
-  return { state: sync.publicState() };
-}));
-
-handle('sync:reveal', vaultResult(async () => {
-  const folder = settings.get().vaultFolder;
-  if (!folder) throw new Error('No folder is being synced yet.');
-  shell.openPath(folder);
-  return { folder };
-}));
-
-handle('vault:state', (ctx, rootDir) => ({
-  ...vault.publicState(),
-  link: vault.linkFor(ctx.filePath),
-  syncable: vault.isSyncable(ctx.filePath),
-  // Named relative to the folder on screen, so a notebook keeps its shape in
-  // the vault instead of collapsing into one flat list.
-  suggested: ctx.filePath
-    ? vault.suggestVaultPath(ctx.filePath, typeof rootDir === 'string' ? rootDir : null)
-    : null,
-}));
-
-handle('vault:suggest', vaultResult(async (_ctx, paths, rootDir) => {
-  const list = Array.isArray(paths) ? paths.slice(0, 2000) : [];
-  const root = typeof rootDir === 'string' ? rootDir : null;
-  const items = list
-    .filter(p => typeof p === 'string' && vault.isSyncable(p))
-    .map(p => ({ localPath: path.resolve(p), vaultPath: vault.suggestVaultPath(path.resolve(p), root) }));
-  return { items, skipped: list.length - items.length };
-}));
-
-handle('vault:collectFolder', vaultResult(async (ctx, dir, rootDir) => {
-  const target = localPath(ctx, dir);
-  // Only somewhere the user actually chose: the folder they sync, or the one
-  // the open document lives in. Otherwise this walks the whole disk and
-  // doubles as a list of every document on the machine.
-  const allowed = settings.get().vaultFolder || (ctx.filePath && path.dirname(ctx.filePath));
-  if (!allowed || !files.isWithin(allowed, target)) {
-    throw new Error('That folder is not one Plume is syncing.');
-  }
-  const root = typeof rootDir === 'string' ? path.resolve(rootDir) : path.dirname(target);
-  const items = await vault.collectFolder(target, root);
-  return { items };
-}));
-
-handle('vault:pushMany', vaultResult(async (ctx, items, options) => {
-  const clean = (Array.isArray(items) ? items : [])
-    .filter(i => i && typeof i.localPath === 'string' && typeof i.vaultPath === 'string')
-    .slice(0, 2000)
-    // cleanVaultPath throws on anything that could step outside the account's
-    // own namespace, so a name typed into the panel cannot reach another vault.
-    .map(i => ({ localPath: localPath(ctx, i.localPath), vaultPath: vault.cleanVaultPath(i.vaultPath) }));
-
-  if (!clean.length) throw new Error('Nothing to sync.');
-
-  const result = await vault.pushMany(clean, {
-    force: Boolean(options && options.force),
-    onProgress: progress => {
-      if (!ctx.win.isDestroyed()) ctx.win.webContents.send('vault:progress', progress);
-    },
-  });
-  broadcastVault();
-  return result;
-}));
+// Sending documents up is not something the renderer can ask for. A linked
+// vault uploads its own contents, decided here from its manifest; there is no
+// channel that takes a local path and a destination, because such a channel is
+// exactly how a loose file ends up in the cloud.
 
 handle('vault:signUp', vaultResult(async (_ctx, email, password) => {
   const state = await vault.signUp(str(email, 320), str(password, 400));
@@ -1564,72 +1782,7 @@ handle('vault:signOut', vaultResult(async () => {
 
 handle('vault:list', vaultResult(async () => vault.list()));
 
-// The notebooks in this account's vault: the folders at the top of it, as a
-// second machine needs to see them before it can say "that one, here".
-// Documents sitting at the vault's root rather than in a folder are one
-// notebook too, the unnamed one, which is what an account that synced before
-// vaults held more than one notebook has.
-handle('vault:notebooks', vaultResult(async () => {
-  const listing = await vault.list();
-  const byName = new Map();
-  for (const file of listing.files || []) {
-    const parts = String(file.path).split('/');
-    const name = parts.length > 1 ? parts[0] : '';
-    const entry = byName.get(name) || { name, documents: 0, bytes: 0 };
-    entry.documents += 1;
-    entry.bytes += file.size || 0;
-    byName.set(name, entry);
-  }
-  const here = settings.get();
-  return {
-    notebooks: [...byName.values()].sort((a, b) => (a.name < b.name ? -1 : 1)),
-    open: here.vaultFolder ? { folder: here.vaultFolder, name: here.vaultPrefix || '' } : null,
-  };
-}));
-
-// Takes a notebook that already exists in the vault and puts it on this
-// machine: a folder named after it, inside one the reader chooses, and then
-// an ordinary sync — which, with the folder empty and the vault full, is all
-// downloads. From then on it is the open folder and the vault, like any other.
-handle('vault:openNotebook', vaultResult(async (ctx, name) => {
-  const notebook = typeof name === 'string' ? name : '';
-  if (notebook) str(notebook, 200);
-  if (notebook.includes('/') || notebook.includes('\\') || notebook.includes('..')) {
-    throw new Error('That is not a notebook in your vault.');
-  }
-
-  const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
-    title: notebook ? `Where should ${notebook} live?` : 'Where should your vault live?',
-    properties: ['openDirectory', 'createDirectory'],
-    buttonLabel: 'Put it here',
-  });
-  if (canceled || !filePaths.length) return { canceled: true };
-
-  const parent = localPath(ctx, filePaths[0]);
-  // A named notebook gets a folder of its own so choosing a folder that
-  // already holds other things does not scatter a vault through it.
-  const dest = notebook ? path.join(parent, notebook) : parent;
-  fs.mkdirSync(dest, { recursive: true });
-
-  settings.update({ folder: dest, vaultFolder: dest, vaultPrefix: notebook || null });
-  broadcastSettings();
-  sync.refresh();
-  await sync.syncNow();
-
-  return { folder: dest, notebook, state: sync.publicState() };
-}));
-
-
 handle('vault:graph', vaultResult(async () => vault.graph()));
-
-handle('vault:push', vaultResult(async (ctx, vaultPath, options) => {
-  if (!ctx.filePath) throw new Error('Open a document first.');
-  const result = await vault.push(ctx.filePath, vaultPath ? str(vaultPath, 400) : null, {
-    force: Boolean(options && options.force),
-  });
-  broadcastVault();
-  return result;
-}));
 
 handle('vault:pull', vaultResult(async (ctx, vaultPath) => {
   const name = str(vaultPath, 400);
@@ -1644,21 +1797,10 @@ handle('vault:pull', vaultResult(async (ctx, vaultPath) => {
   return result;
 }));
 
-handle('vault:keepBoth', vaultResult(async (ctx, vaultPath) => {
-  if (!ctx.filePath) throw new Error('Open a document first.');
-  const copy = await vault.saveConflictCopy(ctx.filePath, str(vaultPath, 400));
-  return { copy };
-}));
-
 handle('vault:remove', vaultResult(async (_ctx, vaultPath) => {
   const result = await vault.remove(str(vaultPath, 400));
   broadcastVault();
   return result;
-}));
-
-handle('vault:unlink', vaultResult(async ctx => {
-  if (!ctx.filePath) throw new Error('Open a document first.');
-  return vault.unlink(ctx.filePath);
 }));
 
 // ---------------------------------------------------------------------------

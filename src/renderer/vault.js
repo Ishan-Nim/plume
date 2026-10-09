@@ -4,8 +4,18 @@
 // signing in is not an interruption, and the vault is somewhere you look
 // things up while you read, not something that covers what you are reading.
 //
-// Everything that touches the network happens in the main process; this file
-// only asks for actions and draws the answers.
+// The panel's whole job is to say which of three things the folder on screen
+// is, and offer the one next step:
+//
+//   loose          a folder of Markdown Plume has not been asked to claim
+//   local vault    a `.plume/` folder, offline, consuming nothing
+//   linked vault   connected to the account, syncing on every save
+//
+// Those are steps, not a ladder to be climbed. A vault that never leaves this
+// computer is a finished, supported state, and the panel never nags about it.
+//
+// Everything that touches the network or the disk happens in the main process;
+// this file only asks for actions and draws the answers.
 
 import { el } from './util.js';
 
@@ -13,7 +23,8 @@ function bytes(n) {
   if (!Number.isFinite(n)) return '—';
   if (n < 1024) return `${n} B`;
   if (n < 1048576) return `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB`;
-  return `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`;
+  if (n < 1073741824) return `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`;
+  return `${(n / 1073741824).toFixed(1)} GB`;
 }
 
 function when(iso) {
@@ -27,12 +38,14 @@ function when(iso) {
   return d.toLocaleDateString();
 }
 
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
 /**
  * The last part of a path, for showing a folder by its name.
  *
  * Both separators. The path arrives as the operating system gave it, so on
  * Windows splitting on "/" alone leaves the whole of C:\Users\…\Notes where a
- * folder name was meant to go — which is what the panel showed until now.
+ * folder name was meant to go.
  */
 export function folderName(p) {
   const given = String(p || '');
@@ -82,20 +95,36 @@ export class Vault {
     this.getRoot = getRoot || (() => null);
 
     this.mode = 'signin';
-    this.state = null;
+    this.account = null;      // who is signed in, and the quota
+    this.view = null;         // the folder on screen, and the vault it is
     this.files = [];
     this.links = {};
+    this.remotes = null;      // the vaults in the account
     this.loaded = false;
     this.busy = false;
-    // Which folders of the vault tree are open, kept across a redraw of the
-    // panel so syncing a document does not fold everything up again.
+    // Which folders of the tree are open, kept across a redraw so syncing a
+    // document does not fold everything up again.
     this.openDirs = new Set();
-    this.sync = null;
 
-    // The main process drives the folder sync; the panel just shows what it says.
-    this.api.onSyncChanged(state => {
-      this.sync = state;
-      if (this.loaded && this.state && this.state.signedIn) this.drawVault();
+    // The main process drives both; the panel just shows what they say.
+    //
+    // A sync reports progress many times a second, and the list of what is in
+    // the account is a round trip — so the cheap local redraw happens on every
+    // tick and the full reload waits until the flurry stops. Without the
+    // reload the panel showed a vault as "in sync" above a list of documents
+    // that was still empty.
+    this.reloadTimer = null;
+    this.api.onSyncChanged(() => {
+      if (!this.loaded) return;
+      this.refreshQuietly();
+      clearTimeout(this.reloadTimer);
+      this.reloadTimer = setTimeout(() => {
+        if (this.loaded) this.load().catch(() => {});
+      }, 700);
+    });
+    this.api.onVaultsChanged(view => {
+      this.view = view;
+      if (this.loaded) this.draw();
     });
   }
 
@@ -106,38 +135,127 @@ export class Vault {
   /** Called whenever the panel becomes visible, and after the document changes. */
   async show({ force = false } = {}) {
     if (this.loaded && !force) {
-      // Already drawn: just refresh the part that depends on the open document.
-      if (this.state && this.state.signedIn) this.drawVault();
+      await this.refreshQuietly();
       return;
     }
     if (!this.loaded) this.render(el('p', { class: 'vault-note', text: 'Checking your vault…' }));
     await this.load();
   }
 
-  async load() {
-    this.state = await this.api.vault.state(this.getRoot());
-    this.sync = await this.api.sync.state();
-    this.loaded = true;
-
-    if (!this.state.signedIn) {
-      this.drawAuth();
-      return;
-    }
-    const res = await this.api.vault.list();
-    if (!res.ok) {
-      this.files = [];
-      this.drawVault(res.error);
-      return;
-    }
-    this.files = res.files || [];
-    this.links = res.links || {};
-    if (res.account) this.state.account = res.account;
-    this.drawVault();
+  /** Re-reads what is cheap and local, without going back to the network. */
+  async refreshQuietly() {
+    this.view = await this.api.vaults.state();
+    this.account = this.view.account;
+    this.draw();
   }
 
-  // ---------- signed out ----------
+  async load() {
+    this.view = await this.api.vaults.state();
+    this.account = this.view.account;
+    this.loaded = true;
 
-  drawAuth(message) {
+    if (this.account && this.account.signedIn) {
+      const res = await this.api.vault.list();
+      if (res.ok) {
+        this.files = res.files || [];
+        this.links = res.links || {};
+        if (res.account) this.account = { ...this.account, account: res.account };
+      } else {
+        this.files = [];
+        this.draw(res.error);
+        return;
+      }
+      const remotes = await this.api.vaults.remotes();
+      this.remotes = remotes.ok ? remotes.vaults : null;
+    }
+    this.draw();
+  }
+
+  draw(message) {
+    const parts = [];
+    const signedIn = Boolean(this.account && this.account.signedIn);
+
+    if (signedIn) parts.push(this.drawAccount());
+    if (message) parts.push(el('p', { class: 'vault-error', text: message }));
+
+    // The folder on screen comes first whether or not there is an account:
+    // making a vault needs neither a network nor a sign-in, and a reader who
+    // never signs in should still find the thing the panel is mostly about.
+    parts.push(this.drawHere());
+
+    if (!signedIn) {
+      parts.push(this.drawAuth());
+    } else {
+      parts.push(this.drawRemotes());
+      parts.push(this.drawFiles());
+    }
+    parts.push(this.drawKnown());
+
+    this.render(...parts.filter(Boolean));
+  }
+
+  // ---------- the account ----------
+
+  drawAccount() {
+    const account = (this.account && this.account.account) || {};
+    const used = account.usedBytes || 0;
+    const quota = account.quotaBytes || 1;
+
+    const section = el('section', { class: 'vault-section' });
+    const head = el('div', { class: 'vault-account' });
+    const who = el('div', { class: 'vault-who' });
+
+    // One pool, across every vault. Said plainly here because "unlimited
+    // vaults, 1 GB of storage" reads as a contradiction until you see that
+    // the cap is on bytes in the cloud and not on how many vaults organise
+    // them.
+    const linked = (this.view && this.view.known ? this.view.known : []).filter(v => v.linked).length;
+    who.append(
+      el('b', { text: account.email || (this.account && this.account.email) || '' }),
+      el('span', { text: `${bytes(used)} of ${bytes(quota)} used` }),
+    );
+    if (linked) {
+      who.append(el('span', {
+        class: 'vault-hint',
+        text: `shared across ${plural(linked, 'linked vault', 'linked vaults')}`,
+      }));
+    }
+
+    const out = el('button', {
+      class: 'vault-btn ghost small', type: 'button', text: 'Sign out',
+      title: 'Sign out of your account',
+    });
+    out.addEventListener('click', async () => {
+      await this.api.vault.signOut();
+      this.files = [];
+      this.links = {};
+      this.remotes = null;
+      this.toast('Signed out of your account');
+      await this.load();
+    });
+    head.append(who, out);
+
+    const meter = el('div', { class: 'vault-meter' });
+    const fill = el('i');
+    const share = Math.min(100, (used / quota) * 100);
+    fill.style.width = `${share.toFixed(1)}%`;
+    if (share > 90) meter.classList.add('full');
+    meter.append(fill);
+
+    section.append(head, meter);
+
+    if (share >= 100) {
+      section.append(el('p', {
+        class: 'vault-hint',
+        text: 'Your account is full. Everything still saves to this computer — '
+          + 'only the upload waits. Free space by deleting a vault from your '
+          + 'account, or unlink one to stop it syncing.',
+      }));
+    }
+    return section;
+  }
+
+  drawAuth() {
     const form = el('form', { class: 'vault-form' });
 
     const tabs = el('div', { class: 'vault-tabs' });
@@ -146,7 +264,7 @@ export class Vault {
       b.setAttribute('aria-pressed', String(this.mode === key));
       b.addEventListener('click', () => {
         this.mode = key;
-        this.drawAuth();
+        this.draw();
       });
       return b;
     };
@@ -154,8 +272,9 @@ export class Vault {
 
     const intro = el('p', { class: 'vault-note' });
     intro.textContent = this.mode === 'signup'
-      ? 'A free account gives you a 100 MB vault for syncing documents between your computers.'
-      : 'Sign in to sync documents between your computers.';
+      ? 'An account lets a vault sync between your computers. Vaults are '
+        + 'unlimited; the free account holds 100 MB of synced documents across all of them.'
+      : 'Sign in to link a vault and sync it between your computers.';
 
     const email = el('input', {
       type: 'email', id: 'vault-email', autocomplete: 'email',
@@ -169,11 +288,13 @@ export class Vault {
 
     const submit = el('button', {
       class: 'vault-btn primary', type: 'submit',
-      text: this.mode === 'signup' ? 'Create my vault' : 'Sign in',
+      text: this.mode === 'signup' ? 'Create my account' : 'Sign in',
     });
 
+    const section = el('section', { class: 'vault-section' });
+    section.append(el('h3', { text: 'Your account' }));
+
     form.append(tabs, intro);
-    if (message) form.append(el('p', { class: 'vault-error', text: message }));
     form.append(
       el('label', { for: 'vault-email', class: 'vault-label', text: 'Email' }),
       email,
@@ -200,130 +321,137 @@ export class Vault {
 
       this.busy = false;
       if (!res.ok) {
-        this.drawAuth(res.error);
+        submit.disabled = false;
+        submit.textContent = this.mode === 'signup' ? 'Create my account' : 'Sign in';
+        form.append(el('p', { class: 'vault-error', text: res.error }));
         return;
       }
-      this.toast(this.mode === 'signup' ? 'Vault created' : 'Signed in to your vault');
+      this.toast(this.mode === 'signup' ? 'Account created' : 'Signed in');
+      // Signing in links nothing and syncs nothing. The vaults on this
+      // computer are exactly as they were a moment ago.
       await this.load();
     });
 
-    this.render(form);
+    section.append(form);
+    return section;
   }
 
-  // ---------- signed in ----------
+  // ---------- the folder on screen ----------
 
-  drawVault(message) {
-    const account = this.state.account || {};
-    const used = account.usedBytes || 0;
-    const quota = account.quotaBytes || 1;
-
-    const head = el('div', { class: 'vault-account' });
-    const who = el('div', { class: 'vault-who' });
-    who.append(
-      el('b', { text: account.email || this.state.email || '' }),
-      el('span', { text: `${bytes(used)} of ${bytes(quota)} · ${this.files.length} ${this.files.length === 1 ? 'document' : 'documents'}` }),
-    );
-    const menu = el('button', {
-      class: 'vault-btn ghost small', type: 'button', text: 'Sign out',
-      title: 'Sign out of your vault',
-    });
-    menu.addEventListener('click', async () => {
-      await this.api.vault.signOut();
-      this.files = [];
-      this.links = {};
-      this.toast('Signed out of your vault');
-      await this.load();
-    });
-    head.append(who, menu);
-
-    const meter = el('div', { class: 'vault-meter' });
-    const fill = el('i');
-    fill.style.width = `${Math.min(100, (used / quota) * 100).toFixed(1)}%`;
-    meter.append(fill);
-
-    const parts = [head, meter];
-    if (message) parts.push(el('p', { class: 'vault-error', text: message }));
-    parts.push(this.drawFolder(), this.drawCurrent(), this.drawFiles());
-
-    this.render(...parts);
-  }
-
-
-  /**
-   * The folder kept in step with the vault. This is the part that runs on its
-   * own: everything else in the panel is a one-off action.
-   */
-  drawFolder() {
+  drawHere() {
+    const view = this.view || {};
     const section = el('section', { class: 'vault-section' });
-    const head = el('div', { class: 'vault-section-head' });
-    head.append(el('h3', { text: 'Synced folder' }));
-    section.append(head);
+    section.append(el('h3', { text: 'This folder' }));
 
-    const sync = this.sync || { status: 'off', folder: null };
-
-    if (!sync.folder) {
+    if (!view.folder) {
       section.append(
         el('p', {
           class: 'vault-note',
-          text: 'Your notes live on this computer. Sync a folder and Plume keeps '
-            + 'everything in it — notes, images and sub-folders — in your vault too, '
-            + 'so another computer can have the same folder.',
-        }),
-        el('p', {
-          class: 'vault-hint',
-          text: 'Only documents and images are uploaded. Programs, installers and archives are never sent.',
+          text: 'No folder is open. Open one to read the Markdown in it, or make a vault.',
         }),
       );
-
-      const acts = el('div', { class: 'vault-row-acts' });
-
-      // The folder already open is almost always the one meant, so it is
-      // offered by name — but offered. Signing in syncs nothing on its own:
-      // the copy on this disk is the real one, and connecting it to the
-      // cloud is a thing somebody decides about a folder they can see.
-      const candidate = sync.candidate;
-      if (candidate) {
-        const name = folderName(candidate);
-        const useOpen = el('button', {
-          class: 'vault-btn primary small', type: 'button', text: `Sync “${name}”`,
-        });
-        useOpen.title = candidate;
-        useOpen.addEventListener('click', () => this.adoptFolder(useOpen));
-        acts.append(useOpen);
-      }
-
-      const choose = el('button', {
-        class: candidate ? 'vault-btn ghost small' : 'vault-btn primary small',
-        type: 'button',
-        text: candidate ? 'Another folder…' : 'Choose a folder…',
-      });
-      choose.addEventListener('click', () => this.chooseFolder(choose));
-      acts.append(choose);
-      section.append(acts);
-
-      // On a second computer there is nothing to choose yet: the notebooks
-      // are already in the vault, and what is wanted is to put one here.
-      const existing = el('div', { class: 'vault-existing' });
-      section.append(existing);
-      this.drawNotebooks(existing).catch(() => {});
+      const make = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Create a vault…' });
+      make.addEventListener('click', () => this.createVault(make, { choose: true }));
+      section.append(el('div', { class: 'vault-row-acts' }, make));
       return section;
     }
 
-    const others = el('div', { class: 'vault-existing' });
+    if (view.loose) return this.drawLoose(section, view);
+    if (view.vault && !view.vault.linked) return this.drawLocal(section, view);
+    return this.drawLinked(section, view);
+  }
 
-    const name = folderName(sync.folder);
+  /** A folder of Markdown that Plume has not been asked to claim. */
+  drawLoose(section, view) {
     const info = el('div', { class: 'vault-current-info' });
-    const title = el('b', { text: name });
-    title.title = sync.folder;
+    const title = el('b', { text: folderName(view.folder) });
+    title.title = view.folder;
+    info.append(title, el('span', { text: 'A folder, not a vault' }));
+    section.append(info);
+
+    section.append(
+      el('p', {
+        class: 'vault-note',
+        text: 'You can read and write everything in here as it is. It is not a '
+          + 'vault, so there are no backlinks across it, no graph, and nothing '
+          + 'in it can ever sync.',
+      }),
+      el('p', {
+        class: 'vault-hint',
+        text: 'Making it a vault adds a .plume folder and indexes the Markdown '
+          + 'already here. Nothing is moved, copied or uploaded.',
+      }),
+    );
+
+    const make = el('button', {
+      class: 'vault-btn primary small', type: 'button',
+      text: `Create vault in “${folderName(view.folder)}”`,
+    });
+    make.title = view.folder;
+    make.addEventListener('click', () => this.createVault(make));
+
+    const other = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Another folder…' });
+    other.addEventListener('click', () => this.createVault(other, { choose: true }));
+
+    section.append(el('div', { class: 'vault-row-acts' }, make, other));
+    return section;
+  }
+
+  /** A vault that exists only on this computer — a finished state. */
+  drawLocal(section, view) {
+    const vault = view.vault;
+    const info = el('div', { class: 'vault-current-info' });
+    const title = el('b', { text: vault.name });
+    title.title = vault.root;
+    info.append(title, el('span', { text: 'A vault on this computer' }));
+    section.append(info);
+
+    section.append(el('p', {
+      class: 'vault-note',
+      text: 'Everything works: notes, backlinks, search, the graph. Nothing '
+        + 'leaves this computer, and it uses none of your storage.',
+    }));
+
+    const acts = el('div', { class: 'vault-row-acts' });
+
+    const signedIn = Boolean(this.account && this.account.signedIn);
+    const link = el('button', {
+      class: 'vault-btn primary small', type: 'button',
+      text: signedIn ? 'Link to my account' : 'Sign in to link',
+      disabled: !signedIn,
+      title: signedIn ? 'Sync this vault between your computers'
+        : 'Sign in below first — linking is a choice you make per vault',
+    });
+    link.addEventListener('click', () => this.linkVault(vault.root, link));
+
+    const rename = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Rename…' });
+    rename.addEventListener('click', () => this.renameVault(vault));
+
+    const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open folder' });
+    open.addEventListener('click', () => this.api.sync.reveal(vault.root));
+
+    acts.append(link, rename, open);
+    section.append(acts);
+    return section;
+  }
+
+  /** A vault connected to the account. */
+  drawLinked(section, view) {
+    const vault = view.vault;
+    const sync = view.sync || { status: 'idle' };
+
+    const info = el('div', { class: 'vault-current-info' });
+    const title = el('b', { text: vault.name });
+    title.title = vault.root;
     info.append(title, el('span', { text: this.syncLine(sync) }));
-    // Which notebook of the vault this folder is, so it is clear that another
-    // folder would be another notebook rather than the same one.
-    if (sync.prefix) {
-      info.append(el('span', { class: 'vault-hint', text: `In your vault as ${sync.prefix}` }));
+    if (vault.link && vault.link.remoteName) {
+      info.append(el('span', {
+        class: 'vault-hint', text: `In your account as “${vault.link.remoteName}”`,
+      }));
     }
     section.append(info);
 
-    if (sync.status === 'syncing' && sync.total) {
+    if ((sync.status === 'syncing' || sync.status === 'scanning') && sync.total) {
       const bar = el('div', { class: 'vault-meter' });
       const fill = el('i');
       fill.style.width = `${Math.min(100, (sync.done / sync.total) * 100).toFixed(0)}%`;
@@ -334,15 +462,23 @@ export class Vault {
     if (sync.lastError) section.append(el('p', { class: 'vault-error', text: sync.lastError }));
     else if (sync.message) section.append(el('p', { class: 'vault-hint', text: sync.message }));
 
+    if (sync.pending) {
+      section.append(el('p', {
+        class: 'vault-hint',
+        text: `${plural(sync.pending, 'document is', 'documents are')} waiting for room in your `
+          + 'account. They are saved here and will go up when there is space.',
+      }));
+    }
+
     const acts = el('div', { class: 'vault-row-acts' });
+    const busy = sync.status === 'syncing' || sync.status === 'scanning';
 
     const now = el('button', {
-      class: 'vault-btn primary small', type: 'button', text: 'Sync now',
-      disabled: sync.status === 'syncing' || sync.status === 'scanning',
+      class: 'vault-btn primary small', type: 'button', text: 'Sync now', disabled: busy,
     });
     now.addEventListener('click', async () => {
       now.disabled = true;
-      await this.api.sync.now();
+      await this.api.sync.now(vault.root);
       await this.load();
     });
 
@@ -351,193 +487,234 @@ export class Vault {
       class: 'vault-btn ghost small', type: 'button', text: paused ? 'Resume' : 'Pause',
     });
     pause.addEventListener('click', async () => {
-      await this.api.sync.pause(!paused);
+      await this.api.sync.pause(vault.root, !paused);
       await this.load();
     });
 
     const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open folder' });
-    open.addEventListener('click', () => this.api.sync.reveal());
+    open.addEventListener('click', () => this.api.sync.reveal(vault.root));
 
-    // Changing which folder syncs is a different act from stopping, and it
-    // is the one somebody with more than one project does often. Without a
-    // button of its own it is Stop followed by Choose, and Stop reads like
-    // breaking something rather than moving to the next project.
-    const change = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Change folder…' });
-    change.addEventListener('click', () => this.chooseFolder(change));
+    const unlink = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Unlink' });
+    unlink.addEventListener('click', () => this.unlinkVault(vault));
 
-    const forget = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Stop' });
-    forget.addEventListener('click', async () => {
-      const warning = 'Stop syncing this folder?\n\n'
-        + 'Nothing is deleted: the folder stays on your computer, and what is '
-        + 'already in your vault stays in your vault.';
-      if (!window.confirm(warning)) return;
-      await this.api.sync.forget();
-      this.toast('This folder is no longer synced');
-      await this.load();
-    });
-
-    acts.append(now, pause, open, change, forget);
+    acts.append(now, pause, open, unlink);
     section.append(acts);
-
-    // The other notebooks in the vault, so moving between projects is
-    // choosing one here rather than finding its folder on disk again.
-    section.append(others);
-    this.drawNotebooks(others, sync.prefix || '').catch(() => {});
     return section;
   }
 
   syncLine(sync) {
     switch (sync.status) {
-      case 'scanning': return 'Looking through the folder…';
+      case 'scanning': return 'Looking through the vault…';
       case 'syncing': return sync.total ? `Syncing ${Math.min(sync.done + 1, sync.total)} of ${sync.total}…` : 'Syncing…';
       case 'paused': return 'Paused';
       case 'error': return 'Could not sync';
-      case 'off': return sync.message || 'Not syncing';
+      case 'offline': return sync.message || 'Not syncing';
+      case 'off': return 'Not linked';
       default:
-        return sync.lastSyncAt ? `Up to date · checked ${when(sync.lastSyncAt)}` : 'Up to date';
+        return sync.lastSyncAt ? `In sync · checked ${when(sync.lastSyncAt)}` : 'Linked — syncing shortly';
     }
   }
 
-  /**
-   * The notebooks already in the vault, each with a way to put it on this
-   * computer. Plume makes the folder and brings the documents down; from then
-   * on it is the open folder and the vault, like one chosen here.
-   */
-  async drawNotebooks(host, openName = null) {
-    const res = await this.api.vault.notebooks();
-    if (!res || !res.ok || !res.notebooks) return;
-    // The one being synced is already on screen above; what is useful here is
-    // the others.
-    const books = res.notebooks.filter(b => openName === null || b.name !== openName);
-    if (!books.length) return;
+  // ---------- actions on a vault ----------
 
-    host.append(el('h4', {
-      class: 'vault-sub',
-      text: openName === null ? 'Already in your vault' : 'Other notebooks in your vault',
-    }));
-    host.append(el('p', {
+  async createVault(button, options = {}) {
+    button.disabled = true;
+    const label = button.textContent;
+    button.textContent = 'Creating…';
+    const res = await this.api.vaults.create(options);
+    button.disabled = false;
+    button.textContent = label;
+
+    if (!res.ok) return this.toast(res.error, 'error');
+    if (res.canceled) return undefined;
+    this.toast(`“${res.vault.name}” is now a vault`);
+    return this.load();
+  }
+
+  async linkVault(root, button) {
+    const warn = 'Link this vault to your account?\n\n'
+      + 'Everything in it — notes, images and sub-folders — is uploaded and kept '
+      + 'in step on every computer you sign in on. It counts against your storage.';
+    if (!window.confirm(warn)) return;
+
+    button.disabled = true;
+    button.textContent = 'Linking…';
+    const res = await this.api.vaults.link(root);
+    button.disabled = false;
+
+    if (!res.ok) {
+      this.toast(res.error, 'error');
+      await this.load();
+      return;
+    }
+    const look = res.preview || {};
+    const skipped = look.skippedTotal || 0;
+    this.toast(
+      `Linked · syncing ${plural(look.files || 0, 'document', 'documents')}`
+      + (skipped ? ` · ${plural(skipped, 'other file', 'other files')} left alone` : ''),
+    );
+    await this.load();
+  }
+
+  async unlinkVault(vault) {
+    const warn = `Unlink “${vault.name}” from your account?\n\n`
+      + 'Nothing is deleted. The folder stays on this computer with every note '
+      + 'in it, and the copy in your account stays there too — so it goes on '
+      + 'using storage until you delete it from your account.';
+    if (!window.confirm(warn)) return;
+    const res = await this.api.vaults.unlink(vault.root);
+    if (!res.ok) return this.toast(res.error, 'error');
+    this.toast(`“${vault.name}” is no longer syncing`);
+    return this.load();
+  }
+
+  async renameVault(vault) {
+    const name = window.prompt('Name for this vault', vault.name);
+    if (name === null) return undefined;
+    const clean = name.trim();
+    if (!clean) return this.toast('Give the vault a name', 'error');
+    const res = await this.api.vaults.rename(vault.root, clean);
+    if (!res.ok) return this.toast(res.error, 'error');
+    // The name in the account was fixed when the vault was linked, and a
+    // rename here does not move documents that are already up there.
+    return this.load();
+  }
+
+  // ---------- the vaults in the account ----------
+
+  drawRemotes() {
+    const section = el('section', { class: 'vault-section' });
+    section.append(el('h3', { text: 'In your account' }));
+
+    if (!this.remotes) {
+      section.append(el('p', { class: 'vault-note', text: 'Checking…' }));
+      return section;
+    }
+    if (!this.remotes.length) {
+      section.append(el('p', {
+        class: 'vault-note',
+        text: 'No vaults here yet. Link one on this computer and it appears here, '
+          + 'ready to put on your other computers.',
+      }));
+      return section;
+    }
+
+    section.append(el('p', {
       class: 'vault-hint',
       text: 'Put one of these on this computer. Plume makes the folder and downloads what is in it.',
     }));
 
-    for (const book of books) {
+    for (const remote of this.remotes) {
       const row = el('div', { class: 'vault-row' });
       const label = el('div', { class: 'vault-row-main' });
-      label.append(el('b', { text: book.name || 'Your vault' }));
+      label.append(el('b', { text: remote.name || 'Loose documents' }));
       label.append(el('span', {
-        text: `${book.documents} document${book.documents === 1 ? '' : 's'}`,
+        text: `${plural(remote.documents, 'document', 'documents')} · ${bytes(remote.bytes)}`
+          + (remote.onThisComputer ? ' · on this computer' : ''),
       }));
-      const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open here' });
-      open.addEventListener('click', () => this.openNotebook(book.name, open));
-      row.append(label, el('div', { class: 'vault-row-acts' }, open));
-      host.append(row);
+
+      const acts = el('div', { class: 'vault-row-acts' });
+      if (!remote.onThisComputer && remote.name) {
+        const clone = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Put it here' });
+        clone.addEventListener('click', () => this.cloneRemote(remote.name, clone));
+        acts.append(clone);
+      }
+      if (remote.name) {
+        const del = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Delete' });
+        del.addEventListener('click', () => this.deleteRemote(remote, del));
+        acts.append(del);
+      }
+
+      row.append(label, acts);
+      section.append(row);
     }
+    return section;
   }
 
-  async openNotebook(name, button) {
+  async cloneRemote(name, button) {
     button.disabled = true;
     button.textContent = 'Downloading…';
     try {
-      const res = await this.api.vault.openNotebook(name);
+      const res = await this.api.vaults.clone(name);
       if (!res || res.canceled) return;
       if (!res.ok) {
-        this.toast(res.error || 'Could not open that notebook', 'error');
+        this.toast(res.error || 'Could not put that vault here', 'error');
         return;
       }
-      this.toast(`${name || 'Your vault'} is now in ${res.folder}`);
-    } catch (err) {
-      this.toast('Could not open that notebook', 'error');
+      this.toast(`“${name}” is now in ${res.folder}`);
+      await this.load();
     } finally {
       button.disabled = false;
-      button.textContent = 'Open here';
+      button.textContent = 'Put it here';
     }
   }
 
-  /** Starts syncing the folder that is already open. */
-  async adoptFolder(button) {
-    button.disabled = true;
-    const res = await this.api.sync.adopt();
-    button.disabled = false;
-    if (!res.ok) return this.toast(res.error, 'error');
+  async deleteRemote(remote, button) {
+    const warn = `Delete “${remote.name}” from your account?\n\n`
+      + `${plural(remote.documents, 'document', 'documents')} (${bytes(remote.bytes)}) are removed `
+      + 'from the cloud and the space is freed. Copies on your computers are '
+      + 'left exactly where they are, and stop syncing.\n\nThis cannot be undone.';
+    if (!window.confirm(warn)) return;
 
-    const look = res.preview || {};
-    const skipped = look.skippedTotal || 0;
-    this.toast(
-      `Syncing ${look.files || 0} document${look.files === 1 ? '' : 's'}`
-      + (skipped ? ` · ${skipped} other file${skipped === 1 ? '' : 's'} left alone` : ''),
-    );
-    await this.load();
+    button.disabled = true;
+    button.textContent = 'Deleting…';
+    const res = await this.api.vaults.deleteRemote(remote.name);
+    button.disabled = false;
+    button.textContent = 'Delete';
+
+    if (!res.ok) return this.toast(res.error, 'error');
+    this.toast(`Removed ${plural(res.removed, 'document', 'documents')} from your account`);
+    return this.load();
   }
 
-  async chooseFolder(button) {
-    button.disabled = true;
-    const res = await this.api.sync.choose();
-    button.disabled = false;
-    if (!res.ok) return this.toast(res.error, 'error');
-    if (res.canceled) return;
+  // ---------- the vaults on this computer ----------
 
-    const look = res.preview || {};
-    const skipped = look.skippedTotal || 0;
-    this.toast(
-      `Syncing ${look.files || 0} document${look.files === 1 ? '' : 's'}`
-      + (skipped ? ` · ${skipped} other file${skipped === 1 ? '' : 's'} left alone` : ''),
-    );
-    await this.load();
-  }
+  drawKnown() {
+    const known = (this.view && this.view.known) || [];
+    const here = this.view && this.view.vault ? this.view.vault.root : null;
+    const others = known.filter(v => v.root !== here);
+    if (!others.length) return null;
 
-  /** The "this document" block: push it up, or show that it is already linked. */
-  drawCurrent() {
-    const doc = this.getDoc();
     const section = el('section', { class: 'vault-section' });
-    section.append(el('h3', { text: 'This document' }));
+    section.append(el('h3', { text: 'Your other vaults' }));
 
-    if (!doc) {
-      section.append(el('p', { class: 'vault-note', text: 'Open a document to sync it.' }));
-      return section;
-    }
+    for (const vault of others) {
+      const row = el('div', { class: 'vault-row' });
+      const label = el('div', { class: 'vault-row-main' });
+      const name = el('b', { text: vault.name });
+      name.title = vault.root;
+      label.append(name);
+      label.append(el('span', {
+        text: vault.linked
+          ? `Linked${vault.lastSyncAt ? ` · synced ${when(vault.lastSyncAt)}` : ''}`
+          : 'On this computer only',
+      }));
 
-    const link = this.links[doc.path];
-
-    if (link) {
-      const info = el('div', { class: 'vault-current-info' });
-      info.append(
-        el('b', { text: link.vaultPath }),
-        el('span', { text: link.syncedAt ? `synced ${when(link.syncedAt)}` : 'not synced yet' }),
-      );
-
-      const sync = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Sync now' });
-      sync.addEventListener('click', () => this.push(link.vaultPath, sync));
-
-      const stop = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Unlink' });
-      stop.addEventListener('click', async () => {
-        const res = await this.api.vault.unlink();
-        if (res.ok) {
-          this.links = res.links || {};
-          this.toast('This document is no longer linked to your vault');
-          this.drawVault();
+      const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open' });
+      open.addEventListener('click', async () => {
+        const res = await this.api.vaults.open(vault.root);
+        if (!res.ok) {
+          this.toast(res.error, 'error');
+          await this.load();
+          return;
         }
+        this.toast(`Opened “${vault.name}”`);
+        await this.load();
       });
 
-      section.append(info, el('div', { class: 'vault-row-acts' }, sync, stop));
-    } else {
-      const name = el('input', {
-        type: 'text', class: 'vault-name',
-        value: doc.name || '',
-        'aria-label': 'Name in the vault',
-      });
-      const send = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Sync to vault' });
-      send.addEventListener('click', () => this.push(name.value.trim(), send));
-      section.append(name, el('div', { class: 'vault-row-acts' }, send));
+      row.append(label, el('div', { class: 'vault-row-acts' }, open));
+      section.append(row);
     }
-
     return section;
   }
+
+  // ---------- what is actually up there ----------
 
   drawFiles() {
     const section = el('section', { class: 'vault-section' });
 
     const head = el('div', { class: 'vault-section-head' });
-    head.append(el('h3', { text: 'In your vault' }));
+    head.append(el('h3', { text: 'All synced documents' }));
     if (this.files.length) {
       const graph = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Graph' });
       graph.addEventListener('click', () => this.onGraph());
@@ -546,7 +723,10 @@ export class Vault {
     section.append(head);
 
     if (!this.files.length) {
-      section.append(el('p', { class: 'vault-note', text: 'Nothing here yet. Sync a document to get started.' }));
+      section.append(el('p', {
+        class: 'vault-note',
+        text: 'Nothing here yet. Link a vault and what is in it appears here.',
+      }));
       return section;
     }
 
@@ -555,13 +735,11 @@ export class Vault {
   }
 
   /**
-   * The vault as its folders, not as a list of paths.
+   * The account as its folders, not as a list of paths.
    *
-   * A flat list was readable when a vault held a handful of documents pushed
-   * one at a time. A synced folder puts its whole shape up there — notebooks,
-   * sub-folders, a Journal with a year in it — and then every row reads
-   * `Journal/2026/today.md` and two notes called `today` are told apart by
-   * squinting at a prefix. Folders fold; what is inside them is indented.
+   * The top level of this tree is the vaults: every document in a linked vault
+   * is named under that vault's name, which is what keeps two vaults holding a
+   * `Notes/today.md` each from ever meeting.
    */
   drawTree(node, trail = '') {
     const list = el('ul', { class: 'vault-tree' });
@@ -602,7 +780,7 @@ export class Vault {
     // The full name is still what identifies it, so it is still reachable.
     info.title = file.path;
 
-    const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open' });
+    const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Save a copy' });
     open.addEventListener('click', async () => {
       open.disabled = true;
       const res = await this.api.vault.pull(file.path);
@@ -612,95 +790,19 @@ export class Vault {
 
     const del = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Delete' });
     del.addEventListener('click', async () => {
-      if (!window.confirm(`Delete “${file.path}” from your vault? This cannot be undone.`)) return;
+      if (!window.confirm(`Delete “${file.path}” from your account? This cannot be undone.`)) return;
       const res = await this.api.vault.remove(file.path);
       if (!res.ok) return this.toast(res.error, 'error');
-      this.toast('Deleted from your vault');
-      await this.load();
+      this.toast('Deleted');
+      return this.load();
     });
 
     row.append(info, el('div', { class: 'vault-row-acts' }, open, del));
     return row;
   }
 
-  // ---------- pushing ----------
-
-  async push(vaultPath, button) {
-    if (!vaultPath) return this.toast('Give the document a name first', 'error');
-
-    // Syncing a document for the first time under a name something else
-    // already uses would replace that other document. The server cannot catch
-    // this — there is no revision to compare against — so ask here.
-    const doc = this.getDoc();
-    const alreadyLinked = doc && this.links[doc.path];
-    const taken = this.files.some(f => f.path === vaultPath);
-    if (!alreadyLinked && taken) {
-      const ok = window.confirm(
-        `Your vault already has a document called “${vaultPath}”. `
-        + 'Syncing will replace it. Use a different name to keep both.',
-      );
-      if (!ok) return;
-    }
-    button.disabled = true;
-    const label = button.textContent;
-    button.textContent = 'Syncing…';
-
-    const res = await this.api.vault.push(vaultPath);
-
-    button.disabled = false;
-    button.textContent = label;
-
-    if (res.ok) {
-      this.toast(res.unchanged ? 'Already up to date' : `Synced ${res.file.path}`);
-      await this.load();
-      return;
-    }
-
-    if (res.status === 409 && res.conflict) {
-      this.drawConflict(vaultPath, res.conflict);
-      return;
-    }
-    this.toast(res.error, 'error');
-  }
-
-  /**
-   * The vault copy changed on another machine. Neither version is thrown away
-   * without the user saying so.
-   */
-  drawConflict(vaultPath, conflict) {
-    const box = el('section', { class: 'vault-section vault-conflict' });
-    box.append(
-      el('h3', { text: 'Changed somewhere else' }),
-      el('p', {
-        class: 'vault-note',
-        text: `The vault copy of “${vaultPath}” was updated ${when(conflict.updatedAt)}, after this computer last synced. Choose what to keep.`,
-      }),
-    );
-
-    const keep = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Save the vault copy beside mine' });
-    keep.addEventListener('click', async () => {
-      keep.disabled = true;
-      const res = await this.api.vault.keepBoth(vaultPath);
-      keep.disabled = false;
-      if (!res.ok) return this.toast(res.error, 'error');
-      this.toast('Saved the vault copy next to your file');
-      await this.load();
-    });
-
-    const over = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Replace the vault copy' });
-    over.addEventListener('click', async () => {
-      over.disabled = true;
-      const res = await this.api.vault.push(vaultPath, { force: true });
-      over.disabled = false;
-      if (!res.ok) return this.toast(res.error, 'error');
-      this.toast('Vault updated');
-      await this.load();
-    });
-
-    const back = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Cancel' });
-    back.addEventListener('click', () => this.drawVault());
-
-    box.append(el('div', { class: 'vault-stack' }, keep, over, back));
-    this.render(box);
-  }
+  // A loose document is never pushed from here. That is not an omission: the
+  // guarantee that a file outside a vault can never reach the cloud is only
+  // worth having if there is no button that quietly breaks it. To sync
+  // something, put it in a vault and link the vault.
 }

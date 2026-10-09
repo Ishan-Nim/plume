@@ -12,7 +12,7 @@
 // Env: PLUME_VAULT_API (required — never point this at production),
 //      PLUME_SHOTS (directory for screenshots), PLUME_SIZE, PLUME_THEME.
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -72,6 +72,17 @@ const OPEN_VAULT = 'var p = document.querySelector("[data-panel=vault]");'
 const logs = [];
 const results = [];
 let failures = 0;
+
+// Linking a vault and deleting one from the account are confirmed by the main
+// process with a native dialog, which a headless run cannot click. The answers
+// are recorded so the run can assert that the question was asked at all —
+// that confirmation is the control, so a release that quietly dropped it
+// should fail here rather than pass.
+const asked = [];
+dialog.showMessageBox = async (_win, options) => {
+  asked.push(options.title || '');
+  return { response: 0, checkboxChecked: false };
+};
 
 function record(name, ok, detail) {
   results.push({ name, ok, detail });
@@ -137,96 +148,96 @@ async function main(win) {
   const signedIn = await until('!!document.querySelector(".vault-account")', { timeout: 25000 });
   record('signing up signs you in', signedIn,
     signedIn ? await read('document.querySelector(".vault-who b").textContent') : await read('(document.querySelector(".vault-error")||{}).textContent'));
-  await shot('03-signed-in');
+  await shot('02b-signed-in');
 
   if (!signedIn) return;
 
-  record('the quota is shown', /100 MB/.test(await read('document.querySelector(".vault-who span").textContent') || ''),
-    await read('document.querySelector(".vault-who span").textContent'));
+  record('the quota is shown', /100 MB/.test(await read('document.querySelector(".vault-who").textContent') || ''),
+    await read('document.querySelector(".vault-who").textContent'));
 
-  // ---- sync the open document ----
-  const hasSync = await until('!!document.querySelector(".vault-name")');
-  record('the open document can be named and synced', hasSync);
+  // ---- the folder on screen is loose, and says so ----
+  //
+  // This is the promise the whole model rests on, so it is checked in the UI
+  // and not only in the sync tests: a folder you opened while signed in is
+  // still just a folder, and the panel says so rather than offering to sync it.
+  const looseShown = await until('!!document.querySelector(".vault-current-info")');
+  const looseLine = await read('(document.querySelector(".vault-current-info span")||{}).textContent');
+  record('an opened folder is shown as a folder, not a vault',
+    looseShown && /not a vault/i.test(looseLine || ''), looseLine);
+  record('a loose folder offers to become a vault',
+    await read(`[...document.querySelectorAll('.vault-btn')].some(b => /^Create vault/.test(b.textContent.trim()))`));
+  await shot('03-loose-folder');
+
+  // ---- make it a vault ----
+  await run(`
+    const make = [...document.querySelectorAll('.vault-btn')].find(b => /^Create vault/.test(b.textContent.trim()));
+    make.click();
+  `);
+  const becameVault = await until(
+    '/on this computer/i.test((document.querySelector(".vault-current-info span")||{}).textContent || "")',
+    { timeout: 20000 },
+  );
+  record('creating a vault is one click, and it happens in place', becameVault,
+    await read('(document.querySelector(".vault-current-info span")||{}).textContent'));
+  record('a new vault is on this computer only, not linked',
+    await read(`[...document.querySelectorAll('.vault-btn')].some(b => b.textContent.trim() === 'Link to my account')`));
+  record('the vault was made where the notes already are',
+    fs.existsSync(path.join(notebook, '.plume', 'vault.json')));
+  record('creating a vault moved nothing',
+    fs.existsSync(path.join(notebook, 'Index.md'))
+    && fs.existsSync(path.join(notebook, 'Projects', 'Index.md')));
+  await shot('04-local-vault');
+
+  // ---- link it ----
+  //
+  // window.confirm would block the run, so it is answered yes for this click
+  // and put back afterwards. What is being tested is the wiring, not the
+  // dialog — but the dialog existing at all is the point of the next check.
+  const hasConfirm = await read(`(() => {
+    const b = [...document.querySelectorAll('.vault-btn')].find(x => x.textContent.trim() === 'Link to my account');
+    return !!b;
+  })()`);
+  record('linking is offered as a deliberate, separate act', hasConfirm);
 
   await run(`
-    const buttons = [...document.querySelectorAll('.vault-btn')];
-    const sync = buttons.find(b => b.textContent.trim() === 'Sync to vault');
-    sync.click();
+    const was = window.confirm;
+    window.confirm = () => true;
+    const link = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Link to my account');
+    link.click();
+    await new Promise(r => setTimeout(r, 400));
+    window.confirm = was;
   `);
 
-  const synced = await until('document.querySelectorAll(".vault-tree .vault-file").length > 0', { timeout: 25000 });
-  record('the document reaches the vault', synced,
-    synced ? await read('document.querySelector(".vault-tree .vault-file b").textContent') : await read('(document.querySelector(".vault-error")||{}).textContent'));
-  await shot('04-synced');
+  const linked = await until(
+    `[...document.querySelectorAll('.vault-btn')].some(b => b.textContent.trim() === 'Unlink')`,
+    { timeout: 30000 },
+  );
+  record('linking a vault connects it to the account', linked,
+    await read('(document.querySelector(".vault-current-info span")||{}).textContent'));
 
-  // ---- sync the rest, so the graph has links ----
-  for (const name of ['Plume.md', 'Reading.md']) {
-    await run(`window.plume.openPaths([${JSON.stringify(path.join(notebook, name))}]);`);
-    await sleep(1200);
-  }
-  // Those open in their own windows; sync them through the API the panel uses.
-  for (const name of ['Plume.md', 'Reading.md']) {
-    const full = path.join(notebook, name);
-    const other = BrowserWindow.getAllWindows().find(x => x.id !== win.id);
-    if (!other) continue;
-    await other.webContents.executeJavaScript(`(async () => {
-      var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();
-      await new Promise(r => setTimeout(r, 1200));
-      const buttons = [...document.querySelectorAll('.vault-btn')];
-      const sync = buttons.find(b => b.textContent.trim() === 'Sync to vault');
-      if (sync) sync.click();
-      return ${JSON.stringify(full)};
-    })()`).catch(() => {});
-    await sleep(2500);
-    if (other && !other.isDestroyed()) other.close();
-    await sleep(400);
-  }
+  // The renderer's own confirm is not the control — a compromised renderer is
+  // exactly the case it would not survive. The main process has to ask too.
+  record('linking is confirmed by the main process, not only by the panel',
+    asked.some(t => /Link this vault/i.test(t)), asked.join(' | ') || '(nothing asked)');
 
+  const synced = await until('document.querySelectorAll(".vault-tree .vault-file").length > 0', { timeout: 30000 });
+  record('the vault’s documents reach the account', synced,
+    synced ? await read('document.querySelector(".vault-tree .vault-file b").textContent')
+      : await read('(document.querySelector(".vault-error")||{}).textContent'));
+
+  record('the account says which vault the documents are in',
+    /In your account as/.test(await read('document.querySelector(".vault-current-info").textContent') || ''),
+    await read('document.querySelector(".vault-current-info").textContent'));
+  await shot('05-linked-vault');
+
+  // ---- the quota is one pool, and it says so ----
+  record('the quota is shown as one pool across linked vaults',
+    /shared across/.test(await read('document.querySelector(".vault-who").textContent') || ''),
+    await read('document.querySelector(".vault-who").textContent'));
+
+  // ---- the graph, which is a thing only a vault has ----
   await run(OPEN_VAULT);
   await sleep(300);
-  await run(`
-    const buttons = [...document.querySelectorAll('.vault-btn')];
-    const refresh = buttons.find(b => b.textContent.trim() === 'Graph');
-    if (refresh) refresh.click();
-  `);
-
-  // The panel must offer the name of the document that is open now. Offering
-  // the one that was open when it first drew made syncing a second document
-  // overwrite the first one's copy in the vault.
-  await run(`
-    document.getElementById('graph-view-close').click();
-    document.querySelector('.sidebar-tab[data-tab="files"]').click();
-    await new Promise(r => setTimeout(r, 500));
-    const rows = [...document.querySelectorAll('.tree-row')];
-    const row = rows.find(r => r.textContent.trim() === 'Reading');
-    if (row) row.click();
-  `);
-  await sleep(1600);
-  await run(OPEN_VAULT);
-  await sleep(800);
-  const offered = await read('(document.querySelector(".vault-name") || {}).value');
-  record('the name offered is the open document, not a stale one', offered === 'Reading.md', offered);
-
-  // A note inside a folder must keep that folder in its vault name. Offering
-  // the bare file name made two documents called Index.md collide, and syncing
-  // the second one replaced the first.
-  await run(`
-    document.querySelector('.sidebar-tab[data-tab="files"]').click();
-    await new Promise(r => setTimeout(r, 400));
-    const folder = [...document.querySelectorAll('.tree-row')].find(r => r.textContent.trim() === 'Projects');
-    if (folder) folder.click();
-    await new Promise(r => setTimeout(r, 900));
-    const rows = [...document.querySelectorAll('.tree-row.is-file')];
-    const deep = rows.find(r => r.textContent.trim() === 'Index');
-    if (deep) deep.click();
-  `);
-  await sleep(1600);
-  await run(OPEN_VAULT);
-  await sleep(800);
-  const nested = await read('(document.querySelector(".vault-name") || {}).value');
-  record('a note in a folder keeps its folder in the vault name',
-    nested === 'Projects/Index.md', nested);
-
   await run(`
     const again = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Graph');
     if (again) again.click();
@@ -240,7 +251,7 @@ async function main(win) {
   const meta = await read('document.getElementById("graph-view-meta").textContent');
   record('the graph has documents and links', /document/.test(meta || ''), meta);
   await sleep(1500);
-  await shot('05-graph');
+  await shot('06-graph');
 
   record('the graph canvas painted', await read(`(() => {
     const c = document.getElementById('graph-view-canvas');
@@ -262,7 +273,7 @@ async function main(win) {
   record('signing out returns to the form', signedOut);
   record('no account details are left behind',
     await read('!document.querySelector(".vault-who")'));
-  await shot('06-signed-out');
+  await shot('07-signed-out');
 }
 
 app.on('browser-window-created', (_e, win) => {

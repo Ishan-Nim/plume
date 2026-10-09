@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Plume Vault — sign in</title>
-<meta name="description" content="Sign in to Plume Vault. 100 MB of free storage for your Markdown notes, synced between Plume on your computers and your browser.">
+<meta name="description" content="Sign in to Plume Vault. 100 MB of free storage, shared across the vaults you link, and readable in your browser.">
 <link rel="canonical" href="https://plume-md.com/app.html">
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <meta name="theme-color" content="#6e56cf">
@@ -153,8 +153,8 @@
   .files .n b { display: block; font-weight: 560; font-size: .95rem; word-break: break-all; }
   .files .n span { font-size: .81rem; color: var(--text-3); }
 
-  /* Folders, so a vault with a synced notebook in it can be read as one. */
-  .files .files { margin: 4px 0 0; padding-left: 10px; border-left: 1px solid var(--border); gap: 4px; }
+  /* Folders, so a vault with a folder tree in it can be read as one. */
+  .files .files { margin: 4px 0 0; padding-left: 10px; border-left: 1px solid var(--line); gap: 4px; }
   .files li.dir-item { display: block; padding: 0; border: 0; background: none; }
   .files .dir > summary {
     display: flex; align-items: center; gap: 8px;
@@ -175,6 +175,42 @@
   .dir-count { margin-left: auto; font-size: .78rem; font-weight: 500; color: var(--text-3); }
   .files .acts { display: flex; gap: 6px; flex: none; }
   .empty { color: var(--text-3); font-size: .93rem; text-align: center; padding: 26px 0; }
+
+  /* Vaults. A linked vault owns one top-level folder of the account, so the
+     grouping is that first path segment and nothing cleverer. */
+  .vaults { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; }
+  .vaults > li { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-2); padding: 5px; }
+  .vault > summary {
+    display: flex; align-items: center; gap: 9px; list-style: none;
+    padding: 9px 11px; border-radius: 9px; cursor: pointer;
+    font-weight: 600; font-size: .97rem;
+  }
+  .vault > summary::-webkit-details-marker { display: none; }
+  .vault > summary::before {
+    content: ""; flex: 0 0 auto; width: 0; height: 0;
+    border-left: 5px solid currentColor;
+    border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+    transition: transform .12s ease; transform-origin: 30% 50%;
+  }
+  .vault[open] > summary::before { transform: rotate(90deg); }
+  .vault > summary:hover { background: var(--chrome-2, rgba(128,128,128,.12)); }
+  .vault-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vault-meta { margin-left: auto; flex: none; font-size: .79rem; font-weight: 500; color: var(--text-3); }
+  .vault > .files { margin: 2px 0 6px; padding: 0 6px; }
+  .vault.loose > summary { font-weight: 560; color: var(--text-2); }
+  .vault-note { margin: 0 11px 10px; font-size: .83rem; color: var(--text-3); }
+
+  .dest { display: grid; gap: 8px; justify-items: center; margin-top: 18px; }
+  .dest-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .dest label { font-size: .85rem; font-weight: 580; color: var(--text-2); }
+  .dest select, .dest input {
+    font: inherit; font-size: .92rem; padding: 8px 11px;
+    border: 1px solid var(--line-2); border-radius: 9px; background: var(--bg); color: var(--text);
+  }
+  .dest select:focus, .dest input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .drop-where { margin: 12px 0 0; font-size: .86rem; color: var(--text-3); }
+
+  .quota-note { margin: 12px 0 0; font-size: .85rem; color: var(--text-3); }
 
   .viewer { margin-top: 20px; display: none; }
   .viewer.show { display: block; }
@@ -281,7 +317,7 @@
     <div class="section-head" style="margin-bottom:26px">
       <span class="kicker">Plume Vault</span>
       <h1 style="font-size:clamp(1.9rem,4.4vw,2.6rem)">Your notes, on every machine.</h1>
-      <p>100&nbsp;MB of storage, free with an account. Sync from Plume on your desktop, read them anywhere.</p>
+      <p>100&nbsp;MB of storage, free with an account, shared across every vault you link to it. Read them here, write them in Plume.</p>
     </div>
 
     <div class="panel">
@@ -303,7 +339,7 @@
                  aria-describedby="pw-hint" placeholder="••••••••••">
           <span class="hint" id="pw-hint">At least 10 characters, with a number or symbol.</span>
         </div>
-        <button class="btn btn-primary btn-lg btn-block" type="submit" id="auth-submit">Create my vault</button>
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="auth-submit">Create my account</button>
         <p class="forgot" id="forgot-row" hidden>
           <button type="button" class="linkish" id="forgot">Forgot your password?</button>
         </p>
@@ -317,20 +353,26 @@
     <div class="panel">
       <h2>How syncing works</h2>
       <ol class="how" style="list-style:none;padding:0">
-        <li><span><b>Create an account</b> here — that is the whole sign-up. You get 100&nbsp;MB.</span></li>
-        <li><span><b>Open Plume</b> on your computer and sign in under <b>⋯ → Plume Vault</b>.</span></li>
-        <li><span><b>Push a document</b> to the vault from the toolbar, or turn on auto-sync so every save goes up.</span></li>
-        <li><span><b>Open it anywhere</b> — another computer running Plume, or right here in your browser.</span></li>
+        <li><span><b>Open a folder</b> in Plume and it stays a folder. A folder on your disk is never quietly made into a vault, and a loose folder can never sync.</span></li>
+        <li><span><b>Create a vault</b> when you want that folder to be one. Plume writes a <code>.plume</code> directory into it — an id, its own settings, an index of its files. A vault can stay on that one computer forever, and costs no storage.</span></li>
+        <li><span><b>Link it to your account</b>, one vault at a time. Linking is a deliberate act on a vault, not a setting on the account: signing in links nothing by itself.</span></li>
+        <li><span><b>Clone it on the second computer</b> — sign in there, pick the vault, and Plume downloads it. Or read it right here in your browser.</span></li>
       </ol>
       <p style="margin-top:18px;font-size:.9rem;color:var(--text-3)">
-        Needs Plume 1.1 or later. <a href="download.html">Get the latest version</a>.
+        A linked vault takes one top-level folder of your account, named after the vault. Link as many as you like — vaults are not rationed. The 100&nbsp;MB is bytes, drawn from one pool shared by all of them.
+      </p>
+      <p style="margin-top:10px;font-size:.9rem;color:var(--text-3)">
+        Unlinking a vault leaves both copies alone: the files stay on your disk and in your account, and no storage is freed. Deleting a vault from the account is the separate, destructive act that frees it.
+      </p>
+      <p style="margin-top:10px;font-size:.9rem;color:var(--text-3)">
+        Vaults need Plume 1.8 or later. <a href="download.html">Get the latest version</a>.
       </p>
     </div>
   </div>
 
   <!-- ============ signed in ============ -->
   <div id="vault" hidden>
-    <h2 class="sr-only">Your vault</h2>
+    <h2 class="sr-only">Your vaults</h2>
     <div class="panel">
       <div class="acct">
         <div class="who">
@@ -344,15 +386,19 @@
         <span id="v-used">—</span>
         <span id="v-files">—</span>
       </div>
+      <p class="quota-note">
+        Vaults themselves are not rationed — link as many as you have. What is
+        counted is bytes, and every linked vault draws on this one pool.
+      </p>
     </div>
 
 
     <div class="panel">
       <h2>API tokens</h2>
       <p class="hint" style="font-size:.9rem;color:var(--text-2);margin-top:6px">
-        A token lets a tool reach this vault without your password — Claude Code, Codex or any
+        A token lets a tool reach this account without your password — Claude Code, Codex or any
         MCP client, an editor plugin, a script. Treat one like a password: it can read and change
-        every document here.
+        every document in every vault linked here.
       </p>
 
       <div class="msg" id="tok-msg" role="alert"></div>
@@ -376,8 +422,8 @@
 
       <h3 style="margin-top:26px;font-size:1rem">Using it with Claude Code</h3>
       <p class="hint" style="font-size:.9rem;color:var(--text-2);margin-top:6px">
-        Add this to your MCP settings, and Claude can keep project memory and notes in your vault —
-        readable from Plume on any of your machines.
+        Add this to your MCP settings, and Claude can keep project memory and notes in a vault on
+        this account — readable from Plume on any machine that has cloned it.
       </p>
       <pre class="snippet">{
   "mcpServers": {
@@ -407,8 +453,8 @@
         </div>
       </div>
       <p class="hint" style="font-size:.88rem;color:var(--text-3);margin-top:6px">
-        How your documents link to each other. Drag a note to move it, scroll to zoom,
-        double-click to open.
+        How your documents link to each other, across every vault on this account. Drag a note to
+        move it, scroll to zoom, double-click to open.
       </p>
       <div class="graph-stage">
         <canvas id="graph-canvas" aria-label="A map of the links between your documents"></canvas>
@@ -419,18 +465,17 @@
     </div>
 
     <div class="panel">
-      <h2>Documents</h2>
+      <h2>Vaults</h2>
+      <p class="hint" style="font-size:.9rem;color:var(--text-2);margin-top:6px">
+        Each vault you have linked holds one top-level folder here, named after it. Open one to see
+        the documents inside.
+      </p>
       <div class="msg" id="vault-msg" role="alert"></div>
 
-      <div class="drop" id="drop">
-        <b>Drop Markdown files here</b> to add them to your vault,<br>
-        or <button type="button" class="btn btn-ghost btn-sm" id="pick" style="margin-top:10px">choose files</button>
-        <input type="file" id="file-input" multiple hidden
-               accept=".md,.markdown,.mdown,.mkd,.mkdn,.mdwn,.mdtxt,.mdtext,.txt,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.avif">
-      </div>
-
-      <ul class="files" id="file-list"></ul>
-      <p class="empty" id="file-empty" hidden>Nothing in your vault yet.</p>
+      <ul class="vaults" id="vault-list"></ul>
+      <p class="empty" id="file-empty" hidden>
+        Nothing is linked to this account yet. Create a vault in Plume and link it, or upload a document below.
+      </p>
 
       <div class="viewer" id="viewer">
         <header>
@@ -438,6 +483,25 @@
           <button class="btn btn-ghost btn-sm" type="button" id="viewer-close">Close</button>
         </header>
         <pre id="viewer-body"></pre>
+      </div>
+
+      <div class="dest">
+        <label for="dest-vault">Upload into</label>
+        <div class="dest-row">
+          <select id="dest-vault" aria-describedby="drop-where">
+            <option value="">Choose a vault…</option>
+          </select>
+          <input type="text" id="dest-new" hidden maxlength="60"
+                 placeholder="Name for the new vault" aria-label="Name for the new vault">
+        </div>
+      </div>
+
+      <div class="drop" id="drop">
+        <b>Drop Markdown files here</b>,
+        or <button type="button" class="btn btn-ghost btn-sm" id="pick">choose files</button>
+        <input type="file" id="file-input" multiple hidden
+               accept=".md,.markdown,.mdown,.mkd,.mkdn,.mdwn,.mdtxt,.mdtext,.txt,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.avif">
+        <p class="drop-where" id="drop-where" role="status">Pick a vault first — nothing is uploaded until a document has somewhere to go.</p>
       </div>
     </div>
   </div>
@@ -495,5 +559,6 @@
 <script src="assets/site.js"></script>
 <script src="assets/graph.js"></script>
 <script src="assets/app.js"></script>
+
 </body>
 </html>
