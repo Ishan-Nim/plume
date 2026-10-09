@@ -431,20 +431,45 @@
 
     <h3>A synced folder</h3>
     <p>
-      Open the <b>Plume Vault</b> bar at the foot of the sidebar, sign in, and choose a folder.
-      From then on everything inside it — notes, images and sub-folders — goes up by itself and
-      stays up to date, keeping the same shape it has on disk.
+      Open the <b>Plume Vault</b> bar at the foot of the sidebar and sign in. The folder you
+      already have open becomes your vault — there is nothing else to choose. From then on the
+      folder and the vault are the same notebook: what you write here goes up, what was written
+      on another computer or in the web vault comes down, and a document deleted on one side goes
+      on the other.
+    </p>
+    <p>
+      Opening a single file on its own never syncs anything. A vault is a folder.
     </p>
     <ul>
+      <li><b>Both ways, by itself.</b> Plume watches the folder while it is open and checks again every few minutes, so an edit made in any editor, on any of your computers, reaches the others without being asked.</li>
+      <li><b>Nothing is destroyed to settle a disagreement.</b> If the same note was edited here <i>and</i> somewhere else before they met, both are kept: yours stays where it is and the vault's copy is saved beside it as <code>note (vault copy …).md</code>. An edit always beats a delete.</li>
+      <li><b>A delete that arrives from elsewhere is recoverable.</b> The document is moved into a hidden <code>.plume-trash</code> folder inside your folder, not erased.</li>
       <li><b>Folders are kept.</b> <code>Projects/Plume.md</code> arrives as <code>Projects/Plume.md</code>, so two notes called <code>README</code> in different folders never collide.</li>
       <li><b>Only documents and images are uploaded.</b> Markdown, text, CSV, JSON, YAML, and PNG, JPEG, GIF, WebP and AVIF images. Programs, installers, archives and anything else are refused by an allow-list and stay on your computer.</li>
       <li><b>It watches while Plume is open</b> and checks again every few minutes, so edits made in any editor go up on their own.</li>
       <li><b>Pause</b> it at any time, or <b>Stop</b> syncing the folder. Stopping deletes nothing: the folder stays on your computer and what is already in the vault stays in the vault.</li>
       <li>Up to 2000 documents and 10&nbsp;MB per file. Hidden folders, <code>node_modules</code> and the like are skipped.</li>
     </ul>
+    <h3>More than one notebook</h3>
+    <p>
+      A vault holds as many notebooks as you have projects. Each folder you sync takes a folder of
+      its own inside the vault, named after itself, so choosing a different folder adds a second
+      notebook rather than merging two into one — and the one you stopped syncing is still there,
+      under its name.
+    </p>
+    <ul>
+      <li><b>Three projects, three folders.</b> Open one and it is the vault; open another and that
+        one is, each keeping its own notebook in the cloud.</li>
+      <li><b>On another computer</b>, sign in and the vault panel lists the notebooks you already
+        have. Press <b>Open here</b>, say where it should go, and Plume makes the folder and
+        downloads what is in it. That folder is then your vault on that machine, syncing both ways
+        like any other.</li>
+    </ul>
+
     <div class="callout">
-      <b>Where is the vault folder on my computer?</b> Wherever you chose — Plume does not create
-      one. It syncs a folder you already have, in place, and never moves or renames your files.
+      <b>Where is the vault folder on my computer?</b> Wherever you chose — Plume never moves or
+      renames the files in a folder you already have. The one time it makes a folder for you is
+      <b>Open here</b>, when you are putting a notebook on a computer that does not have it yet.
     </div>
     <figure>
       <img src="assets/shots/vault-signin.png" width="1380" height="880" loading="lazy" alt="The Plume Vault bar at the foot of the sidebar, with the sign-in form open above it">
