@@ -12,6 +12,13 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
+const os = require('node:os');
+const fs = require('node:fs');
+
+// sync.js asks vaults.js which computer this is, to name a conflict copy.
+// Outside a window there is no userData folder, so it is told where to look.
+process.env.PLUME_USER_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-sync-test-'));
+
 const sync = require(path.join(__dirname, '..', 'src', 'main', 'sync.js'));
 
 const file = sha => ({ sha256: sha });
@@ -188,4 +195,58 @@ test('ordinary tidying is not stopped', () => {
   assert.ok(!sync.alarming(12, 200), 'a dozen out of two hundred is tidying');
   assert.ok(!sync.alarming(3, 3), 'three documents is not an accident');
   assert.ok(!sync.alarming(0, 47), 'nothing to delete');
+});
+
+// ---------------------------------------------------------------------------
+// Conflict copies
+//
+// When both sides moved, both are kept. The copy that comes down has to be
+// told apart from the one that was already here, and from a conflict on
+// another machine last week — so it is named for the day and the computer.
+
+test('a conflict copy sits beside the original, named for the day and the machine', () => {
+  const made = sync.conflictPath(path.join('C:', 'Notes', 'idea.md'));
+  const name = path.basename(made);
+
+  assert.equal(path.dirname(made), path.join('C:', 'Notes'), 'beside the original');
+  assert.ok(name.startsWith('idea (conflict '), `got ${name}`);
+  assert.ok(name.endsWith('.md'), 'still a Markdown file, so it opens like one');
+  assert.match(name, /\(conflict \d{4}-\d{2}-\d{2} /, 'the day it happened');
+});
+
+test('a conflict copy never overwrites the document it is a copy of', () => {
+  const original = path.join('C:', 'Notes', 'idea.md');
+  assert.notEqual(sync.conflictPath(original), original);
+});
+
+// ---------------------------------------------------------------------------
+// Naming a vault in the account
+//
+// A remote vault is one top-level folder of the account's store. Two vaults
+// linked under one name would merge into one notebook, so a name that is
+// taken is never handed out twice.
+
+const vault = require(path.join(__dirname, '..', 'src', 'main', 'vault.js'));
+
+test('a vault name becomes a folder name the account will accept', () => {
+  assert.equal(vault.remoteNameFrom('My Notes'), 'My Notes');
+  assert.equal(vault.remoteNameFrom('Work/2026'), 'Work 2026', 'no second level smuggled in');
+  assert.equal(vault.remoteNameFrom('..'), 'Vault', 'never a step outside');
+  assert.equal(vault.remoteNameFrom('.hidden'), 'hidden');
+  assert.equal(vault.remoteNameFrom(''), 'Vault');
+  assert.equal(vault.remoteNameFrom(null), 'Vault');
+});
+
+test('a name already in use is not handed out a second time', () => {
+  assert.equal(vault.freeRemoteName('Notes', []), 'Notes');
+  assert.equal(vault.freeRemoteName('Notes', ['Notes']), 'Notes 2');
+  assert.equal(vault.freeRemoteName('Notes', ['Notes', 'Notes 2']), 'Notes 3');
+  // Case is not a distinction the store can be trusted to make.
+  assert.equal(vault.freeRemoteName('Notes', ['notes']), 'Notes 2');
+});
+
+test('a document names the vault it belongs to', () => {
+  assert.equal(vault.remoteOf('Work Notes/Projects/plan.md'), 'Work Notes');
+  // A document at the top of the store belongs to no vault at all.
+  assert.equal(vault.remoteOf('stray.md'), '');
 });

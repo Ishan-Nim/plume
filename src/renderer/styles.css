@@ -769,7 +769,9 @@ body:not(.is-welcome) .welcome { display: none; }
 /* -------------------------------------------------------------- welcome */
 
 .welcome { display: grid; place-items: center; min-height: 100%; padding: 48px 24px; }
-.welcome-inner { width: min(540px, 100%); text-align: center; }
+/* Wide enough for the chooser's two columns; the heading above it stays
+   centred on the same column so the screen reads as one block. */
+.welcome-inner { width: min(760px, 100%); text-align: center; }
 .welcome-logo { display: inline-block; width: 80px; height: 80px; }
 .welcome-logo svg { width: 100%; height: 100%; }
 .welcome h1 { margin: 16px 0 4px; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--heading); }
@@ -843,7 +845,86 @@ body:not(.is-welcome) .welcome { display: none; }
   text-align: left;
 }
 
-.recent { margin-top: 34px; text-align: left; }
+/* The vault chooser: what this computer already has on the left, the ways to
+   get another on the right. A vault is somewhere to keep things, so it comes
+   before the list of recent files, which is only a way back to one. */
+.chooser {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 28px;
+  margin-top: 34px;
+  text-align: left;
+}
+.chooser-side h2,
+.recent h2 {
+  margin: 0 0 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.welcome-vault-list { margin: 0; padding: 0; list-style: none; }
+.welcome-vault { position: relative; display: flex; border-radius: 8px; }
+.welcome-vault:hover { background: var(--chrome); }
+.welcome-vault-open {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  padding: 8px 28px 8px 10px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.welcome-vault-name,
+.welcome-vault-where { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.welcome-vault-name { font-size: 13.5px; font-weight: 500; color: var(--text); }
+.welcome-vault-where { font-size: 11px; color: var(--text-3); }
+.welcome-vault-mark { position: absolute; top: 9px; right: 26px; color: var(--accent); line-height: 0; }
+.welcome-vault-forget { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); opacity: 0; }
+.welcome-vault:hover .welcome-vault-forget,
+.welcome-vault-forget:focus-visible { opacity: 1; }
+
+.chooser-empty { margin: 4px 0 0 10px; font-size: 12.5px; color: var(--text-3); }
+
+.chooser-main {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.chooser-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 14px 14px 18px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.chooser-row:last-child { border-bottom: 0; }
+.chooser-row.quiet { background: var(--chrome); }
+.chooser-row b { display: block; font-size: 13.5px; font-weight: 600; color: var(--text); }
+.chooser-row span {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.chooser-row > div:first-child { min-width: 0; }
+.chooser-row button { flex: none; }
+/* Never squeezed: the text beside it has min-width 0 and shrinks instead. */
+.chooser-pair { flex: none; display: flex; gap: 8px; }
+
+@media (max-width: 880px) {
+  .chooser { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+}
+@media (max-width: 560px) {
+  .chooser-row { flex-direction: column; align-items: stretch; gap: 10px; }
+}
+
+.recent { margin-top: 28px; text-align: left; }
 .recent h2 {
   margin: 0 0 8px 4px;
   font-size: 11px;
@@ -1598,10 +1679,12 @@ summary.callout-title::-webkit-details-marker { display: none; }
   display: flex;
   align-items: center;
   gap: 9px;
-  width: 100%;
+  /* Takes what is left of the row rather than all of it, so the switcher
+     button beside it is not pushed off the edge of the sidebar. */
+  flex: 1;
+  min-width: 0;
   padding: 9px 12px;
   border: 0;
-  border-top: 1px solid var(--border);
   background: var(--chrome);
   color: var(--text-2);
   font: inherit;
@@ -1634,14 +1717,35 @@ summary.callout-title::-webkit-details-marker { display: none; }
    Plume Vault — sidebar panel
    --------------------------------------------------------------------------- */
 
+/* The bar and the switcher button share one strip at the foot of the sidebar:
+   the bar names the vault you are in and opens its panel, the button beside it
+   switches to another. Two acts, so two targets. */
+.vault-bar-row {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  border-top: 1px solid var(--border);
+  background: var(--chrome);
+}
+.vault-switch {
+  flex: none;
+  width: 34px;
+  border-radius: 0;
+  color: var(--text-3);
+}
+.vault-switch:hover { background: var(--chrome-2); color: var(--text); }
+.vault-switch[aria-expanded="true"] { background: var(--chrome-2); color: var(--accent); }
+
 .vault-bar {
   display: flex;
   align-items: center;
   gap: 9px;
-  width: 100%;
+  /* Takes what is left of the row rather than all of it, so the switcher
+     button beside it is not pushed off the edge of the sidebar. */
+  flex: 1;
+  min-width: 0;
   padding: 9px 12px;
   border: 0;
-  border-top: 1px solid var(--border);
   background: var(--chrome);
   color: var(--text-2);
   font: inherit;
@@ -2119,3 +2223,66 @@ body.is-editing #btn-edit { color: var(--accent); background: var(--accent-soft)
   color: var(--text);
 }
 .git-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------------------------------------------------------------------------
+   The vault switcher
+   --------------------------------------------------------------------------- */
+
+.popover.switcher { width: 340px; max-width: calc(100vw - 24px); padding: 6px; }
+.switcher-filter {
+  width: 100%;
+  margin: 2px 0 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.switcher-filter:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.switcher-list { max-height: 320px; overflow-y: auto; }
+.switcher-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.switcher-row:hover { background: var(--chrome); }
+.switcher-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.switcher-row.current { cursor: default; }
+.switcher-row.current:hover { background: transparent; }
+.switcher-main { flex: 1; min-width: 0; }
+.switcher-main b { display: block; font-size: 13px; font-weight: 500; color: var(--text); }
+.switcher-where {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;          /* a long path is identified by its tail, not its head */
+  text-align: left;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.switcher-mark { flex: none; line-height: 0; color: var(--accent); }
+.switcher-current { flex: none; font-size: 11px; color: var(--text-3); }
+.switcher-empty { margin: 10px; font-size: 12.5px; color: var(--text-3); }
+
+.switcher-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
+}
+.switcher-foot .ghost-btn { justify-content: flex-start; width: 100%; text-align: left; }

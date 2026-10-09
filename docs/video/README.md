@@ -41,7 +41,7 @@ published and served from the website:
 | `themes` | Each palette in turn, then dark |
 | `editing` | The editor opening and closing |
 | `git` | The Git sync panel, and one press of Sync now |
-| `vault` | The vault panel with a synced folder |
+| `vault` | The vault panel, with a vault linked to an account |
 | `graph` | The vault graph settling, fitted and re-arranged |
 
 Each is at `https://plume-md.com/assets/clips/<name>.mp4` (and `.webm`, and

@@ -69,6 +69,7 @@ const ui = {
   moreMenu: $('#menu-more'),
   treeMenu: $('#menu-tree'),
   gitPop: $('#pop-git'),
+  vaultsPop: $('#pop-vaults'),
 };
 
 // ---------------------------------------------------------------------------
@@ -829,12 +830,90 @@ function renderRecent() {
   }
 }
 
+/**
+ * The vaults this computer already has, on the welcome screen.
+ *
+ * This is the whole of what a second computer needs: one of these, or the
+ * account, and it is somewhere rather than nowhere. A list of recent *files*
+ * cannot do that job — a file is not a place to keep things.
+ */
+async function renderWelcomeVaults() {
+  const list = $('#welcome-vault-list');
+  const empty = $('#welcome-vault-empty');
+  if (!list) return;
+
+  let view = null;
+  try {
+    view = await api.vaults.state();
+  } catch {
+    return;
+  }
+
+  const known = view.known || [];
+  list.replaceChildren();
+  if (empty) empty.hidden = known.length > 0;
+
+  for (const vault of known) {
+    const item = el('li', { class: 'welcome-vault' });
+    const open = el('button', { class: 'welcome-vault-open', type: 'button', title: vault.root });
+    open.append(
+      el('span', { class: 'welcome-vault-name', text: vault.name }),
+      // The path, because two vaults can share a name and the folder is what
+      // tells them apart — which is exactly the moment somebody needs it.
+      el('span', { class: 'welcome-vault-where', text: vault.root }),
+    );
+    if (vault.linked) {
+      const mark = el('span', { class: 'welcome-vault-mark', title: 'Linked to your account' });
+      mark.innerHTML = icon('cloud', 13);
+      open.append(mark);
+    }
+    open.addEventListener('click', async () => {
+      const res = await api.vaults.open(vault.root);
+      if (!res.ok) {
+        toast(res.error, 'error');
+        return renderWelcomeVaults();
+      }
+      return renderWelcomeVaults();
+    });
+
+    // Taking a vault off this list is about the list, not the folder — so it
+    // is a quiet action on the row rather than anything that looks like a
+    // delete.
+    const forget = el('button', {
+      class: 'welcome-vault-forget icon-btn', type: 'button',
+      title: 'Remove from this list', 'aria-label': `Remove ${vault.name} from this list`,
+    });
+    forget.innerHTML = icon('close', 13);
+    forget.addEventListener('click', async ev => {
+      ev.stopPropagation();
+      await api.vaults.forget(vault.root);
+      return renderWelcomeVaults();
+    });
+
+    item.append(open, forget);
+    list.append(item);
+  }
+
+  // Signed in with no vault here is where a second computer starts, and the
+  // way out of it is the vault panel — so the row says so rather than going
+  // on offering a sign-in to somebody already signed in.
+  const signedIn = Boolean(view.account && view.account.signedIn);
+  const text = $('#welcome-account-text');
+  const button = $('#btn-welcome-account');
+  if (!text || !button) return;
+  text.textContent = signedIn
+    ? `Signed in as ${view.account.email}. Pick one of your vaults and Plume downloads it here.`
+    : 'Sign in to bring a vault from another computer to this one.';
+  button.textContent = signedIn ? 'Choose a vault…' : 'Sign in';
+}
+
 async function showWelcome() {
   state.doc = null;
   body.classList.add('is-welcome');
   document.title = 'Plume';
   updateTitlebar();
   renderRecent();
+  renderWelcomeVaults().catch(() => {});
   fileTree.clear();
   outlineView.clear();
   // With no document open the folder is all there is to show, so show it.
@@ -871,7 +950,13 @@ function togglePopover(button, pop) {
   pop.hidden = false;
   const r = button.getBoundingClientRect();
   const w = pop.offsetWidth;
-  pop.style.top = `${r.bottom + 6}px`;
+  const h = pop.offsetHeight;
+  // Below the button normally, above it when there is no room — the vault bar
+  // sits at the foot of the sidebar, so its popover would otherwise open off
+  // the bottom of the window.
+  const below = r.bottom + 6;
+  const top = below + h <= window.innerHeight - 8 ? below : Math.max(8, r.top - h - 6);
+  pop.style.top = `${top}px`;
   pop.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w))}px`;
   button.classList.add('pressed');
   button.setAttribute('aria-expanded', 'true');
@@ -1088,6 +1173,8 @@ function buildMoreMenu() {
   }
   items.push(
     sep(),
+    menuItem('Switch vault…', 'vault', () => openVaultSwitcher($('#vault-switch')),
+      { shortcut: 'Ctrl+Shift+V' }),
     menuItem('Plume Vault…', 'cloud', openVault),
     menuItem('Git sync…', 'refresh', openGit),
     menuItem('About Plume', 'info', () => api.about()),
@@ -1241,8 +1328,132 @@ function toggleVault() {
   updateSettings({ sidebar: true, sidebarTab: showing ? lastDocTab : 'vault' });
 }
 
-/** Keeps the bar at the foot of the sidebar saying something true. */
-function paintVaultBar(sync, account) {
+// ---------------------------------------------------------------------------
+// Switching vaults
+//
+// Two projects open on two days is the ordinary way to have more than one
+// vault, so moving between them is a thing people do constantly. Sending them
+// back to the welcome screen to do it — or to a file chooser, to find on disk
+// a folder Plume already knows the path of — is the kind of detour that makes
+// somebody keep everything in one vault instead.
+
+/** Opens the switcher under a button, filtered as you type. */
+async function openVaultSwitcher(button) {
+  const pop = ui.vaultsPop;
+  if (openPopover && openPopover.pop === pop) return closePopover();
+
+  let view = null;
+  try {
+    view = await api.vaults.state();
+  } catch {
+    return toast('Could not read your vaults', 'error');
+  }
+
+  const known = view.known || [];
+  const here = view.vault ? view.vault.root : null;
+
+  pop.replaceChildren();
+  pop.append(el('div', { class: 'pop-title', text: 'Switch vault' }));
+
+  const list = el('div', { class: 'switcher-list' });
+
+  const draw = filter => {
+    const want = filter.trim().toLowerCase();
+    const rows = known.filter(v => !want
+      || v.name.toLowerCase().includes(want)
+      || v.root.toLowerCase().includes(want));
+    list.replaceChildren();
+
+    if (!rows.length) {
+      list.append(el('p', {
+        class: 'switcher-empty',
+        text: known.length ? 'No vault matches that.' : 'No vaults on this computer yet.',
+      }));
+      return;
+    }
+
+    for (const vault of rows) {
+      const row = el('button', { class: 'switcher-row', type: 'button', title: vault.root });
+      if (vault.root === here) row.classList.add('current');
+      const main = el('span', { class: 'switcher-main' });
+      main.append(
+        el('b', { text: vault.name }),
+        el('span', { class: 'switcher-where', text: vault.root }),
+      );
+      row.append(main);
+      if (vault.linked) {
+        const mark = el('span', { class: 'switcher-mark', title: 'Linked to your account' });
+        mark.innerHTML = icon('cloud', 13);
+        row.append(mark);
+      }
+      // The one you are already in is shown so the list is the whole truth,
+      // but switching to it would reload a window for nothing.
+      if (vault.root === here) {
+        row.append(el('span', { class: 'switcher-current', text: 'open' }));
+      } else {
+        row.addEventListener('click', async () => {
+          closePopover();
+          const res = await api.vaults.open(vault.root);
+          if (!res.ok) return toast(res.error, 'error');
+          toast(`Switched to “${vault.name}”`);
+          return undefined;
+        });
+      }
+      list.append(row);
+    }
+  };
+
+  // The filter earns its place once somebody has more than a handful; below
+  // that it is noise, and the list is already one glance.
+  let input = null;
+  if (known.length > 6) {
+    input = el('input', {
+      type: 'text', class: 'switcher-filter', placeholder: 'Filter vaults…',
+      'aria-label': 'Filter vaults',
+    });
+    input.addEventListener('input', () => draw(input.value));
+    pop.append(input);
+  }
+
+  pop.append(list);
+  draw('');
+
+  const foot = el('div', { class: 'switcher-foot' });
+  const make = el('button', { class: 'ghost-btn', type: 'button', text: 'Create a vault…' });
+  make.addEventListener('click', async () => {
+    closePopover();
+    const res = await api.vaults.create({ choose: true, mode: 'create' });
+    if (!res.ok) return toast(res.error, 'error');
+    if (res.canceled) return undefined;
+    toast(`“${res.vault.name}” is now a vault`);
+    return undefined;
+  });
+  const open = el('button', { class: 'ghost-btn', type: 'button', text: 'Open a folder as a vault…' });
+  open.addEventListener('click', async () => {
+    closePopover();
+    const res = await api.vaults.create({ choose: true, mode: 'adopt' });
+    if (!res.ok) return toast(res.error, 'error');
+    if (res.canceled) return undefined;
+    toast(`“${res.vault.name}” is now a vault`);
+    return undefined;
+  });
+  foot.append(make, open);
+  pop.append(foot);
+
+  togglePopover(button, pop);
+  if (input) input.focus({ preventScroll: true });
+  return undefined;
+}
+
+/**
+ * Keeps the bar at the foot of the sidebar saying something true.
+ *
+ * It names the vault the window is in, not the account, because that is the
+ * thing the reader is working on and the thing whose state changes. The three
+ * states a folder can be in each get a plain sentence: a folder, a vault on
+ * this computer, or a vault that syncs.
+ */
+function paintVaultBar(view, account) {
   // Signed in with no document and no folder is where a second computer
   // starts, and the vault — the only thing that gets it out of that state —
   // is in the sidebar, which the welcome screen otherwise tucks away.
@@ -1255,33 +1466,43 @@ function paintVaultBar(sync, account) {
   $('#vault-bar').setAttribute('aria-expanded',
     String(Boolean(state.settings && state.settings.sidebarTab === 'vault')));
 
-  if (!account || !account.signedIn) {
-    title.textContent = 'Plume Vault';
-    status.textContent = 'Sign in to sync';
+  const vault = view && view.vault;
+
+  if (!vault) {
+    title.textContent = view && view.folder ? view.folderName : 'Plume Vault';
+    if (view && view.folder) status.textContent = 'A folder, not a vault';
+    else if (account && account.signedIn) status.textContent = 'No vault open';
+    else status.textContent = 'Sign in to sync';
     return;
   }
 
-  title.textContent = account.email || 'Plume Vault';
+  title.textContent = vault.name;
 
-  if (!sync || !sync.folder) {
-    status.textContent = 'No folder synced';
+  if (!vault.linked) {
+    status.textContent = 'On this computer';
     return;
   }
+
+  const sync = (view && view.sync) || {};
   switch (sync.status) {
     case 'scanning':
-      status.textContent = 'Checking the folder…';
+      status.textContent = 'Checking the vault…';
       break;
     case 'syncing':
-      status.textContent = sync.total ? `Syncing ${Math.min(sync.done + 1, sync.total)} of ${sync.total}…` : 'Syncing…';
+      status.textContent = sync.total
+        ? `Syncing ${Math.min(sync.done + 1, sync.total)} of ${sync.total}…` : 'Syncing…';
       break;
     case 'paused':
       status.textContent = 'Sync paused';
+      break;
+    case 'offline':
+      status.textContent = 'Sign in to sync';
       break;
     case 'error':
       status.textContent = sync.lastError || 'Sync problem';
       break;
     default:
-      status.textContent = 'Folder up to date';
+      status.textContent = 'In sync';
   }
 }
 
@@ -1535,6 +1756,27 @@ function wireUi() {
   $('#btn-more').addEventListener('click', e => togglePopover(e.currentTarget, ui.moreMenu));
   $('#btn-welcome-open').addEventListener('click', openDialog);
   $('#btn-welcome-folder').addEventListener('click', () => openFolder().catch(console.error));
+
+  // Making a vault and claiming a folder that already has notes in it are the
+  // same act underneath — a `.plume/` written where the files already are —
+  // but they are different questions to be asked, so the chooser they open
+  // asks them differently.
+  const makeVault = async mode => {
+    const res = await api.vaults.create({ choose: true, mode });
+    if (!res.ok) return toast(res.error, 'error');
+    if (res.canceled) return undefined;
+    toast(`“${res.vault.name}” is now a vault`);
+    await renderWelcomeVaults();
+    updateSettings({ sidebar: true, sidebarTab: 'vault' });
+    return vault().show({ force: true });
+  };
+  $('#btn-welcome-vault').addEventListener('click', () => makeVault('create'));
+  $('#btn-welcome-adopt').addEventListener('click', () => makeVault('adopt'));
+
+  $('#btn-welcome-account').addEventListener('click', () => {
+    updateSettings({ sidebar: true, sidebarTab: 'vault' });
+    vault().show({ force: true });
+  });
   $('#btn-default').addEventListener('click', () => api.openDefaultApps());
   $('#btn-tree-refresh').addEventListener('click', () => fileTree.refresh());
   $('#banner-close').addEventListener('click', hideBanner);
@@ -1545,9 +1787,21 @@ function wireUi() {
   $('#btn-save').addEventListener('click', saveDoc);
 
   $('#vault-bar').addEventListener('click', toggleVault);
-  api.onSyncChanged(sync => {
-    lastSyncState = sync;
-    paintVaultBar(sync, lastVaultState);
+  $('#vault-switch').addEventListener('click', ev => {
+    ev.stopPropagation();
+    openVaultSwitcher($('#vault-switch'));
+  });
+  api.onVaultsChanged(view => {
+    lastSyncState = view;
+    paintVaultBar(view, lastVaultState);
+  });
+  api.onSyncChanged(() => {
+    // A sync moved. What the bar needs is this window's vault, which only the
+    // main process can say, so ask rather than guess from the list.
+    api.vaults.state().then(view => {
+      lastSyncState = view;
+      paintVaultBar(view, lastVaultState);
+    }).catch(() => {});
   });
   api.onVaultChanged(account => {
     lastVaultState = account;
@@ -1555,11 +1809,12 @@ function wireUi() {
   });
 
   // Asked once at boot: the window has to know whether there is an account
-  // before anyone changes it, or a computer that is already signed in opens
-  // with its vault hidden.
-  api.vault.state().then(account => {
-    lastVaultState = account;
-    paintVaultBar(lastSyncState, account);
+  // and what the folder on screen is before anyone changes either, or a
+  // computer that is already signed in opens with its vault hidden.
+  api.vaults.state().then(view => {
+    lastSyncState = view;
+    lastVaultState = view.account;
+    paintVaultBar(view, view.account);
   }).catch(() => {});
 
   $('#graph-view-close').addEventListener('click', closeGraph);
@@ -1756,6 +2011,10 @@ function wireKeys() {
     if (ctrl && e.shiftKey && lower === 'n') {
       e.preventDefault();
       return newNote();
+    }
+    if (ctrl && e.shiftKey && lower === 'v') {
+      e.preventDefault();
+      return openVaultSwitcher($('#vault-switch'));
     }
     if (ctrl && e.shiftKey && lower === 'g') {
       e.preventDefault();

@@ -30,9 +30,13 @@ const DEFAULTS = Object.freeze({
   autoUpdate: true,       // check GitHub for a newer release on launch
   skippedVersion: null,   // a version the user chose not to be told about again
   folder: null,           // the folder of notes the sidebar opens on
-  vaultFolder: null,      // the folder kept in step with the vault, if any
-  vaultPrefix: null,      // the folder that folder occupies inside the vault
+  // Kept only so a vault made by an older Plume can be recognised and carried
+  // across on first launch. Syncing is a property of a vault now — see
+  // vaults.js — and nothing writes these again once the move has happened.
+  vaultFolder: null,      // the folder an older Plume kept in step
+  vaultPrefix: null,      // the folder it occupied inside the account
   syncPaused: false,
+  migratedVaults: false,  // the one-time move from a single synced folder
   gitFolder: null,        // a folder kept in step with a Git remote, if any
   gitAuto: false,         // sync it on a timer as well as on demand
   gitEvery: 15,           // minutes between automatic syncs
@@ -58,6 +62,7 @@ const VALIDATORS = {
   vaultFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
   vaultPrefix: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 200),
   syncPaused: v => typeof v === 'boolean',
+  migratedVaults: v => typeof v === 'boolean',
   gitFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
   gitAuto: v => typeof v === 'boolean',
   gitEvery: v => Number.isInteger(v) && v >= 1 && v <= 1440,

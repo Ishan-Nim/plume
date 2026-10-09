@@ -381,12 +381,116 @@ async function list() {
   return { files: data.files, account: data.account, links: { ...links } };
 }
 
+// ---------- remote vaults ----------
+
+// The account holds a flat, content-addressed store keyed by path. A remote
+// vault is the top-level folder of that store: every document in it begins
+// with the vault's remote name. That is the whole of the mapping, and it is
+// what lets one account hold any number of vaults against a single quota
+// without the server having to know what a vault is.
+//
+// Keeping it to one segment is the part that matters. Two vaults can hold a
+// `Notes/today.md` each and never meet, and cloning one is "everything under
+// this prefix" rather than a list the client has to be trusted to assemble.
+
+const MAX_REMOTE_NAME = 120;
+
+/** A top-level folder name the vault will accept, from a vault's name. */
+function remoteNameFrom(name) {
+  const flat = String(name || '').replace(/[\\/]+/g, ' ').trim();
+  const clean = [...flat]
+    .filter(ch => ch.charCodeAt(0) >= 0x20 && ch.charCodeAt(0) !== 0x7f)
+    .join('')
+    .replace(/^[.]+/, '')
+    .trim();
+  return clean.slice(0, MAX_REMOTE_NAME) || 'Vault';
+}
+
+/** The same, but not one already in use by another remote vault. */
+function freeRemoteName(name, taken) {
+  const base = remoteNameFrom(name);
+  const used = new Set((taken || []).map(n => String(n).toLowerCase()));
+  if (!used.has(base.toLowerCase())) return base;
+  for (let n = 2; n < 1000; n += 1) {
+    const candidate = `${base} ${n}`;
+    if (!used.has(candidate.toLowerCase())) return candidate;
+  }
+  return `${base} ${Date.now()}`;
+}
+
+/** The top-level segment of a vault path, which names the remote vault. */
+function remoteOf(vaultPath) {
+  const parts = String(vaultPath || '').split('/').filter(Boolean);
+  return parts.length > 1 ? parts[0] : '';
+}
+
+/**
+ * The vaults in the account, assembled from the store's top-level folders.
+ *
+ * Documents sitting at the top level with no folder of their own belong to no
+ * vault: they are what one-off pushes and older versions of Plume left behind.
+ * They are reported under a null name so the panel can still show them rather
+ * than pretending the account is emptier than it is.
+ */
+async function remoteVaults() {
+  requireSession();
+  const data = await call('/vault/list');
+  session.account = data.account;
+
+  const byName = new Map();
+  for (const f of data.files || []) {
+    const name = remoteOf(f.path);
+    if (!byName.has(name)) byName.set(name, { name: name || null, documents: 0, bytes: 0, updatedAt: null });
+    const row = byName.get(name);
+    row.documents += 1;
+    row.bytes += f.size || 0;
+    if (!row.updatedAt || (f.updatedAt && f.updatedAt > row.updatedAt)) row.updatedAt = f.updatedAt;
+  }
+
+  const vaults = [...byName.values()].sort((a, b) => {
+    if (!a.name) return 1;
+    if (!b.name) return -1;
+    return a.name.localeCompare(b.name);
+  });
+  return { vaults, account: data.account, files: data.files || [] };
+}
+
+/**
+ * Deletes a remote vault and everything in it. Destructive, and the only
+ * thing here that frees quota — which is exactly why it is its own named
+ * action rather than something unlinking does on the way past.
+ */
+async function removeRemote(remoteName, onProgress) {
+  requireSession();
+  const name = remoteNameFrom(remoteName);
+  const data = await call('/vault/list');
+  const mine = (data.files || []).filter(f => remoteOf(f.path) === name);
+
+  let done = 0;
+  const failed = [];
+  for (const f of mine) {
+    try {
+      await remove(f.path);
+    } catch (err) {
+      failed.push({ path: f.path, error: err && err.message });
+    }
+    done += 1;
+    if (onProgress) onProgress({ done, total: mine.length });
+    await wait(80);
+  }
+  return { removed: done - failed.length, failed, account: session ? session.account : null };
+}
+
 /**
  * Sends a local file up. When the vault copy has moved on since this machine
  * last synced, the push is refused and the conflict is handed back rather than
  * overwriting work done elsewhere.
+ *
+ * `baseSha` is what the caller last saw of the remote copy. A vault passes its
+ * manifest entry, which is the record that makes its sync a sync; a one-off
+ * push of a loose document has no manifest and falls back to the links file.
  */
-async function push(localPath, vaultPath, { force = false } = {}) {
+async function push(localPath, vaultPath, { force = false, baseSha } = {}) {
   requireSession();
 
   const ext = path.extname(localPath).toLowerCase();
@@ -404,7 +508,14 @@ async function push(localPath, vaultPath, { force = false } = {}) {
   const known = links[localPath];
 
   const headers = {};
-  if (!force && known && known.vaultPath === target) headers['X-Plume-Base-Sha'] = known.sha256;
+  if (!force) {
+    // An explicit base beats the links file: it is the vault's own record of
+    // what the remote held, and it is the one kept in step with the manifest.
+    if (typeof baseSha === 'string' && baseSha) headers['X-Plume-Base-Sha'] = baseSha;
+    else if (baseSha === undefined && known && known.vaultPath === target) {
+      headers['X-Plume-Base-Sha'] = known.sha256;
+    }
+  }
 
   const data = await call(`/vault/file?path=${encodeURIComponent(target)}`, {
     method: 'PUT',
@@ -428,14 +539,13 @@ async function pull(vaultPath, destPath) {
   await fsp.mkdir(path.dirname(destPath), { recursive: true });
   await fsp.writeFile(destPath, body);
 
-  links[destPath] = {
-    vaultPath,
-    sha256: res.headers.get('x-plume-sha256') || sha256(body),
-    syncedAt: res.headers.get('x-plume-updated-at') || new Date().toISOString(),
-  };
+  const hash = res.headers.get('x-plume-sha256') || sha256(body);
+  const updatedAt = res.headers.get('x-plume-updated-at') || new Date().toISOString();
+
+  links[destPath] = { vaultPath, sha256: hash, syncedAt: updatedAt };
   saveLinks();
 
-  return { localPath: destPath, vaultPath, size: body.length };
+  return { localPath: destPath, vaultPath, size: body.length, sha256: hash, updatedAt };
 }
 
 /** Saves the vault copy next to the local one so neither version is lost. */
@@ -506,6 +616,11 @@ module.exports = {
   signOut,
   refresh,
   list,
+  remoteVaults,
+  removeRemote,
+  remoteNameFrom,
+  freeRemoteName,
+  remoteOf,
   graph,
   push,
   pull,

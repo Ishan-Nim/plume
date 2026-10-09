@@ -53,14 +53,21 @@
       <section class="sidebar-panel" data-panel="vault" hidden>
         <div id="vault-panel" class="vault-panel"></div>
       </section>
-      <button id="vault-bar" class="vault-bar" type="button" aria-expanded="false">
-        <span class="vault-bar-icon" data-icon="cloud" data-size="15"></span>
-        <span class="vault-bar-text">
-          <b id="vault-bar-title">Plume Vault</b>
-          <span id="vault-bar-status">Sign in to sync</span>
-        </span>
-        <span class="vault-bar-chevron" data-icon="chevron" data-size="14"></span>
-      </button>
+      <!-- The bar names the vault you are in and opens its panel; the button
+           beside it switches to another. Two acts, so two targets. -->
+      <div class="vault-bar-row">
+        <button id="vault-bar" class="vault-bar" type="button" aria-expanded="false">
+          <span class="vault-bar-icon" data-icon="cloud" data-size="15"></span>
+          <span class="vault-bar-text">
+            <b id="vault-bar-title">Plume Vault</b>
+            <span id="vault-bar-status">Sign in to sync</span>
+          </span>
+          <span class="vault-bar-chevron" data-icon="chevron" data-size="14"></span>
+        </button>
+        <button id="vault-switch" class="vault-switch icon-btn" type="button"
+                title="Switch vault (Ctrl+Shift+V)" aria-label="Switch vault" aria-expanded="false"
+                data-icon="vault" data-size="15"></button>
+      </div>
       <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize"></div>
     </aside>
 
@@ -115,11 +122,58 @@
           <div class="welcome-logo" data-logo></div>
           <h1>Plume</h1>
           <p class="tagline">A feather-light Markdown viewer.</p>
-          <div class="welcome-acts">
-            <button id="btn-welcome-open" class="primary-btn" type="button" data-icon="folderOpen">Open file <kbd>Ctrl O</kbd></button>
-            <button id="btn-welcome-folder" class="secondary-btn" type="button" data-icon="folder">Open folder</button>
+          <!--
+            The vaults this computer already has on the left, the ways to get a
+            new one on the right. Three of those, and they are not the same
+            thing: making a vault somewhere new, claiming a folder of Markdown
+            that already exists, and bringing one down from the account. Below
+            them, quieter, the way in that commits to nothing at all — opening
+            a file or a folder and leaving it loose.
+          -->
+          <div class="chooser">
+            <div class="chooser-side">
+              <h2>Your vaults</h2>
+              <ul id="welcome-vault-list" class="welcome-vault-list"></ul>
+              <p id="welcome-vault-empty" class="chooser-empty" hidden>No vaults on this computer yet.</p>
+            </div>
+
+            <div class="chooser-main">
+              <div class="chooser-row">
+                <div>
+                  <b>Create a new vault</b>
+                  <span>Make a vault in a folder you choose. It stays on this computer until you link it.</span>
+                </div>
+                <button id="btn-welcome-vault" class="primary-btn" type="button">Create</button>
+              </div>
+
+              <div class="chooser-row">
+                <div>
+                  <b>Open a folder as a vault</b>
+                  <span>Take a folder of Markdown you already have. Nothing is moved or copied.</span>
+                </div>
+                <button id="btn-welcome-adopt" class="secondary-btn" type="button">Open</button>
+              </div>
+
+              <div class="chooser-row">
+                <div>
+                  <b>Open a vault from your account</b>
+                  <span id="welcome-account-text">Sign in to bring a vault from another computer to this one.</span>
+                </div>
+                <button id="btn-welcome-account" class="secondary-btn" type="button">Sign in</button>
+              </div>
+
+              <div class="chooser-row quiet">
+                <div>
+                  <b>Just open something</b>
+                  <span>A file or a folder, read and edited where it lies. Not a vault, and never synced.</span>
+                </div>
+                <div class="chooser-pair">
+                  <button id="btn-welcome-open" class="ghost-btn" type="button">File <kbd>Ctrl O</kbd></button>
+                  <button id="btn-welcome-folder" class="ghost-btn" type="button">Folder</button>
+                </div>
+              </div>
+            </div>
           </div>
-          <p class="hint">or drop a Markdown file anywhere in this window</p>
           <div id="default-banner" class="default-banner" hidden>
             <span>Open <b>.md</b> files with a double-click — make Plume your default viewer.</span>
             <button id="btn-default" class="ghost-btn" type="button">Set as default…</button>
@@ -193,6 +247,10 @@
   <div id="menu-more" class="popover menu" role="menu" hidden></div>
   <div id="menu-tree" class="popover menu" role="menu" hidden></div>
   <div id="pop-git" class="popover git" role="dialog" aria-label="Git sync" hidden></div>
+  <!-- Switching vaults. Reachable from the vault bar, the menu and Ctrl+Shift+V,
+       because moving between two projects is something people do all day and
+       going back to the welcome screen for it is a detour. -->
+  <div id="pop-vaults" class="popover switcher" role="dialog" aria-label="Switch vault" hidden></div>
 
   <div id="lightbox" class="lightbox" hidden>
     <img alt="">

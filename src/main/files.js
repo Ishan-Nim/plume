@@ -207,7 +207,18 @@ async function listDir(dir) {
 }
 
 // ---------------------------------------------------------------------------
-// Obsidian vault detection
+// Vault detection
+//
+// A folder is a vault if it holds a `.plume/` directory — Plume's own mark,
+// written only when somebody asks for it. `.obsidian/` counts too: a vault
+// made in Obsidian is a vault, and wiki links and the graph should work the
+// moment it is opened rather than after being claimed a second time.
+//
+// This answers "which root do links resolve against", which is a different
+// and broader question than "which vault does sync own this file" — that one
+// is vaults.js, and it only ever says yes to `.plume/`.
+
+const VAULT_MARKS = ['.plume', '.obsidian'];
 
 const vaultCache = new Map(); // dir -> { root, at }
 
@@ -218,7 +229,14 @@ async function findVaultRoot(dir) {
   let cur = start;
   let root = null;
   for (let i = 0; i < 40; i++) {
-    if (await isDir(path.join(cur, '.obsidian'))) {
+    let found = false;
+    for (const mark of VAULT_MARKS) {
+      if (await isDir(path.join(cur, mark))) {
+        found = true;
+        break;
+      }
+    }
+    if (found) {
       root = cur;
       break;
     }
@@ -228,6 +246,11 @@ async function findVaultRoot(dir) {
   }
   vaultCache.set(norm(start), { root, at: Date.now() });
   return root;
+}
+
+/** Forgets what is cached about a folder, after one becomes a vault. */
+function forgetVaultRoot() {
+  vaultCache.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -473,6 +496,7 @@ module.exports = {
   isDir,
   listDir,
   walkMarkdown,
+  forgetVaultRoot,
   findVaultRoot,
   parseWikiTarget,
   resolveWiki,

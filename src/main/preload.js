@@ -67,23 +67,33 @@ contextBridge.exposeInMainWorld('plume', {
     forget: () => invoke('git:forget'),
   },
 
+  // There is deliberately no way from here to send a local path up. Uploading
+  // is something a linked vault does to its own contents, decided in the main
+  // process from the vault's manifest — so the guarantee that a loose file
+  // never reaches the cloud is not a rule the renderer is trusted to keep.
   vault: {
-    state: rootDir => invoke('vault:state', rootDir),
-    suggest: (paths, rootDir) => invoke('vault:suggest', paths, rootDir),
-    collectFolder: (dir, rootDir) => invoke('vault:collectFolder', dir, rootDir),
-    pushMany: (items, options) => invoke('vault:pushMany', items, options),
     signUp: (email, password) => invoke('vault:signUp', email, password),
     signIn: (email, password) => invoke('vault:signIn', email, password),
     signOut: () => invoke('vault:signOut'),
     list: () => invoke('vault:list'),
-    notebooks: () => invoke('vault:notebooks'),
-    openNotebook: name => invoke('vault:openNotebook', name),
     graph: () => invoke('vault:graph'),
-    push: (vaultPath, options) => invoke('vault:push', vaultPath, options),
     pull: vaultPath => invoke('vault:pull', vaultPath),
-    keepBoth: vaultPath => invoke('vault:keepBoth', vaultPath),
     remove: vaultPath => invoke('vault:remove', vaultPath),
-    unlink: () => invoke('vault:unlink'),
+  },
+
+  // Vaults: the folders Plume has been asked to treat as vaults, and their
+  // relationship to the account. Nothing here happens on its own.
+  vaults: {
+    state: () => invoke('vaults:state'),
+    create: options => invoke('vaults:create', options),
+    rename: (root, name) => invoke('vaults:rename', root, name),
+    open: root => invoke('vaults:open', root),
+    forget: root => invoke('vaults:forget', root),
+    link: root => invoke('vaults:link', root),
+    unlink: root => invoke('vaults:unlink', root),
+    remotes: () => invoke('vaults:remotes'),
+    clone: remoteName => invoke('vaults:clone', remoteName),
+    deleteRemote: remoteName => invoke('vaults:deleteRemote', remoteName),
   },
 
   update: {
@@ -97,12 +107,9 @@ contextBridge.exposeInMainWorld('plume', {
 
   sync: {
     state: () => invoke('sync:state'),
-    choose: () => invoke('sync:choose'),
-    adopt: () => invoke('sync:adopt'),
-    forget: () => invoke('sync:forget'),
-    pause: paused => invoke('sync:pause', paused),
-    now: () => invoke('sync:now'),
-    reveal: () => invoke('sync:reveal'),
+    pause: (root, paused) => invoke('sync:pause', root, paused),
+    now: root => invoke('sync:now', root),
+    reveal: root => invoke('sync:reveal', root),
   },
 
   pathForFile: file => {
@@ -120,6 +127,7 @@ contextBridge.exposeInMainWorld('plume', {
   onOpenPath: subscribe('open-path'),
   onCommand: subscribe('command'),
   onVaultChanged: subscribe('vault:changed'),
+  onVaultsChanged: subscribe('vaults:changed'),
   onVaultProgress: subscribe('vault:progress'),
   onSyncChanged: subscribe('sync:changed'),
   onGitChanged: subscribe('git:changed'),

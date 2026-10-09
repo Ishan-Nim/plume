@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Plume documentation — reading, syncing and the vault</title>
-<meta name="description" content="How to open Markdown in Plume, edit it, create a free 100 MB vault, sync a folder between computers, and give an AI assistant project memory.">
+<title>Plume documentation — reading, vaults and syncing</title>
+<meta name="description" content="How to open Markdown in Plume, edit it, turn a folder into a vault, link a vault to a free 100 MB account, and give an AI assistant project memory.">
 <link rel="canonical" href="https://plume-md.com/docs.html">
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon.png">
@@ -27,15 +27,15 @@
 <meta property="og:site_name" content="Plume">
 <meta property="og:locale" content="en">
 <meta property="og:url" content="https://plume-md.com/docs.html">
-<meta property="og:title" content="Plume documentation — reading, syncing and the vault">
-<meta property="og:description" content="How to open Markdown, edit it, create a free 100 MB vault and keep a folder in sync between your computers.">
+<meta property="og:title" content="Plume documentation — reading, vaults and syncing">
+<meta property="og:description" content="How to open Markdown, edit it, turn a folder into a vault, and keep a vault in step across your computers.">
 <meta property="og:image" content="https://plume-md.com/assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Plume — Markdown, beautifully set.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Plume documentation — reading, syncing and the vault">
-<meta name="twitter:description" content="How to open Markdown, edit it, create a free 100 MB vault and keep a folder in sync between your computers.">
+<meta name="twitter:title" content="Plume documentation — reading, vaults and syncing">
+<meta name="twitter:description" content="How to open Markdown, edit it, turn a folder into a vault, and keep a vault in step across your computers.">
 <meta name="twitter:image" content="https://plume-md.com/assets/og.png">
 <meta property="og:locale:alternate" content="ja">
 <meta property="og:locale:alternate" content="zh">
@@ -164,8 +164,8 @@
 {
   "@context": "https://schema.org",
   "@type": "TechArticle",
-  "headline": "Plume documentation — reading, syncing and the vault",
-  "description": "How to open Markdown, edit it, create a free 100 MB vault and keep a folder in sync between your computers.",
+  "headline": "Plume documentation — reading, vaults and syncing",
+  "description": "How to open Markdown, edit it, turn a folder into a vault, and keep a vault in step across your computers.",
   "url": "https://plume-md.com/docs.html",
   "inLanguage": "en",
   "author": {
@@ -234,8 +234,8 @@
     <a href="#reading">Reading documents</a>
     <a href="#themes">Themes &amp; palettes</a>
     <a href="#obsidian">Obsidian notes</a>
-    <a href="#vault">Plume Vault</a>
-    <a href="#sync">Syncing</a>
+    <a href="#vault">Vaults</a>
+    <a href="#sync">Syncing a vault</a>
     <a href="#web">The web vault</a>
     <a href="#editing">Editing</a>
     <a href="#git">Git sync</a>
@@ -301,7 +301,7 @@
 
     <ul>
       <li><b>Open a folder</b> of notes from the welcome screen, or <b>⋯ → Open folder…</b>, and the sidebar roots itself there and stays there — opening a note inside it reveals the file in the tree instead of re-rooting on the note's own folder. Plume remembers the folder, so it is waiting next time; <b>Close folder</b> lets it go.</li>
-      <li><b>New notes</b> come from the <b>Files</b> tab: the <code>+</code> in its header makes one in the folder the tree is showing, the <code>+</code> that appears on a folder makes one inside that folder, and <code>Ctrl+Shift+N</code> does the first of those from the keyboard. Type the name in the tree where the note will be and press <code>Enter</code> — it is created, opened and ready to type in; <code>Esc</code> leaves nothing behind. The button beside it makes a folder the same way. If that folder is synced, the note goes up with everything else.</li>
+      <li><b>New notes</b> come from the <b>Files</b> tab: the <code>+</code> in its header makes one in the folder the tree is showing, the <code>+</code> that appears on a folder makes one inside that folder, and <code>Ctrl+Shift+N</code> does the first of those from the keyboard. Type the name in the tree where the note will be and press <code>Enter</code> — it is created, opened and ready to type in; <code>Esc</code> leaves nothing behind. The button beside it makes a folder the same way. If you are in a linked vault, the note goes up with everything else.</li>
       <li><b>Organising them</b> is a right-click away: the <b>Files</b> tree has a menu on every row — open, open in a new window, <b>rename</b> (<code>F2</code>), <b>move to trash</b>, copy path, show in folder, and on a folder, a new note or folder inside it. Drag a note onto a folder to move it there. <b>Renaming rewrites the links that pointed at the note</b> — <code>[[Plan]]</code>, <code>![[Plan]]</code>, <code>[[Plan#Heading|alias]]</code> and <code>[the plan](Plan.md)</code> all follow it, across every note in the folder the sidebar is showing, and Plume says how many it changed. Deleting goes to your system trash and asks first; links to a deleted note are left broken on purpose, because that is how you notice.</li>
       <li><b>The sidebar</b> has two tabs — <b>Files</b> (the folder around your document, or the whole vault if it is in one) and <b>Outline</b> (every heading, with a reading time) — and the <b>Plume Vault</b> bar at its foot. Toggle the sidebar with <code>Ctrl+\</code>.</li>
       <li><b>Reading settings</b> (the <code>Aa</code> button) set the theme, the colour palette, text size, reading width, serif or sans, whether a click edits a paragraph (live preview), and whether a single newline is a line break.</li>
@@ -354,12 +354,12 @@
       remembered per device.
     </p>
     <p>
-      The four beyond Plume&rsquo;s own are derived from
+      The four beyond Plume’s own are derived from
       <a href="https://github.com/0crazy-0/obsidian-void">Void</a>,
       <a href="https://github.com/fireisgood/obsidian-everforest-enchanted">Everforest Enchanted</a>,
       <a href="https://github.com/tofrankie/obsidian-theme-gfm">GitHub Flavored Markdown</a> and
       <a href="https://github.com/tomzorz/Sodalite">Sodalite</a> — Obsidian community themes, each
-      MIT licensed. The CSS is Plume&rsquo;s and the names are different so neither is mistaken for
+      MIT licensed. The CSS is Plume’s and the names are different so neither is mistaken for
       the other. Void and Sodalite are dark-only upstream; their light sides are built here from
       the same hues. Where a borrowed colour was not readable enough it was adjusted: every
       palette clears 3:1 contrast for body text, links and accents in both modes.
@@ -390,27 +390,85 @@
       For a note inside a real Obsidian vault, <code>⋯ → Open in Obsidian</code> hands it over.
     </p>
 
-    <h2 id="vault">Plume Vault</h2>
+    <h2 id="vault">Vaults</h2>
     <p>
-      A vault is 100 MB of storage attached to an account. It is <b>free</b> — there is no card, no
-      trial and no paid tier — and it is entirely optional.
+      A folder on your computer is never quietly a vault. It is in one of three states, and you are
+      the one who moves it between them.
     </p>
     <figure>
       <video class="film" width="1180" height="760" preload="none" muted loop playsinline
-             poster="assets/clips/vault.jpg" aria-label="The Plume Vault panel showing a synced folder and the documents in it">
+             poster="assets/clips/vault.jpg" aria-label="The vault panel in Plume, showing a vault and the documents in it">
         <source src="assets/clips/vault.webm" type="video/webm">
         <source src="assets/clips/vault.mp4" type="video/mp4">
       </video>
-      <figcaption>The vault panel: what is in your vault, and what it is in step with.</figcaption>
+      <figcaption>The vault panel: which vault you are in, and what it is in step with.</figcaption>
     </figure>
 
-    <p>To create one, either:</p>
+    <h3>Three states</h3>
+    <ul>
+      <li><b>Loose files and folders.</b> Open a <code>.md</code> file or a folder and you can read
+        and write everything in it. It is not a vault: there is no index, no backlinks across it and
+        no graph — and it can never sync. That last one is a guarantee rather than a default. The
+        main process has no channel left that can hand a local path to the cloud, so nothing in the
+        app, and nothing you press by accident, can start uploading a folder you only opened.</li>
+      <li><b>A local-only vault.</b> Choose <b>Create vault</b> on a folder and Plume writes a
+        <code>.plume/</code> directory into it. The folder now has a permanent id, settings of its
+        own and an index of its files, so backlinks, search and the graph work across all of it. It
+        needs no account and no network, ever, and it uses no storage. This is a finished state, not
+        a step on the way to signing in.</li>
+      <li><b>A linked vault.</b> A vault you have attached to your account, which syncs from then
+        on. Linking is done one vault at a time and is always asked for — see
+        <a href="#sync">Syncing a vault</a>.</li>
+    </ul>
+
+    <h3>Creating a vault</h3>
+    <p>
+      Open the folder and press <b>Create vault</b>. Plume writes <code>.plume/</code> and does
+      nothing else: Markdown already in the folder is adopted where it lies, with nothing moved,
+      copied or re-imported. A folder with three years of notes in it becomes a vault in place, and
+      every path you have linked to from elsewhere still points at the same file.
+    </p>
+    <p>
+      Delete <code>.plume/</code> and the folder is loose again, with every note untouched.
+    </p>
+
+    <h3>What is in <code>.plume/</code></h3>
+    <pre><code>.plume/
+  vault.json           identity: vault_id, name, created_at
+  config.json          settings for this vault
+  link.json            the account link (absent on a local-only vault)
+  sync/manifest.json   path -&gt; { hash, size, mtime, rev }
+  sync/state.json      sync cursor for this device (never synced)
+  sync/pending/        uploads waiting on quota
+  workspace.json       open tabs and panes (never synced)
+  cache/               search index, thumbnails (rebuildable)</code></pre>
+    <p>
+      It is all plain files sitting beside your notes, so a vault can be copied, backed up or moved
+      with the folder it is in. <code>state.json</code> and <code>workspace.json</code> describe this
+      computer rather than the vault, which is why they never go up; <code>cache/</code> is rebuilt
+      from the notes whenever it is missing.
+    </p>
+
+    <h2 id="sync">Syncing a vault</h2>
+    <p>
+      Syncing is per vault, and a vault syncs only after you have said so. Signing in links nothing
+      and uploads nothing.
+    </p>
+
+    <h3>Local first</h3>
+    <p>
+      Your notes are files on your computer, and that copy is the one that matters. The cloud is
+      where a vault is carried between computers, not where it lives.
+    </p>
+
+    <h3>An account</h3>
+    <p>To make one, either:</p>
     <ul>
       <li>In Plume, open the <b>Plume Vault</b> bar at the foot of the sidebar, choose <b>Create account</b>, and enter an email and a password; or</li>
       <li>On the web at <a href="app.html">plume-md.com/app.html</a>.</li>
     </ul>
     <p>
-      Either way it is the same vault. A password needs at least 10 characters with a number or a
+      Either way it is the same account. A password needs at least 10 characters with a number or a
       symbol in it.
     </p>
     <figure>
@@ -418,127 +476,93 @@
       <figcaption>Signing in happens at the foot of the sidebar, under Files and Outline — not in a dialog over your document.</figcaption>
     </figure>
 
+    <h3>Linking a vault to your account</h3>
+    <p>
+      Open a vault, sign in, and press <b>Link to my account</b>. Plume makes a vault of the same
+      name in your account and keeps the two in step from then on: what you write here goes up, what
+      was written on another computer or in the web vault comes down, and a document deleted on one
+      side goes on the other. Work offline as much as you like; what you wrote goes up when you are
+      next online.
+    </p>
+    <ul>
+      <li><b>Both ways, by itself.</b> Plume watches a linked vault while it is open and checks again every few minutes, so an edit made in any editor, on any of your computers, reaches the others without being asked.</li>
+      <li><b>A sync that looks like an accident is stopped.</b> If a round is about to remove ten or more documents, and a third or more of the vault, Plume pauses and says what it was about to do. A drive that has not finished mounting looks exactly like “everything was deleted”.</li>
+      <li><b>A delete that arrives from elsewhere is recoverable.</b> The document is moved into a hidden <code>.plume-trash</code> folder inside the vault, not erased.</li>
+      <li><b>Folders are kept.</b> <code>Projects/Plume.md</code> arrives as <code>Projects/Plume.md</code>, so two notes called <code>README</code> in different folders never collide.</li>
+      <li><b>Only documents and images are uploaded.</b> Markdown, text, CSV, JSON, YAML, and PNG, JPEG, GIF, WebP and AVIF images. Programs, installers, archives and anything else are refused by an allow-list and stay on your computer.</li>
+      <li><b>Pause</b> it at any time, or <b>Unlink</b> the vault. Neither deletes anything.</li>
+      <li>Up to 2000 documents and 10&nbsp;MB per file. Hidden folders, <code>node_modules</code> and the like are skipped.</li>
+    </ul>
+
+    <h3>The same vault on a second computer</h3>
+    <p>
+      Install Plume, sign in, and the vault panel lists the vaults in your account. Press
+      <b>Put it here</b> on one, say where it should go, and Plume makes the folder, writes the link
+      into it and downloads what is in it. It is a linked vault on that machine from the moment it
+      arrives.
+    </p>
+    <div class="callout">
+      <b>Where does a vault live on my computer?</b> Wherever you chose — Plume never moves or
+      renames the files in a folder you already have. The one time it makes a folder for you is
+      <b>Put it here</b>, on a computer that does not have that vault yet.
+    </div>
+
+    <h3>Storage</h3>
+    <p>
+      A free account comes with <b>100&nbsp;MB</b>. It is free in the plain sense — there is no card,
+      no trial and no paid tier.
+    </p>
+    <ul>
+      <li><b>There is no limit on vaults.</b> Have as many as you have projects. The 100&nbsp;MB is a limit on bytes in the cloud, shared across every linked vault, because bytes are the part that costs something.</li>
+      <li><b>Local-only vaults and loose folders cost nothing.</b> They never reach the cloud, so there is nothing to count.</li>
+      <li><b>Running out stops the upload, not your work.</b> The edit still saves to disk exactly as it always does; the upload waits in <code>.plume/sync/pending/</code> until there is room for it. Nothing is refused, truncated or undone on your machine.</li>
+    </ul>
     <div class="callout">
       <b>What a vault holds.</b> Markdown and text documents, and images to go with them, up to
       10&nbsp;MB each and 2000 files. It is for notes you want on more than one machine — not a
       general file store.
     </div>
 
-    <h2 id="sync">Syncing</h2>
-    <p>
-      There are two ways to get a document into your vault. A <b>synced folder</b> keeps itself up
-      to date and is what most people want; syncing <b>one document</b> is there for notes that live
-      outside that folder.
-    </p>
-
-    <h3>Local first</h3>
-    <p>
-      Your notes are files on your computer, and that copy is the one that matters. An account
-      changes nothing on its own: signing in creates no vault and starts syncing no folder. The
-      cloud is where a folder is carried between computers, not where it lives.
-    </p>
-
-    <h3>Syncing a folder</h3>
-    <p>
-      Open the folder you want, then open the <b>Plume Vault</b> bar at the foot of the sidebar
-      and press <b>Sync “that folder”</b> — it offers the folder you have open by name. From then
-      on the folder and the vault are the same notebook: what you write here goes up, what was
-      written on another computer or in the web vault comes down, and a document deleted on one
-      side goes on the other. Work offline as much as you like; what you wrote goes up when you
-      are next online.
-    </p>
-    <p>
-      Opening a single file on its own never syncs anything. A vault is a folder.
-    </p>
-    <figure>
-      <img src="assets/shots/vault-offer.png" width="1380" height="880" loading="lazy" alt="The vault panel signed in with nothing synced, offering to sync the folder that is open by name">
-      <figcaption>Signed in, and nothing synced. The panel offers the folder you have open, by name, and waits to be asked.</figcaption>
-    </figure>
-    <ul>
-      <li><b>Both ways, by itself.</b> Once a folder is synced, Plume watches it while it is open and checks again every few minutes, so an edit made in any editor, on any of your computers, reaches the others without being asked.</li>
-      <li><b>A sync that looks like an accident is stopped.</b> If a round is about to remove ten or more documents, and a third or more of the notebook, Plume pauses and says what it was about to do. A folder pointed at the wrong notebook and a drive that has not finished mounting both look exactly like "everything was deleted".</li>
-      <li><b>Nothing is destroyed to settle a disagreement.</b> If the same note was edited here <i>and</i> somewhere else before they met, both are kept: yours stays where it is and the vault's copy is saved beside it as <code>note (vault copy …).md</code>. An edit always beats a delete.</li>
-      <li><b>A delete that arrives from elsewhere is recoverable.</b> The document is moved into a hidden <code>.plume-trash</code> folder inside your folder, not erased.</li>
-      <li><b>Folders are kept.</b> <code>Projects/Plume.md</code> arrives as <code>Projects/Plume.md</code>, so two notes called <code>README</code> in different folders never collide.</li>
-      <li><b>Only documents and images are uploaded.</b> Markdown, text, CSV, JSON, YAML, and PNG, JPEG, GIF, WebP and AVIF images. Programs, installers, archives and anything else are refused by an allow-list and stay on your computer.</li>
-      <li><b>It watches while Plume is open</b> and checks again every few minutes, so edits made in any editor go up on their own.</li>
-      <li><b>Pause</b> it at any time, or <b>Stop</b> syncing the folder. Stopping deletes nothing: the folder stays on your computer and what is already in the vault stays in the vault.</li>
-      <li>Up to 2000 documents and 10&nbsp;MB per file. Hidden folders, <code>node_modules</code> and the like are skipped.</li>
-    </ul>
-    <h3>More than one notebook</h3>
-    <p>
-      A vault holds as many notebooks as you have projects. Each folder you sync takes a folder of
-      its own inside the vault, named after itself, so choosing a different folder adds a second
-      notebook rather than merging two into one — and the one you stopped syncing is still there,
-      under its name.
-    </p>
-    <ul>
-      <li><b>Three projects, three folders.</b> Open one and it is the vault; open another and that
-        one is, each keeping its own notebook in the cloud.</li>
-      <li><b>On another computer</b>, sign in and the vault panel lists the notebooks you already
-        have. Press <b>Open here</b>, say where it should go, and Plume makes the folder and
-        downloads what is in it. That folder is then your vault on that machine, syncing both ways
-        like any other.</li>
-    </ul>
-    <figure>
-      <img src="assets/shots/vault-notebooks.png" width="1380" height="880" loading="lazy" alt="The vault panel on a computer with no synced folder, listing the notebooks already in the vault, each with an Open here button">
-      <figcaption>A computer that has the account but none of its notebooks. <b>Open here</b> makes the folder and downloads what is in it.</figcaption>
-    </figure>
-
-    <div class="callout">
-      <b>Where is the vault folder on my computer?</b> Wherever you chose — Plume never moves or
-      renames the files in a folder you already have. The one time it makes a folder for you is
-      <b>Open here</b>, when you are putting a notebook on a computer that does not have it yet.
-    </div>
-    <figure>
-      <img src="assets/shots/vault-folder.png" width="1380" height="880" loading="lazy" alt="The vault panel showing the synced folder, which notebook of the vault it is, and the documents in it as a folder tree">
-      <figcaption>The folder you are working in, and which notebook of your vault it is. <b>Change folder…</b> moves to another project; <b>Stop</b> stops syncing altogether.</figcaption>
-    </figure>
-
-    <h3>One document at a time</h3>
-    <ol>
-      <li>Open the document you want.</li>
-      <li>Open the <b>Plume Vault</b> bar. Under <b>This document</b>, check the name it will take in the vault and press <b>Sync to vault</b>.</li>
-      <li>That document is now linked: the panel shows when it last synced, and <b>Sync now</b> sends your latest version up.</li>
-      <li>On another computer, sign in, find it under <b>In your vault</b> and press <b>Open</b>. Plume asks where to save it, then opens it — and links it there too.</li>
-    </ol>
-    <p>
-      The name offered is the path from the folder shown in the sidebar, not just the file name,
-      for the same reason: so nothing collides. If something already in the vault uses that name,
-      Plume says so before replacing it.
-    </p>
-    <figure>
-      <img src="assets/shots/vault-synced.png" width="1380" height="880" loading="lazy" alt="The vault panel showing a synced document and the documents already in the vault">
-      <figcaption>Once a document is linked, the panel shows when it last synced and what else is in the vault.</figcaption>
-    </figure>
-
     <h3>When the same document changes in two places</h3>
     <p>
-      Every upload carries the revision this machine last saw. If the vault copy has moved on since
-      then — because you edited it on your laptop — Plume <b>refuses the upload</b> rather than
-      flattening that work, and asks what to keep:
+      Both are kept. If a file changed here and somewhere else before the two met, yours stays where
+      it is and the copy that arrived is written beside it, named for the day it arrived and the
+      machine it came from:
     </p>
+    <pre><code>idea.md
+idea (conflict 2026-10-09 LAPTOP).md</code></pre>
+    <p>
+      Nothing is overwritten and nothing is merged for you: the two versions sit next to each other
+      and you decide what the note should say. An edit always beats a delete.
+    </p>
+
+    <h3>Unlinking and deleting</h3>
     <ul>
-      <li><b>Save the vault copy beside mine</b> downloads the other version next to your file as <code>Note (vault copy 2026-10-07-14-30).md</code>, so you have both and can merge them yourself.</li>
-      <li><b>Replace the vault copy</b> sends yours up and overwrites the other one. Only pick this when you know yours is the one you want.</li>
+      <li><b>Unlink</b> stops the syncing and keeps both copies — the folder on your computer, which
+        goes back to being a local-only vault, and the vault in your account, which still uses your
+        storage. Unlinking frees nothing, because it throws nothing away.</li>
+      <li><b>Delete vault</b> removes a vault from your account. It is a separate act with its own
+        name on it, it is the only thing that frees storage, and it leaves the folders on your
+        computers alone: they stay where they are, as local-only vaults.</li>
     </ul>
 
     <h2 id="web">The web vault</h2>
     <p>
-      <a href="app.html">plume-md.com/app.html</a> shows the same documents in a browser: read them,
-      download them, drop new ones in, and delete them. Useful on a machine where Plume is not
-      installed.
+      <a href="app.html">plume-md.com/app.html</a> shows your linked vaults in a browser: read them,
+      download them, drop new documents in, and delete them. Useful on a machine where Plume is not
+      installed. A vault you have not linked is not there, because it was never uploaded.
     </p>
     <figure>
       <img src="assets/shots/web-vault.png" width="1340" height="880" loading="lazy" alt="The Plume Vault web page listing documents, with storage used">
-      <figcaption>The same vault in a browser, on a machine where Plume is not installed.</figcaption>
+      <figcaption>A linked vault in a browser, on a machine where Plume is not installed.</figcaption>
     </figure>
 
 
     <h2 id="graph">The graph</h2>
     <p>
-      The <b>Graph</b> button in the vault panel draws how your documents link to each other —
-      wiki links, embeds and ordinary Markdown links all count; links inside code blocks do not.
+      The <b>Graph</b> button draws how the documents in a vault link to each other — wiki links,
+      embeds and ordinary Markdown links all count; links inside code blocks do not. It reads the
+      vault’s own index, so it works on a local-only vault with no account and no connection.
     </p>
     <figure>
       <video class="film" width="1180" height="760" preload="none" muted loop playsinline
@@ -728,9 +752,9 @@ people/notes.md                 who said what, and when</code></pre>
       somebody else's merge or rebase is never touched.
     </p>
     <p>
-      Git sync and <a href="#sync">vault sync</a> can point at the same folder. Neither knows about
-      the other, and neither needs to: one keeps a copy in your vault, the other keeps a history in
-      your repository.
+      Git sync works on any folder, vault or not, and it can point at the same folder as
+      <a href="#sync">vault sync</a>. Neither knows about the other, and neither needs to: one keeps
+      a copy in your account, the other keeps a history in your repository.
     </p>
     <p>
       If Git has no name and email configured — common if you set them per repository rather than
