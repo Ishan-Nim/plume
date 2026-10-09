@@ -18,7 +18,11 @@ const { app, safeStorage } = require('electron');
 function resolveApi() {
   const DEFAULT = 'https://plume-md.com/api';
   const override = process.env.PLUME_VAULT_API;
-  if (!override || app.isPackaged) return DEFAULT;
+  // `app` is undefined when this module is loaded outside Electron, which is
+  // how the unit tests reach it. Reading `isPackaged` off it threw before the
+  // override was even considered, so a test run with PLUME_VAULT_API set — the
+  // way the end-to-end runs set it — could not load this file at all.
+  if (!override || (app && app.isPackaged)) return DEFAULT;
   try {
     const url = new URL(override);
     const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
