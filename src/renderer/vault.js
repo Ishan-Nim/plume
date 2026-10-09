@@ -249,16 +249,41 @@ export class Vault {
       section.append(
         el('p', {
           class: 'vault-note',
-          text: 'Choose one folder and Plume keeps everything in it — notes, images and sub-folders — in your vault, by itself.',
+          text: 'Your notes live on this computer. Sync a folder and Plume keeps '
+            + 'everything in it — notes, images and sub-folders — in your vault too, '
+            + 'so another computer can have the same folder.',
         }),
         el('p', {
           class: 'vault-hint',
           text: 'Only documents and images are uploaded. Programs, installers and archives are never sent.',
         }),
       );
-      const choose = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Choose a folder…' });
+
+      const acts = el('div', { class: 'vault-row-acts' });
+
+      // The folder already open is almost always the one meant, so it is
+      // offered by name — but offered. Signing in syncs nothing on its own:
+      // the copy on this disk is the real one, and connecting it to the
+      // cloud is a thing somebody decides about a folder they can see.
+      const candidate = sync.candidate;
+      if (candidate) {
+        const name = candidate.replace(/[\/]+$/, '').split(/[\/]/).pop() || candidate;
+        const useOpen = el('button', {
+          class: 'vault-btn primary small', type: 'button', text: `Sync “${name}”`,
+        });
+        useOpen.title = candidate;
+        useOpen.addEventListener('click', () => this.adoptFolder(useOpen));
+        acts.append(useOpen);
+      }
+
+      const choose = el('button', {
+        class: candidate ? 'vault-btn ghost small' : 'vault-btn primary small',
+        type: 'button',
+        text: candidate ? 'Another folder…' : 'Choose a folder…',
+      });
       choose.addEventListener('click', () => this.chooseFolder(choose));
-      section.append(el('div', { class: 'vault-row-acts' }, choose));
+      acts.append(choose);
+      section.append(acts);
 
       // On a second computer there is nothing to choose yet: the notebooks
       // are already in the vault, and what is wanted is to put one here.
@@ -410,6 +435,22 @@ export class Vault {
       button.disabled = false;
       button.textContent = 'Open here';
     }
+  }
+
+  /** Starts syncing the folder that is already open. */
+  async adoptFolder(button) {
+    button.disabled = true;
+    const res = await this.api.sync.adopt();
+    button.disabled = false;
+    if (!res.ok) return this.toast(res.error, 'error');
+
+    const look = res.preview || {};
+    const skipped = look.skippedTotal || 0;
+    this.toast(
+      `Syncing ${look.files || 0} document${look.files === 1 ? '' : 's'}`
+      + (skipped ? ` · ${skipped} other file${skipped === 1 ? '' : 's'} left alone` : ''),
+    );
+    await this.load();
   }
 
   async chooseFolder(button) {

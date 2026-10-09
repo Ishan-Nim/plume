@@ -895,9 +895,10 @@ handle('app:openFolder', async ctx => {
   });
   if (canceled || !filePaths.length) return { canceled: true };
   settings.update({ folder: filePaths[0] });
-  // Already signed in: this folder is the vault from the moment it is picked.
-  if (adoptOpenFolder()) sync.refresh();
   broadcastSettings();
+  // Nothing starts syncing here. This only tells the windows what the sync
+  // state is now, so the vault panel can offer this folder by name.
+  sync.refresh();
   return { folder: filePaths[0], vaultFolder: settings.get().vaultFolder };
 });
 
@@ -1071,38 +1072,7 @@ function vaultResult(fn) {
   };
 }
 
-/**
- * The folder you are working in is the vault.
- *
- * Somebody opens a folder of notes, writes in it for a while, and then signs
- * in. That folder is what they mean by their vault, so it becomes the one
- * that syncs — there is nothing else to choose, and asking them to choose the
- * same folder a second time in another panel is the whole complaint.
- *
- * Opening a different folder moves the vault to it, and that is safe because
- * each folder occupies a folder of its own inside the vault, named after
- * itself. Changing which folder syncs adds a second notebook to the vault
- * rather than merging two into one, and the notebook you stopped syncing is
- * still there under its own name.
- *
- * An account already syncing a folder before this existed keeps its prefix as
- * it was — none — so its documents stay where it put them.
- *
- * A single file opened on its own is not a folder and never becomes a vault.
- */
-function adoptOpenFolder() {
-  if (!vault.publicState().signedIn) return false;
-  const { folder, vaultFolder } = settings.get();
-  if (!folder || folder === vaultFolder) return false;
-  settings.update({ vaultFolder: folder, vaultPrefix: sync.prefixFor(folder) });
-  return true;
-}
-
 function broadcastVault() {
-  // Signing in is what turns the open folder into the vault, so this happens
-  // before the windows are told anything: they get one settled picture, with
-  // the account and the folder it just adopted agreeing with each other.
-  if (adoptOpenFolder()) broadcastSettings();
   const state = vault.publicState();
   for (const win of liveWindows()) win.webContents.send('vault:changed', state);
   // Signing in or out starts or stops the folder sync.
@@ -1147,6 +1117,27 @@ handle('update:skip', vaultResult(async (_ctx, version) => {
   settings.update({ skippedVersion: typeof version === 'string' ? version : null });
   broadcastSettings();
   return { skipped: version };
+}));
+
+// Syncing the folder already open, which is the usual way a vault starts.
+//
+// Nothing here happens on its own. Signing in creates no vault and syncs no
+// folder: the local copy is the one that matters, and the cloud is where it
+// is carried between computers, so connecting the two is something a person
+// asks for about a folder they name. An account with no synced folder is a
+// perfectly ordinary state, and the state everybody is in to begin with.
+handle('sync:adopt', vaultResult(async () => {
+  const folder = settings.get().folder;
+  if (!folder) throw new Error('Open a folder first.');
+  const look = await sync.preview(folder);
+  settings.update({
+    vaultFolder: folder,
+    vaultPrefix: sync.prefixFor(folder),
+    syncPaused: false,
+  });
+  broadcastSettings();
+  sync.refresh();
+  return { folder, preview: look, state: sync.publicState() };
 }));
 
 handle('sync:choose', vaultResult(async ctx => {

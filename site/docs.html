@@ -429,19 +429,28 @@
       outside that folder.
     </p>
 
-    <h3>A synced folder</h3>
+    <h3>Local first</h3>
     <p>
-      Open the <b>Plume Vault</b> bar at the foot of the sidebar and sign in. The folder you
-      already have open becomes your vault — there is nothing else to choose. From then on the
-      folder and the vault are the same notebook: what you write here goes up, what was written
-      on another computer or in the web vault comes down, and a document deleted on one side goes
-      on the other.
+      Your notes are files on your computer, and that copy is the one that matters. An account
+      changes nothing on its own: signing in creates no vault and starts syncing no folder. The
+      cloud is where a folder is carried between computers, not where it lives.
+    </p>
+
+    <h3>Syncing a folder</h3>
+    <p>
+      Open the folder you want, then open the <b>Plume Vault</b> bar at the foot of the sidebar
+      and press <b>Sync “that folder”</b> — it offers the folder you have open by name. From then
+      on the folder and the vault are the same notebook: what you write here goes up, what was
+      written on another computer or in the web vault comes down, and a document deleted on one
+      side goes on the other. Work offline as much as you like; what you wrote goes up when you
+      are next online.
     </p>
     <p>
       Opening a single file on its own never syncs anything. A vault is a folder.
     </p>
     <ul>
-      <li><b>Both ways, by itself.</b> Plume watches the folder while it is open and checks again every few minutes, so an edit made in any editor, on any of your computers, reaches the others without being asked.</li>
+      <li><b>Both ways, by itself.</b> Once a folder is synced, Plume watches it while it is open and checks again every few minutes, so an edit made in any editor, on any of your computers, reaches the others without being asked.</li>
+      <li><b>A sync that looks like an accident is stopped.</b> If a round is about to remove ten or more documents, and a third or more of the notebook, Plume pauses and says what it was about to do. A folder pointed at the wrong notebook and a drive that has not finished mounting both look exactly like "everything was deleted".</li>
       <li><b>Nothing is destroyed to settle a disagreement.</b> If the same note was edited here <i>and</i> somewhere else before they met, both are kept: yours stays where it is and the vault's copy is saved beside it as <code>note (vault copy …).md</code>. An edit always beats a delete.</li>
       <li><b>A delete that arrives from elsewhere is recoverable.</b> The document is moved into a hidden <code>.plume-trash</code> folder inside your folder, not erased.</li>
       <li><b>Folders are kept.</b> <code>Projects/Plume.md</code> arrives as <code>Projects/Plume.md</code>, so two notes called <code>README</code> in different folders never collide.</li>

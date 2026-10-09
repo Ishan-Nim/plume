@@ -83,6 +83,14 @@ app.whenReady().then(async () => {
     })();
     record('an account can be made', vault.publicState().signedIn, email);
 
+    // Local-first: the copy on this disk is the real one, and signing in does
+    // not hand a folder to the cloud. A folder open in the window stays a
+    // folder open in the window until somebody says otherwise.
+    settings.update({ folder });
+    record('signing in syncs nothing on its own',
+      !settings.get().vaultFolder && !settings.get().vaultPrefix,
+      `vaultFolder=${settings.get().vaultFolder} prefix=${settings.get().vaultPrefix}`);
+
     settings.update({ vaultFolder: folder, vaultPrefix: PREFIX, syncPaused: false });
 
     // ---- what is written here goes up ----

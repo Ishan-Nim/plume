@@ -180,7 +180,11 @@ function publicState() {
   // The prefix is settings', not this module's, but it is half of what the
   // panel has to say — "this folder, as that notebook" — so it travels with
   // the rest rather than being fetched separately and arriving out of step.
-  return { ...state, prefix: settings.get().vaultPrefix || '' };
+  //
+  // `candidate` is the folder open in the window, which is not synced and may
+  // never be. The panel offers it; nothing here acts on it.
+  const { vaultPrefix, folder } = settings.get();
+  return { ...state, prefix: vaultPrefix || '', candidate: folder || null };
 }
 
 function announce() {

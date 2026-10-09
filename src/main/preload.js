@@ -93,6 +93,7 @@ contextBridge.exposeInMainWorld('plume', {
   sync: {
     state: () => invoke('sync:state'),
     choose: () => invoke('sync:choose'),
+    adopt: () => invoke('sync:adopt'),
     forget: () => invoke('sync:forget'),
     pause: paused => invoke('sync:pause', paused),
     now: () => invoke('sync:now'),

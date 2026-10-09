@@ -1,7 +1,31 @@
-# Plume 1.4.1
+# Plume 1.5.0
 
 **Released 9 October 2026** · [plume-md.com](https://plume-md.com) · MIT licence
 
+> **1.5.0 makes syncing something you ask for.**
+>
+> 1.4.0 had signing in adopt whatever folder was open and start syncing it.
+> That was wrong, and wrong in the way that costs people something: an account
+> is not a decision about a folder, and a folder full of notes can be carried
+> into a vault — or a vault emptied into a folder — before anybody has agreed
+> to it. Plume is local first. Your notes are files on your computer, that copy
+> is the one that matters, and the cloud is where a folder is carried between
+> computers rather than where it lives.
+>
+> **So signing in now does nothing to your files.** It creates no vault and
+> syncs no folder. An account with nothing synced is an ordinary state, and the
+> one everybody starts in.
+>
+> **When you want a folder synced, you say so.** Open it, go to the Plume Vault
+> bar at the foot of the sidebar, and press **Sync “that folder”** — it offers
+> the folder you already have open, by name. That is what connects the two, and
+> nothing else does.
+>
+> Everything that follows from there is as it was: both directions, deletes on
+> both sides, both copies kept when two of them moved apart, a notebook of its
+> own in the vault for each folder, and **Open here** to put a notebook on a
+> computer that does not have it yet.
+>
 > **1.4.1 fixes a folder being synced into the wrong notebook.**
 >
 > Changing the synced folder moved the folder but kept the notebook name the
@@ -311,22 +335,22 @@ vault, and no way to forge a session.
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.4.1.exe` |
-| macOS, Apple silicon | `Plume-1.4.1-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.4.1-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.4.1-linux-x86_64.AppImage` or `Plume-1.4.1-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.5.0.exe` |
+| macOS, Apple silicon | `Plume-1.5.0-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.5.0-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.5.0-linux-x86_64.AppImage` or `Plume-1.5.0-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html),
 which offers the right build for your system.
 
 Checksums for every file are in `SHA256SUMS.txt` on the
-[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.4.1).
+[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.5.0).
 
 ## Installing
 
 ### Windows
 
-Run `Plume-Setup-1.4.1.exe`. Plume installs for all users in
+Run `Plume-Setup-1.5.0.exe`. Plume installs for all users in
 `C:\Program Files\Plume`, so Windows asks for administrator approval once. The
 installer is not code-signed yet: if SmartScreen shows "Windows protected your
 PC", choose **More info → Run anyway**.
@@ -348,8 +372,8 @@ so macOS blocks the first launch. Use either of these:
 ### Linux
 
 - **AppImage:** make it executable with
-  `chmod +x Plume-1.4.1-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.4.1-linux-amd64.deb`. On
+  `chmod +x Plume-1.5.0-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.5.0-linux-amd64.deb`. On
   Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that
   Electron apps need to start there.
 

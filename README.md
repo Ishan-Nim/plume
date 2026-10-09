@@ -65,10 +65,11 @@ Plume reads the files already on your disk, and that needs no account. Create a 
 one and you also get **Plume Vault**: 100 MB of storage for syncing documents between
 your computers, and a browser to read them in. It is free — there is no paid tier.
 
-- **The folder you are working in is the vault.** Sign in from the **Plume Vault** bar at
-  the foot of the sidebar and the folder you already have open becomes your vault. There is
-  nothing else to choose. Opening a single file on its own never syncs anything: a vault is
-  a folder.
+- **Local first.** Your notes are files on your computer, and that is the copy that
+  matters. An account changes nothing by itself: signing in creates no vault and syncs no
+  folder. When you want a folder kept in step with another computer, open it, go to the
+  **Plume Vault** bar at the foot of the sidebar and press **Sync “that folder”**. A single
+  file opened on its own is never synced: a vault is a folder.
 - **Both ways, by itself.** What you write here goes up; what was written on another
   computer or in the web vault comes down; a document deleted on one side goes on the
   other. Plume watches while it runs and checks again every few minutes.
