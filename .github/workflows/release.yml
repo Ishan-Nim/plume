@@ -98,3 +98,53 @@ jobs:
               --title "Plume $GITHUB_REF_NAME" \
               --notes-file .github/release-notes.md
           fi
+
+  # The release is only half of a release. plume-md.com builds its download
+  # links from a version string, and plume-vault decides which versions it will
+  # redirect; when those two disagree every download link on the site answers
+  # 404 and nothing says so. That shipped to users with 1.1.0, 1.1.1 and 1.2.0.
+  # This asks the live site for the files it just published, so the next time
+  # it happens it is a red mark here rather than something a user finds.
+  downloads:
+    name: Check the downloads work
+    needs: release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask plume-md.com for every artifact
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          files=(
+            "Plume-Setup-$version.exe"
+            "Plume-$version-mac-arm64.dmg"
+            "Plume-$version-mac-x64.dmg"
+            "Plume-$version-mac-arm64.zip"
+            "Plume-$version-mac-x64.zip"
+            "Plume-$version-linux-x86_64.AppImage"
+            "Plume-$version-linux-amd64.deb"
+          )
+
+          # The backend is meant to be updated once the release exists, so give
+          # a deploy time to finish before calling it broken.
+          for attempt in $(seq 1 10); do
+            failed=()
+            for file in "${files[@]}"; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+                "https://plume-md.com/api/download?file=$file")
+              [ "$code" = "302" ] || failed+=("$file ($code)")
+            done
+            if [ ${#failed[@]} -eq 0 ]; then
+              echo "All ${#files[@]} downloads redirect. $version is live."
+              exit 0
+            fi
+            echo "Attempt $attempt: ${#failed[@]} not served yet. Waiting."
+            sleep 30
+          done
+
+          echo "::error::plume-md.com will not serve $version. Its download links are 404ing."
+          printf '%s\n' "${failed[@]}"
+          echo "Add $version to SERVED in plume-vault src/downloads.js (and to"
+          echo "PLUME_VERSIONS on DigitalOcean if that variable is set)."
+          echo "What it is serving now:"
+          curl -s --max-time 20 https://plume-md.com/api/health
+          exit 1
