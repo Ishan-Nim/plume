@@ -31,6 +31,7 @@ const DEFAULTS = Object.freeze({
   skippedVersion: null,   // a version the user chose not to be told about again
   folder: null,           // the folder of notes the sidebar opens on
   vaultFolder: null,      // the folder kept in step with the vault, if any
+  vaultPrefix: null,      // the folder that folder occupies inside the vault
   syncPaused: false,
   gitFolder: null,        // a folder kept in step with a Git remote, if any
   gitAuto: false,         // sync it on a timer as well as on demand
@@ -55,6 +56,7 @@ const VALIDATORS = {
   skippedVersion: v => v === null || (typeof v === 'string' && v.length < 40),
   folder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
   vaultFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
+  vaultPrefix: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 200),
   syncPaused: v => typeof v === 'boolean',
   gitFolder: v => v === null || (typeof v === 'string' && v.length > 0 && v.length < 4096),
   gitAuto: v => typeof v === 'boolean',

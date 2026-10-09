@@ -1127,6 +1127,11 @@ function toggleVault() {
 
 /** Keeps the bar at the foot of the sidebar saying something true. */
 function paintVaultBar(sync, account) {
+  // Signed in with no document and no folder is where a second computer
+  // starts, and the vault — the only thing that gets it out of that state —
+  // is in the sidebar, which the welcome screen otherwise tucks away.
+  body.classList.toggle('has-account', Boolean(account && account.signedIn));
+
   const title = $('#vault-bar-title');
   const status = $('#vault-bar-status');
   if (!title || !status) return;
@@ -1409,6 +1414,14 @@ function wireUi() {
     lastVaultState = account;
     paintVaultBar(lastSyncState, account);
   });
+
+  // Asked once at boot: the window has to know whether there is an account
+  // before anyone changes it, or a computer that is already signed in opens
+  // with its vault hidden.
+  api.vault.state().then(account => {
+    lastVaultState = account;
+    paintVaultBar(lastSyncState, account);
+  }).catch(() => {});
 
   $('#graph-view-close').addEventListener('click', closeGraph);
   $('#graph-view-fit').addEventListener('click', () => graphView && graphView.fit());

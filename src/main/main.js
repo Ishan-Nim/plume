@@ -895,8 +895,10 @@ handle('app:openFolder', async ctx => {
   });
   if (canceled || !filePaths.length) return { canceled: true };
   settings.update({ folder: filePaths[0] });
+  // Already signed in: this folder is the vault from the moment it is picked.
+  if (adoptOpenFolder()) sync.refresh();
   broadcastSettings();
-  return { folder: filePaths[0] };
+  return { folder: filePaths[0], vaultFolder: settings.get().vaultFolder };
 });
 
 handle('app:forgetFolder', () => {
@@ -1069,7 +1071,38 @@ function vaultResult(fn) {
   };
 }
 
+/**
+ * The folder you are working in is the vault.
+ *
+ * Somebody opens a folder of notes, writes in it for a while, and then signs
+ * in. That folder is what they mean by their vault, so it becomes the one
+ * that syncs — there is nothing else to choose, and asking them to choose the
+ * same folder a second time in another panel is the whole complaint.
+ *
+ * Opening a different folder moves the vault to it, and that is safe because
+ * each folder occupies a folder of its own inside the vault, named after
+ * itself. Changing which folder syncs adds a second notebook to the vault
+ * rather than merging two into one, and the notebook you stopped syncing is
+ * still there under its own name.
+ *
+ * An account already syncing a folder before this existed keeps its prefix as
+ * it was — none — so its documents stay where it put them.
+ *
+ * A single file opened on its own is not a folder and never becomes a vault.
+ */
+function adoptOpenFolder() {
+  if (!vault.publicState().signedIn) return false;
+  const { folder, vaultFolder } = settings.get();
+  if (!folder || folder === vaultFolder) return false;
+  settings.update({ vaultFolder: folder, vaultPrefix: sync.prefixFor(folder) });
+  return true;
+}
+
 function broadcastVault() {
+  // Signing in is what turns the open folder into the vault, so this happens
+  // before the windows are told anything: they get one settled picture, with
+  // the account and the folder it just adopted agreeing with each other.
+  if (adoptOpenFolder()) broadcastSettings();
   const state = vault.publicState();
   for (const win of liveWindows()) win.webContents.send('vault:changed', state);
   // Signing in or out starts or stops the folder sync.
@@ -1359,6 +1392,62 @@ handle('vault:signOut', vaultResult(async () => {
 }));
 
 handle('vault:list', vaultResult(async () => vault.list()));
+
+// The notebooks in this account's vault: the folders at the top of it, as a
+// second machine needs to see them before it can say "that one, here".
+// Documents sitting at the vault's root rather than in a folder are one
+// notebook too, the unnamed one, which is what an account that synced before
+// vaults held more than one notebook has.
+handle('vault:notebooks', vaultResult(async () => {
+  const listing = await vault.list();
+  const byName = new Map();
+  for (const file of listing.files || []) {
+    const parts = String(file.path).split('/');
+    const name = parts.length > 1 ? parts[0] : '';
+    const entry = byName.get(name) || { name, documents: 0, bytes: 0 };
+    entry.documents += 1;
+    entry.bytes += file.size || 0;
+    byName.set(name, entry);
+  }
+  const here = settings.get();
+  return {
+    notebooks: [...byName.values()].sort((a, b) => (a.name < b.name ? -1 : 1)),
+    open: here.vaultFolder ? { folder: here.vaultFolder, name: here.vaultPrefix || '' } : null,
+  };
+}));
+
+// Takes a notebook that already exists in the vault and puts it on this
+// machine: a folder named after it, inside one the reader chooses, and then
+// an ordinary sync — which, with the folder empty and the vault full, is all
+// downloads. From then on it is the open folder and the vault, like any other.
+handle('vault:openNotebook', vaultResult(async (ctx, name) => {
+  const notebook = typeof name === 'string' ? name : '';
+  if (notebook) str(notebook, 200);
+  if (notebook.includes('/') || notebook.includes('\\') || notebook.includes('..')) {
+    throw new Error('That is not a notebook in your vault.');
+  }
+
+  const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
+    title: notebook ? `Where should ${notebook} live?` : 'Where should your vault live?',
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Put it here',
+  });
+  if (canceled || !filePaths.length) return { canceled: true };
+
+  const parent = localPath(ctx, filePaths[0]);
+  // A named notebook gets a folder of its own so choosing a folder that
+  // already holds other things does not scatter a vault through it.
+  const dest = notebook ? path.join(parent, notebook) : parent;
+  fs.mkdirSync(dest, { recursive: true });
+
+  settings.update({ folder: dest, vaultFolder: dest, vaultPrefix: notebook || null });
+  broadcastSettings();
+  sync.refresh();
+  await sync.syncNow();
+
+  return { folder: dest, notebook, state: sync.publicState() };
+}));
+
 
 handle('vault:graph', vaultResult(async () => vault.graph()));
 

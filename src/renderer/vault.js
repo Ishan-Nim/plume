@@ -234,14 +234,27 @@ export class Vault {
       const choose = el('button', { class: 'vault-btn primary small', type: 'button', text: 'Choose a folder…' });
       choose.addEventListener('click', () => this.chooseFolder(choose));
       section.append(el('div', { class: 'vault-row-acts' }, choose));
+
+      // On a second computer there is nothing to choose yet: the notebooks
+      // are already in the vault, and what is wanted is to put one here.
+      const existing = el('div', { class: 'vault-existing' });
+      section.append(existing);
+      this.drawNotebooks(existing).catch(() => {});
       return section;
     }
+
+    const others = el('div', { class: 'vault-existing' });
 
     const name = sync.folder.replace(/[\/]+$/, '').split(/[\/]/).pop() || sync.folder;
     const info = el('div', { class: 'vault-current-info' });
     const title = el('b', { text: name });
     title.title = sync.folder;
     info.append(title, el('span', { text: this.syncLine(sync) }));
+    // Which notebook of the vault this folder is, so it is clear that another
+    // folder would be another notebook rather than the same one.
+    if (sync.prefix) {
+      info.append(el('span', { class: 'vault-hint', text: `In your vault as ${sync.prefix}` }));
+    }
     section.append(info);
 
     if (sync.status === 'syncing' && sync.total) {
@@ -292,6 +305,11 @@ export class Vault {
 
     acts.append(now, pause, open, forget);
     section.append(acts);
+
+    // The other notebooks in the vault, so moving between projects is
+    // choosing one here rather than finding its folder on disk again.
+    section.append(others);
+    this.drawNotebooks(others, sync.prefix || '').catch(() => {});
     return section;
   }
 
@@ -304,6 +322,61 @@ export class Vault {
       case 'off': return sync.message || 'Not syncing';
       default:
         return sync.lastSyncAt ? `Up to date · checked ${when(sync.lastSyncAt)}` : 'Up to date';
+    }
+  }
+
+  /**
+   * The notebooks already in the vault, each with a way to put it on this
+   * computer. Plume makes the folder and brings the documents down; from then
+   * on it is the open folder and the vault, like one chosen here.
+   */
+  async drawNotebooks(host, openName = null) {
+    const res = await this.api.vault.notebooks();
+    if (!res || !res.ok || !res.notebooks) return;
+    // The one being synced is already on screen above; what is useful here is
+    // the others.
+    const books = res.notebooks.filter(b => openName === null || b.name !== openName);
+    if (!books.length) return;
+
+    host.append(el('h4', {
+      class: 'vault-sub',
+      text: openName === null ? 'Already in your vault' : 'Other notebooks in your vault',
+    }));
+    host.append(el('p', {
+      class: 'vault-hint',
+      text: 'Put one of these on this computer. Plume makes the folder and downloads what is in it.',
+    }));
+
+    for (const book of books) {
+      const row = el('div', { class: 'vault-row' });
+      const label = el('div', { class: 'vault-row-main' });
+      label.append(el('b', { text: book.name || 'Your vault' }));
+      label.append(el('span', {
+        text: `${book.documents} document${book.documents === 1 ? '' : 's'}`,
+      }));
+      const open = el('button', { class: 'vault-btn ghost small', type: 'button', text: 'Open here' });
+      open.addEventListener('click', () => this.openNotebook(book.name, open));
+      row.append(label, el('div', { class: 'vault-row-acts' }, open));
+      host.append(row);
+    }
+  }
+
+  async openNotebook(name, button) {
+    button.disabled = true;
+    button.textContent = 'Downloading…';
+    try {
+      const res = await this.api.vault.openNotebook(name);
+      if (!res || res.canceled) return;
+      if (!res.ok) {
+        this.toast(res.error || 'Could not open that notebook', 'error');
+        return;
+      }
+      this.toast(`${name || 'Your vault'} is now in ${res.folder}`);
+    } catch (err) {
+      this.toast('Could not open that notebook', 'error');
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Open here';
     }
   }
 

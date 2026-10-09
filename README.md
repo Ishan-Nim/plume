@@ -65,11 +65,24 @@ Plume reads the files already on your disk, and that needs no account. Create a 
 one and you also get **Plume Vault**: 100 MB of storage for syncing documents between
 your computers, and a browser to read them in. It is free — there is no paid tier.
 
-- **Sync from the app.** The **Plume Vault** bar at the foot of the sidebar signs you in
-  and pushes the open document up. Another machine pulls it down.
-- **Or sync a whole folder.** Choose one folder and Plume keeps everything in it — notes,
-  images and sub-folders — in your vault by itself, watching for changes while it runs.
-  Only documents and images are ever uploaded; programs and archives are refused by an
+- **The folder you are working in is the vault.** Sign in from the **Plume Vault** bar at
+  the foot of the sidebar and the folder you already have open becomes your vault. There is
+  nothing else to choose. Opening a single file on its own never syncs anything: a vault is
+  a folder.
+- **Both ways, by itself.** What you write here goes up; what was written on another
+  computer or in the web vault comes down; a document deleted on one side goes on the
+  other. Plume watches while it runs and checks again every few minutes.
+- **A vault holds more than one notebook.** Each folder you sync takes a folder of its own
+  inside the vault, named after itself, so changing which folder syncs adds a second
+  notebook rather than merging two into one. Three projects in three folders are three
+  notebooks, and the one you switch away from is still there.
+- **On a computer that has none of them**, sign in and the panel lists your notebooks.
+  **Open here** makes the folder, downloads what is in it, and syncs from then on.
+- **Nothing is destroyed to settle a disagreement.** Edited here *and* somewhere else before
+  they met? Both are kept — yours stays and the vault's is saved beside it as
+  `note (vault copy …).md`. An edit always beats a delete, and a delete arriving from
+  elsewhere moves the file into a hidden `.plume-trash` folder rather than erasing it.
+- Only documents and images are ever uploaded; programs and archives are refused by an
   allow-list and stay on your computer. That is why a 1.5 GB notebook is usually a few
   megabytes of vault. Your folder is never moved or renamed, and folders are kept:
   `Projects/Plume.md` arrives as `Projects/Plume.md`.

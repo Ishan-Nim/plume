@@ -519,13 +519,23 @@ kbd {
   transition: margin-left 0.18s ease;
 }
 .sidebar-hidden .sidebar,
-/* The welcome screen has nothing to navigate, so the sidebar is tucked away
-   and its button with it — unless a folder is open, which is the one thing on
-   that screen that puts something in the tree. Without the exception, Open
-   folder sets the root, fills the tree, and shows the reader nothing at all:
-   the only button that opens a folder lives on this screen. */
-.is-welcome:not(.has-folder) .sidebar { margin-left: calc(-1 * var(--sidebar-w) - 1px); }
-.is-welcome:not(.has-folder) #btn-sidebar { visibility: hidden; }
+/* The welcome screen has nothing to navigate, so the sidebar is tucked away —
+   unless there is something in it worth reaching.
+
+   A folder is open: the tree has the folder in it, and without this exception
+   Open folder would set the root, fill the tree and show the reader nothing,
+   since the only button that opens a folder lives on this screen.
+
+   Signed in: the vault panel is at the foot of the sidebar, and a computer
+   with no document and no folder is exactly where somebody starts when they
+   have just installed Plume to fetch their notes. Hiding the sidebar there
+   hides the one thing that can get them out of it.
+
+   The button stays either way, so signing in is reachable before there is an
+   account to reach it with. */
+.is-welcome:not(.has-folder):not(.has-account) .sidebar {
+  margin-left: calc(-1 * var(--sidebar-w) - 1px);
+}
 .resizing,
 .resizing * { cursor: col-resize !important; user-select: none; }
 .resizing .sidebar { transition: none; }
@@ -1756,6 +1766,19 @@ summary.callout-title::-webkit-details-marker { display: none; }
 .vault-current-info span { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
 
 .vault-row-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* The notebooks already in the vault, offered on a computer that has none of
+   them yet. Set apart from the choose-a-folder button above it, because they
+   are two answers to the same question rather than a list of its options. */
+.vault-existing { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.vault-sub { margin: 0 0 2px; font-size: 11.5px; font-weight: 600; color: var(--text-2); }
+.vault-existing .vault-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 6px 0;
+}
+.vault-row-main { min-width: 0; }
+.vault-row-main b { display: block; font-size: 12.5px; font-weight: 550; word-break: break-all; }
+.vault-row-main span { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
 .vault-stack { display: flex; flex-direction: column; gap: 6px; }
 
 .vault-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

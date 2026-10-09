@@ -1,7 +1,35 @@
-# Plume 1.3.0
+# Plume 1.4.0
 
 **Released 9 October 2026** · [plume-md.com](https://plume-md.com) · MIT licence
 
+> **1.4.0 makes the folder you are working in your vault.**
+>
+> **Sign in and the open folder is the vault.** There is nothing else to choose,
+> and no second folder to pick in another panel. From that moment the folder and
+> the vault are the same notebook: what you write here goes up, what was written
+> on another computer or in the web vault comes down, and a document deleted on
+> one side goes on the other. Plume watches the folder while it is open and
+> checks again every few minutes. Opening a single file on its own still syncs
+> nothing — a vault is a folder.
+>
+> **Nothing is destroyed to settle a disagreement.** Syncing both ways means two
+> copies can move apart, so when they do, both are kept: yours stays where it is
+> and the vault's is saved beside it as `note (vault copy …).md`. An edit always
+> beats a delete. A delete that arrives from elsewhere moves the document into a
+> hidden `.plume-trash` folder inside your folder rather than erasing it, so the
+> one thing that can take a file off this disk is something you can undo.
+>
+> **A vault holds more than one notebook.** Each folder you sync takes a folder
+> of its own inside the vault, named after itself, so choosing a different folder
+> adds a second notebook rather than merging two into one. Three projects in
+> three folders are three notebooks, and the one you switch away from is still
+> there under its name.
+>
+> **Open a notebook on a computer that does not have it.** Install Plume, sign
+> in, and the vault panel lists what you already have. **Open here** asks where
+> it should go, makes the folder, and downloads what is in it. That folder is
+> then your vault on that machine, syncing both ways like any other.
+>
 > **1.3.0 hides the Markdown syntax while you are not in it.**
 >
 > **Live preview goes a word at a time.** Until now, the block you were editing
@@ -260,22 +288,22 @@ vault, and no way to forge a session.
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.3.0.exe` |
-| macOS, Apple silicon | `Plume-1.3.0-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.3.0-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.3.0-linux-x86_64.AppImage` or `Plume-1.3.0-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-1.4.0.exe` |
+| macOS, Apple silicon | `Plume-1.4.0-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-1.4.0-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-1.4.0-linux-x86_64.AppImage` or `Plume-1.4.0-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html),
 which offers the right build for your system.
 
 Checksums for every file are in `SHA256SUMS.txt` on the
-[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.3.0).
+[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.4.0).
 
 ## Installing
 
 ### Windows
 
-Run `Plume-Setup-1.3.0.exe`. Plume installs for all users in
+Run `Plume-Setup-1.4.0.exe`. Plume installs for all users in
 `C:\Program Files\Plume`, so Windows asks for administrator approval once. The
 installer is not code-signed yet: if SmartScreen shows "Windows protected your
 PC", choose **More info → Run anyway**.
@@ -297,8 +325,8 @@ so macOS blocks the first launch. Use either of these:
 ### Linux
 
 - **AppImage:** make it executable with
-  `chmod +x Plume-1.3.0-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.3.0-linux-amd64.deb`. On
+  `chmod +x Plume-1.4.0-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-1.4.0-linux-amd64.deb`. On
   Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that
   Electron apps need to start there.
 
