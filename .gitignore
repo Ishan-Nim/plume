@@ -11,3 +11,7 @@ dist/
 
 # Credentials and test accounts, never committed: this repository is public.
 CREDENTIALS.md
+
+# Plume's own bookkeeping, if a folder in here is ever opened as a vault.
+# It is per-folder state, not source, and it carries a per-device sync cursor.
+.plume/

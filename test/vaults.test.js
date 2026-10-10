@@ -358,6 +358,27 @@ test('a vault that is no longer on disk drops out of the list', () => {
   assert.equal(vaults.known().some(v => v.root === vault.root), false);
 });
 
+test('claiming a folder that is already a vault puts it back on the list', () => {
+  // Taking a vault off the list is about the list. Opening the folder as a
+  // vault again is how it goes back on — and it was not doing that, so a vault
+  // removed from the list and reopened was one you were working in that the
+  // app said you did not have.
+  const dir = tempDir();
+  write(dir, 'note.md', 'mine');
+  const made = vaults.create(dir, { name: 'Field Notes' });
+  assert.ok(vaults.known().some(v => v.id === made.id));
+
+  vaults.forget(dir);
+  assert.equal(vaults.known().some(v => v.id === made.id), false);
+
+  const again = vaults.create(dir, { name: 'ignored, it is already named' });
+
+  assert.equal(again.id, made.id, 'same vault, not a new one');
+  assert.equal(again.name, 'Field Notes', 'claiming it again does not rename it');
+  assert.ok(vaults.known().some(v => v.id === made.id), 'and it is on the list again');
+  assert.equal(fs.readFileSync(path.join(dir, 'note.md'), 'utf8'), 'mine');
+});
+
 // ---------- the move from one synced folder ----------
 
 test('an older Plume’s synced folder becomes a linked vault, keeping its name', () => {

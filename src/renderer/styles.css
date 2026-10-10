@@ -1761,9 +1761,8 @@ summary.callout-title::-webkit-details-marker { display: none; }
    Plume Vault — sidebar panel
    --------------------------------------------------------------------------- */
 
-/* One strip at the foot of the sidebar: the vault you are in at the near end,
-   where pressing it lists the others, and help and settings at the far end,
-   which is where a thing you reach for twice a month belongs. */
+/* One strip at the foot of the sidebar, and one thing on it: the vault you are
+   in, which is also the control for being in a different one. */
 .vault-bar-row {
   display: flex;
   align-items: stretch;
@@ -1771,24 +1770,13 @@ summary.callout-title::-webkit-details-marker { display: none; }
   border-top: 1px solid var(--border);
   background: var(--chrome);
 }
-.vault-bar-act {
-  flex: none;
-  width: 30px;
-  border-radius: 0;
-  color: var(--text-3);
-}
-.vault-bar-act:hover { background: var(--chrome-2); color: var(--text); }
-.vault-bar-act[aria-expanded="true"] { background: var(--chrome-2); color: var(--accent); }
-
 .vault-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* Takes what is left of the row, so the name has the width and the two
-     buttons beside it keep to the edge. */
   flex: 1;
   min-width: 0;
-  padding: 9px 4px 9px 10px;
+  padding: 9px 12px 9px 10px;
   border: 0;
   background: var(--chrome);
   color: var(--text-2);

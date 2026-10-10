@@ -55,8 +55,9 @@
       </section>
       <!-- The name of the vault you are in, and what it is doing. Pressing it
            lists the others: the vault you are in is the thing you change when
-           you want a different one, so it is the control for changing it.
-           Help and settings sit at the far end, out of the way of that. -->
+           you want a different one, so it is the control for changing it. It
+           is the whole bar, because reading settings already have a button in
+           the toolbar and a second one down here was the same button twice. -->
       <div class="vault-bar-row">
         <button id="vault-bar" class="vault-bar" type="button" aria-haspopup="true"
                 aria-expanded="false" title="Switch vault (Ctrl+Shift+V)">
@@ -66,11 +67,6 @@
             <span id="vault-bar-status">Sign in to sync</span>
           </span>
         </button>
-        <button id="btn-vault-help" class="vault-bar-act icon-btn" type="button"
-                title="Help" aria-label="Help" data-icon="help" data-size="15"></button>
-        <button id="btn-vault-settings" class="vault-bar-act icon-btn" type="button"
-                title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false"
-                data-icon="settings" data-size="15"></button>
       </div>
       <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize"></div>
     </aside>

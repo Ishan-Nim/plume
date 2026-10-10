@@ -155,7 +155,12 @@ Having more than one vault is the normal case — one per project, or one for
 work and one for everything else — so moving between them is not a thing to go
 back to the welcome screen for. The bar at the foot of the sidebar names the
 vault you are in and is the control for leaving it: press it and the others are
-there. The overflow menu and **Ctrl+Shift+V** open the same list.
+there, with the account under them and the chooser under that. The overflow menu
+and **Ctrl+Shift+V** open the same list.
+
+Taking a vault off the list is about the list; the folder is untouched and
+opening it again puts it back. Taking off the list the vault you are *in* closes
+it too, so the window is never in a vault it says you do not have.
 
 ![The switcher: every vault this computer knows about, the one you are in
 ticked, with the account and the way back to the chooser.](../site/assets/shots/vault-switcher.png)

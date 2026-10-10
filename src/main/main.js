@@ -714,8 +714,12 @@ async function resumeTarget() {
     // the vault bar and sync all read the open folder — so make it the open
     // folder rather than quietly opening a document from somewhere else.
     settings.update({ folder: root });
-    vaults.remember(root);
   }
+  // The vault you are standing in is on the list of vaults on this computer,
+  // always. Taking one off that list is about the list, and opening it again
+  // puts it back — otherwise a vault removed from it and then reopened is a
+  // vault you are working in that the app says you do not have.
+  vaults.remember(root);
   return { folder: root, doc: await noteToOpen(root) };
 }
 
@@ -1612,11 +1616,24 @@ handle('vaults:open', vaultResult(async (ctx, root) => {
   return { vault: found, opened: await noteToOpen(abs), view: vaultView(ctx) };
 }));
 
-/** Takes a vault off this computer's list. The folder is not touched. */
+/**
+ * Takes a vault off this computer's list. The folder is not touched.
+ *
+ * Taking off the list the vault you are standing in would leave the app saying
+ * two things at once — this is the vault you are in, and you have no vaults —
+ * so it also stops standing in it. The folder, the `.plume/` and every note in
+ * it are exactly as they were, and opening it again puts it back on the list.
+ */
 handle('vaults:forget', vaultResult(async (ctx, root) => {
   const abs = localPath(ctx, root);
   sync.unwatch(abs);
   vaults.forget(abs);
+  const open = settings.get().folder;
+  if (open && files.samePath(path.resolve(open), abs)) {
+    settings.update({ folder: null });
+    files.forgetVaultRoot();
+    broadcastSettings();
+  }
   broadcastVaults();
   return { view: vaultView(ctx) };
 }));

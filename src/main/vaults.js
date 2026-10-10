@@ -235,7 +235,15 @@ function create(dir, { name } = {}) {
   const abs = path.resolve(dir);
   if (!isDirSync(abs)) throw new Error('That folder is not there.');
 
-  if (isVault(abs)) return read(abs);
+  // Already a vault: there is nothing to write, but this computer is still
+  // being told about it, and that is the whole of what "open this folder as a
+  // vault" means for a folder that is one already. Remembering it here is what
+  // puts a vault back on the list after it has been taken off — otherwise the
+  // only way back was to open it from the list it is no longer on.
+  if (isVault(abs)) {
+    remember(abs);
+    return read(abs);
+  }
 
   // Nesting makes it ambiguous which vault owns a file, which makes it
   // ambiguous where that file syncs. Refused on both sides.

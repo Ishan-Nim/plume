@@ -25,11 +25,6 @@ const MERMAID_URL = new URL('vendor/mermaid.min.js', location.href).href;
 const FONT_MIN = 12;
 const FONT_MAX = 28;
 
-// Where the help button goes. The documentation is on the site rather than in
-// the app so that it is the same page for somebody who has not installed Plume
-// yet, and so that fixing a wrong sentence does not need a release.
-const DOCS_URL = 'https://plume-md.com/docs.html';
-
 // Above this many characters the document is laid out lazily (see .is-large).
 const LARGE_DOC_CHARS = 250000;
 
@@ -1969,11 +1964,6 @@ function wireUi() {
   $('#vault-bar').addEventListener('click', ev => {
     ev.stopPropagation();
     openVaultSwitcher($('#vault-bar'));
-  });
-  $('#btn-vault-help').addEventListener('click', () => api.openExternal(DOCS_URL));
-  $('#btn-vault-settings').addEventListener('click', e => {
-    e.stopPropagation();
-    togglePopover(e.currentTarget, ui.readingPop);
   });
   api.onVaultsChanged(view => {
     lastSyncState = view;
