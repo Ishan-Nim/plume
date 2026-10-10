@@ -1,8 +1,14 @@
 'use strict';
 
 // Captures the app screenshots the documentation uses, from the real app:
-// the reading view, the vault panel signed out and signed in, the synced
-// folder, the notebooks a second computer would be offered, and the graph.
+// the reading view in both themes, the reading settings and the palettes, a
+// diagram with the outline beside it, the opening screen, Git sync, and — with
+// a vault API — the vault panel signed out and signed in, the synced folder,
+// the notebooks a second computer would be offered, and the graph.
+//
+// Every picture in README.md, docs/ and site/ that shows the app comes from
+// here or from vault-shots.js. Nothing is composed by hand, so a change to the
+// window is one run away from being in the documentation.
 //
 //   set PLUME_VAULT_API=http://127.0.0.1:8098/api
 //   set PLUME_SHOTS=docs\screenshots
@@ -41,8 +47,11 @@ fs.writeFileSync(path.join(tmp, 'settings.json'), JSON.stringify({
   sidebarWidth: 280,
 }));
 
-// A copy of the demo notebook, so syncing does not touch the repository.
-const notebook = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-demo-'));
+// A copy of the demo notebook, so syncing does not touch the repository. The
+// folder is called "Notebook" rather than the temporary directory it sits in,
+// because its name is on screen — in the sidebar's header, in the breadcrumb
+// and on the vault bar.
+const notebook = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'plume-demo-')), 'Notebook');
 fs.cpSync(path.join(ROOT, 'docs', process.env.PLUME_NOTEBOOK || 'demo-notebook'), notebook, { recursive: true });
 const opener = path.join(notebook, process.env.PLUME_OPEN || 'A field guide to Plume.md');
 process.argv.push(opener);
@@ -84,18 +93,59 @@ async function main(win) {
   await sleep(1200);
 
   // ---- reading ----
+  //
+  // light.png and dark.png are the same two pictures under the names README.md
+  // has always used for them; writing both here is cheaper than keeping two
+  // sets of frames that have to agree.
   await shoot(win, 'reading-light');
+  await shoot(win, 'light');
 
   await run(`window.plume.setSettings({ theme: 'dark' });`);
   await sleep(900);
   await shoot(win, 'reading-dark');
+  await shoot(win, 'dark');
   await run(`window.plume.setSettings({ theme: 'light' });`);
   await sleep(700);
 
   await run(`document.querySelector('.sidebar-tab[data-tab="outline"]').click();`);
   await sleep(500);
   await shoot(win, 'outline');
-  await run(`document.querySelector('.sidebar-tab[data-tab="files"]').click();`);
+
+  // ---- a diagram, with the outline still beside it ----
+  await run(`
+    const el = [...document.querySelectorAll('#doc .mermaid-block, #doc pre, #doc h2')]
+      .find(n => n.classList.contains('mermaid-block'))
+      || document.querySelector('#doc pre');
+    if (el) el.scrollIntoView({ block: 'center' });
+  `);
+  await sleep(900);
+  await shoot(win, 'diagram');
+  await run(`
+    document.querySelector('.sidebar-tab[data-tab="files"]').click();
+    document.getElementById('viewer').scrollTop = 0;
+  `);
+  await sleep(500);
+
+  // ---- the reading settings, and the palettes inside them ----
+  await run("document.getElementById('btn-reading').click();");
+  await sleep(600);
+  await shoot(win, 'reading');
+  await shoot(win, 'palettes');
+  await run('document.body.click();');
+  await sleep(400);
+
+  // ---- Git sync, which lives in a popover of its own ----
+  const gitOpened = await run(`
+    document.getElementById('btn-more').click();
+    await new Promise(r => setTimeout(r, 300));
+    const b = [...document.querySelectorAll('#menu-more button')].find(x => /Git sync/i.test(x.textContent));
+    if (!b) return false;
+    b.click();
+    return true;
+  `);
+  await sleep(900);
+  if (gitOpened) await shoot(win, 'git-sync');
+  await run('document.body.click();');
   await sleep(400);
 
   // ---- editing ----
@@ -104,6 +154,19 @@ async function main(win) {
   await shoot(win, 'editing');
   await run("document.getElementById('btn-edit').click();");
   await sleep(700);
+
+  // ---- the screen Plume opens on ----
+  //
+  // Reached the way a reader reaches it — the vault bar, then Manage vaults —
+  // and last, because it puts the document away that every shot above needs.
+  await run(`
+    document.getElementById('vault-bar').click();
+    await new Promise(r => setTimeout(r, 500));
+    const b = [...document.querySelectorAll('#pop-vaults button')].find(x => x.textContent.includes('Manage'));
+    if (b) b.click();
+  `);
+  await sleep(1200);
+  await shoot(win, 'welcome');
 
   if (!VAULT_SHOTS) {
     console.log('\n(no PLUME_VAULT_API — the vault and graph shots were skipped)');

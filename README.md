@@ -310,7 +310,9 @@ docs/           screenshots and the demo notebook they are taken from
 
 ## Credits
 
-Written and maintained by **Ishan Nim** — [personal site and blog](https://ishan-nim-portfolio-74tdd.ondigitalocean.app). Full credits are in [docs/CREDITS.md](docs/CREDITS.md).
+Plume is a product of **[ZeroDay.lk](https://zeroday.lk)**, written and maintained by
+**Ishan Nim** — [personal site and blog](https://ishan-nim-portfolio-74tdd.ondigitalocean.app).
+Full credits are in [docs/CREDITS.md](docs/CREDITS.md).
 
 
 The four colour palettes beyond Plume's own are derived from Obsidian community

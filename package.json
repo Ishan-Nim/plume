@@ -1,9 +1,13 @@
 {
   "name": "plume",
   "productName": "Plume",
-  "version": "1.9.1",
+  "version": "0.0.2",
   "description": "Plume — a feather-light Markdown viewer",
-  "author": "Ishan Nim",
+  "author": {
+    "name": "ZeroDay.lk",
+    "email": "hello@zeroday.lk",
+    "url": "https://zeroday.lk"
+  },
   "license": "MIT",
   "homepage": "https://github.com/Ishan-Nim/plume",
   "private": true,
@@ -42,9 +46,9 @@
     "mermaid": "^12.1.0"
   },
   "build": {
-    "appId": "app.plume.viewer",
+    "appId": "lk.zeroday.plume",
     "productName": "Plume",
-    "copyright": "Copyright © 2026 Ishan Nim",
+    "copyright": "Copyright © 2026 ZeroDay.lk",
     "directories": {
       "buildResources": "resources",
       "output": "release"
@@ -84,6 +88,7 @@
       ],
       "icon": "resources/icon.ico",
       "executableName": "Plume",
+      "publisherName": "ZeroDay.lk",
       "fileAssociations": [
         {
           "ext": [
@@ -174,7 +179,7 @@
       ],
       "category": "Office",
       "icon": "resources/icon.png",
-      "maintainer": "Ishan Nim <ishan.nim@security-pool.io>",
+      "maintainer": "ZeroDay.lk <hello@zeroday.lk>",
       "synopsis": "A feather-light Markdown viewer",
       "artifactName": "Plume-${version}-linux-${arch}.${ext}",
       "mimeTypes": [

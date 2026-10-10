@@ -115,7 +115,7 @@
   "applicationCategory": "Productivity",
   "applicationSubCategory": "Markdown viewer",
   "operatingSystem": "Windows 10, Windows 11, macOS 11+, Linux",
-  "softwareVersion": "1.9.1",
+  "softwareVersion": "0.0.2",
   "url": "https://plume-md.com/",
   "downloadUrl": "https://plume-md.com/download.html",
   "installUrl": "https://plume-md.com/download.html",
@@ -123,13 +123,18 @@
   "license": "https://opensource.org/licenses/MIT",
   "isAccessibleForFree": true,
   "author": {
-    "@type": "Person",
-    "name": "Ishan Nim",
-    "url": "https://github.com/Ishan-Nim"
+    "@type": "Organization",
+    "name": "ZeroDay.lk",
+    "url": "https://zeroday.lk"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "ZeroDay.lk",
+    "url": "https://zeroday.lk"
   },
   "maintainer": {
-    "@type": "Person",
-    "name": "Ishan Nim"
+    "@type": "Organization",
+    "name": "ZeroDay.lk"
   },
   "offers": {
     "@type": "Offer",
@@ -187,10 +192,10 @@
   "sameAs": [
     "https://github.com/Ishan-Nim/plume"
   ],
-  "founder": {
-    "@type": "Person",
-    "name": "Ishan Nim",
-    "url": "https://github.com/Ishan-Nim"
+  "parentOrganization": {
+    "@type": "Organization",
+    "name": "ZeroDay.lk",
+    "url": "https://zeroday.lk"
   }
 }
 </script>
@@ -271,6 +276,7 @@
     </a>
     <nav class="nav-links" aria-label="Main">
       <a class="navlink nav-hide" href="#features">Features</a>
+      <a class="navlink nav-hide" href="#vaults">Vaults</a>
       <a class="navlink nav-hide" href="docs.html">Docs</a>
       <a class="navlink nav-hide" href="https://github.com/Ishan-Nim/plume">GitHub</a>
       <button class="navlink" id="nav-signout" type="button" hidden>Sign out</button>
@@ -285,7 +291,7 @@
   <div class="hero">
     <div class="wrap">
       <a class="eyebrow" href="https://github.com/Ishan-Nim/plume/releases/latest">
-        <b>New</b> Plume <span data-version>1.9.1</span> is out
+        <b>New</b> Plume <span data-version>0.0.2</span> is out
       </a>
       <h1>Markdown, <em>beautifully</em> set.</h1>
       <p class="lede">
@@ -405,11 +411,84 @@
     </div>
   </section>
 
+
+  <!-- The vault model, in the order somebody meets it: what a vault is, the
+       screen that makes one, the list that moves between them, and the thing
+       people ask first — how many am I allowed. -->
+  <section id="vaults">
+    <div class="wrap">
+      <div class="section-head center">
+        <h2>As many vaults as you like, in your own space.</h2>
+        <p>
+          A vault is a folder of your Markdown with an index beside it. Plume never makes one
+          behind your back, and never limits how many you keep.
+        </p>
+      </div>
+
+      <div class="shots">
+        <figure class="shot">
+          <img src="assets/shots/vault-maker.png" width="1340" height="880" loading="lazy"
+               alt="Plume&rsquo;s create-a-vault screen: a vault name, a location with a Browse button, and a line naming the folder it will make">
+          <figcaption><b>Name it, place it, done.</b> Plume makes the folder with the name you typed and tells you exactly where it is going.</figcaption>
+        </figure>
+
+        <figure class="shot">
+          <img src="assets/shots/vault-chooser.png" width="1340" height="880" loading="lazy"
+               alt="Plume&rsquo;s opening screen: the vaults on this computer on the left, and four ways to get another on the right">
+          <figcaption><b>Your vaults, on the left.</b> Make one, claim a folder you already have, bring one down from your account, or just open a file and keep it loose.</figcaption>
+        </figure>
+
+        <figure class="shot">
+          <img src="assets/shots/vault-switcher.png" width="1340" height="880" loading="lazy"
+               alt="The vault list at the foot of Plume&rsquo;s sidebar, with the open vault ticked and the account beneath it">
+          <figcaption><b>Move between them in one press.</b> The bar at the foot of the sidebar names the vault you are in and lists the rest, the one you are in ticked.</figcaption>
+        </figure>
+
+        <figure class="shot">
+          <img src="assets/shots/vault-linked.png" width="1340" height="880" loading="lazy"
+               alt="A linked vault in Plume&rsquo;s sidebar, showing when it last synced and the storage it shares with every other linked vault">
+          <figcaption><b>Sync is a separate choice, made per vault.</b> Signing in links nothing and uploads nothing until you say so.</figcaption>
+        </figure>
+      </div>
+
+      <div class="grid grid-3">
+        <article class="card">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/></svg></div>
+          <h3>Unlimited vaults</h3>
+          <p>One per project, one for work, one for everything else — there is no number. The free account holds 100&nbsp;MB of synced documents in one pool shared across all of them, so a hundred small vaults and one large one look the same to the meter.</p>
+        </article>
+
+        <article class="card">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M12 7v5l3 2"/></svg></div>
+          <h3>Costs nothing to keep local</h3>
+          <p>A vault that never leaves this computer works offline, forever, with no account: notes, backlinks, search, the graph. It uses none of your storage, and nothing nags you to connect it to anything.</p>
+        </article>
+
+        <article class="card">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><path d="M14 14h6v6h-6z"/></svg></div>
+          <h3>They never collide</h3>
+          <p>Two vaults holding a note of the same name are two different notes, and they sync at the same time without meeting. Nothing is merged, and nothing is overwritten to settle a disagreement.</p>
+        </article>
+
+        <article class="card">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div>
+          <h3>It opens where you left off</h3>
+          <p>Plume comes back into the vault you were last in, on the note you were last reading. That place is remembered inside the vault and never leaves the computer that wrote it, so a laptop and a desktop each keep their own.</p>
+        </article>
+      </div>
+
+      <p class="section-more">
+        A folder is never silently a vault, and a vault never silently syncs.
+        <a href="docs.html#vault">How the vault model works</a>
+      </p>
+    </div>
+  </section>
+
   <section class="cta-band">
     <div class="wrap">
       <div class="section-head center">
         <h2>Read your Markdown today.</h2>
-        <p>Free, open source, and about as heavy as a feather. Version <span data-version>1.9.1</span>.</p>
+        <p>Free, open source, and about as heavy as a feather. Version <span data-version>0.0.2</span>.</p>
       </div>
       <a class="btn btn-primary btn-lg" href="download.html" data-auto-download>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
@@ -455,7 +534,7 @@
     </div>
 
     <div class="foot-bottom">
-      <p class="foot-note">Plume is free software by <a href="https://github.com/Ishan-Nim">Ishan Nim</a>, released under the MIT licence. Not affiliated with Obsidian. Your files stay on your machine: Plume has no telemetry, and the vault is opt-in.</p>
+      <p class="foot-note">Plume is a product of <a href="https://zeroday.lk">ZeroDay.lk</a>, free software released under the MIT licence. Not affiliated with Obsidian. Your files stay on your machine: Plume has no telemetry, and the vault is opt-in.</p>
       <div class="foot-controls" id="foot-controls">
         <select class="palette-picker" id="palette-picker" aria-label="Colour palette" data-no-i18n>
           <option value="plume">Plume</option>

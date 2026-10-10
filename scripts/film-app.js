@@ -30,7 +30,9 @@ app.setPath('userData', tmp);
 const [w, h] = (process.env.PLUME_SIZE || '1280x832').split('x').map(Number);
 
 // A copy, so filming never writes to the repository.
-const notebook = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-demo-'));
+// Named, not a temporary directory: the folder's name is on screen in the
+// sidebar's header, the breadcrumb and the vault bar for the whole film.
+const notebook = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'plume-demo-')), 'Notebook');
 fs.cpSync(path.join(ROOT, 'docs', 'film-notebook'), notebook, { recursive: true });
 
 // The graph is only worth filming with something to draw. Five notes make a

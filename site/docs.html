@@ -170,7 +170,7 @@
   "inLanguage": "en",
   "author": {
     "@type": "Person",
-    "name": "Ishan Nim"
+    "name": "ZeroDay.lk"
   },
   "publisher": {
     "@type": "Organization",
@@ -396,6 +396,17 @@
       the one who moves it between them.
     </p>
     <figure>
+      <img src="assets/shots/vault-chooser.png" width="1340" height="880" loading="lazy" alt="Plume&rsquo;s opening screen: the vaults on this computer listed on the left, and four ways to get another on the right">
+      <figcaption>The screen Plume opens on when there is nothing to come back to: the vaults this computer already has on the left, and the four ways to get another on the right.</figcaption>
+    </figure>
+    <p>
+      The three on the right are not the same act. <b>Create a new vault</b> makes a folder and a
+      vault in it. <b>Open a folder as a vault</b> takes Markdown you already have and claims it
+      where it lies. <b>Open a vault from your account</b> brings one down from another computer.
+      Under them, quieter, is the way in that commits to nothing at all: open a file or a folder and
+      leave it loose.
+    </p>
+    <figure>
       <video class="film" width="1180" height="760" preload="none" muted loop playsinline
              poster="assets/clips/vault.jpg" aria-label="The vault panel in Plume, showing a vault and the documents in it">
         <source src="assets/clips/vault.webm" type="video/webm">
@@ -443,6 +454,34 @@
     </p>
     <p>
       Delete <code>.plume/</code> and the folder is loose again, with every note untouched.
+    </p>
+
+    <h3>How many you can have</h3>
+    <p>
+      As many as you like. There is no limit on vaults, and there never has been: one per project,
+      one for work and one for everything else is the ordinary way to use them. They sync at the
+      same time, and two vaults holding a note of the same name are two different notes that never
+      meet.
+    </p>
+    <p>
+      What is limited is <b>storage in your account</b> &mdash; 100&nbsp;MB on the free plan &mdash;
+      and it is one pool shared across every linked vault. A hundred small vaults and one large one
+      look the same to the meter. <b>Local-only vaults and loose folders cost nothing at all</b>,
+      because nothing of them is in the cloud to measure: a vault you never link is unlimited in
+      every sense that matters, bounded only by your own disk.
+    </p>
+
+    <h3>Moving between them</h3>
+    <figure>
+      <img src="assets/shots/vault-switcher.png" width="1340" height="880" loading="lazy" alt="The vault list at the foot of Plume&rsquo;s sidebar, with the open vault ticked, the account beneath it and a way back to the chooser">
+      <figcaption>The bar at the foot of the sidebar names the vault you are in; pressing it lists the rest.</figcaption>
+    </figure>
+    <p>
+      The one you are in is ticked, a linked vault carries a cloud mark, and the list filters as you
+      type once there are more than a handful. Your account sits under the list, and
+      <b>Manage vaults&hellip;</b> under that goes back to the opening screen.
+      <code>Ctrl+Shift+V</code> opens the same list from the keyboard, and so does
+      <b>&#8943; &rarr; Switch vault&hellip;</b>.
     </p>
 
     <h3>Where Plume opens</h3>
@@ -908,7 +947,7 @@ people/notes.md                 who said what, and when</code></pre>
     </div>
 
     <div class="foot-bottom">
-      <p class="foot-note">Plume is free software by <a href="https://github.com/Ishan-Nim">Ishan Nim</a>, released under the MIT licence. Not affiliated with Obsidian. Your files stay on your machine: Plume has no telemetry, and the vault is opt-in.</p>
+      <p class="foot-note">Plume is a product of <a href="https://zeroday.lk">ZeroDay.lk</a>, free software released under the MIT licence. Not affiliated with Obsidian. Your files stay on your machine: Plume has no telemetry, and the vault is opt-in.</p>
       <div class="foot-controls" id="foot-controls">
         <select class="palette-picker" id="palette-picker" aria-label="Colour palette" data-no-i18n>
           <option value="plume">Plume</option>

@@ -1,5 +1,11 @@
 # Credits
 
+## Publisher
+
+Plume is a product of **ZeroDay.lk**.
+
+- <https://zeroday.lk>
+
 ## Author
 
 Plume is written and maintained by **Ishan Nim**.
