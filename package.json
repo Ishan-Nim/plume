@@ -88,7 +88,9 @@
       ],
       "icon": "resources/icon.ico",
       "executableName": "Plume",
-      "publisherName": "ZeroDay.lk",
+      "signtoolOptions": {
+        "publisherName": "ZeroDay.lk"
+      },
       "fileAssociations": [
         {
           "ext": [
