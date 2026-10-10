@@ -1241,6 +1241,10 @@ body.is-making .default-banner { display: none; }
 }
 
 /* ============================================================ document */
+/* >>> shared with the web view: scripts/build.js copies everything between
+   this marker and the one before `print` into site/assets/web-doc.css, so a
+   note looks the same in a browser tab as it does in the app. Keep rules in
+   here about the document itself — nothing about the window around it. */
 
 .markdown-body {
   max-width: var(--measure);
@@ -1700,6 +1704,8 @@ summary.callout-title::-webkit-details-marker { display: none; }
   0%, 30% { background-color: var(--accent-soft); box-shadow: 0 0 0 6px var(--accent-soft); }
   100% { background-color: transparent; box-shadow: 0 0 0 6px transparent; }
 }
+
+/* <<< end of what the web view shares */
 
 /* ================================================================ print */
 

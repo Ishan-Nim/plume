@@ -53,6 +53,7 @@
 - **Open a folder** of notes from the welcome screen or **⋯ → Open folder…**: the sidebar roots itself there and stays there, and Plume remembers it for next time. Opening a folder is all it is — nothing is written beside your notes, and the folder is not a vault until you make it one.
 - **Vaults, when you want one.** Name a vault and say where it goes and Plume makes the folder, or claim a folder of notes you already have. Either way it writes a `.plume/` folder and indexes the Markdown, which is what backlinks across the whole folder, search and the graph are built on. It needs no account and no network, and it is a finished state on its own. Link a vault to an account and it syncs between your computers. See [Vaults](#vaults).
 - **It opens where you left it.** Plume comes back into the vault it was last in, on the note it was last showing — recorded in the vault, never leaving the computer it was read on. The bar at the foot of the sidebar names that vault and lists the others; `Ctrl+Shift+V` opens the same list.
+- **And in any browser.** A linked vault opens at [plume-md.com/notes.html](https://plume-md.com/notes.html) — the vaults on the left, a note in the middle, rendered by the same pipeline from the same source files. Press **Edit** for the Markdown and `Ctrl+S` to save it back. Cloud vaults only: a browser cannot reach the folders on your disk.
 - **Live reload** — save the file in any editor and Plume updates in place, keeping your scroll position.
 - **Updates that ask first.** Plume tells you when a new version is out and installs it when you say so. Every download is checked against the release's published checksum.
 - **Find in page**, back/forward between linked notes, image lightbox, copy buttons on code blocks.
@@ -277,6 +278,15 @@ are replaced with recorders first, so nothing it presses leaves the window.
 PLUME_VAULT_API=http://127.0.0.1:8098/api npx electron test/e2e/sweep-flow.js
 ```
 
+And the web view, in a real browser window: it signs up, puts documents in the
+account, then does everything else through the page — the vaults list, a note
+renders, a wiki link follows, an edit saves, and the account really holds the
+new text afterwards.
+
+```bash
+PLUME_VAULT_API=http://127.0.0.1:8098/api npx electron test/e2e/web-flow.js
+```
+
 The rest follow one story each and need no server:
 
 ```bash
@@ -300,6 +310,7 @@ The screenshots above come from the sample notes in [`docs/demo-notebook`](docs/
 ```
 src/main/       main process — windows, file access, settings, vaults, sync, account, IPC, preload
 src/renderer/   UI — markdown pipeline, DOM enhancements, find, sidebar, vault panel, graph
+src/web/        the web view — the same pipeline, in a browser tab, against the vault API
 mcp/            MCP server, so an AI assistant can use the vault as project memory
 site/           plume-md.com — the landing, download, docs and web-vault pages
 resources/      icons (SVG sources + generated ICO/PNG), NSIS installer additions

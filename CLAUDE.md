@@ -14,6 +14,7 @@ them is finished until all of them are:
 | macOS app | same workflow (`macos-latest`) | same tag — dmg and zip, x64 and arm64 |
 | Linux app | same workflow (`ubuntu-latest`) | same tag — AppImage and deb |
 | Website | `site/` (plume-md.com) | version strings, download links, feature copy, `site/assets/site.js` `VERSION` |
+| Web view | `src/web/` → `site/assets/web.js` | `node scripts/build.js` emits it; it ships with the site, not with the app |
 | Docs | `site/docs.html`, `README.md`, `docs/` | anything the change makes untrue |
 | Backend | `E:\plume-vault` (private repo, DigitalOcean app **plume-md**) | `PLUME_VERSIONS` must list the new version, or every download link 404s |
 | Ishan's own machine | `release/Plume-Setup-<version>.exe` | build it locally and install it, so he is on what he just shipped |
@@ -59,12 +60,19 @@ Do not weaken that.
 
 - Tests: `npm test` (unit) and the end-to-end runs under `test/e2e/`
   (`edit-flow.js`, `live-flow.js`, `new-note-flow.js`, `organise-flow.js`,
-  `qa-flow.js`, `vault-flow.js`, `vault-sync-flow.js`, `sweep-flow.js`) with
+  `qa-flow.js`, `vault-flow.js`, `vault-sync-flow.js`, `sweep-flow.js`,
+  `web-flow.js`) with
   `npx electron`. Run the ones a change touches before shipping it, and
   `sweep-flow.js` — which presses every control in the window — before any
   release. The vault runs and the sweep need a vault API that is never
   production: `node scripts/dev-server-memory.js` in `E:\plume-vault` serves
   one in memory on port 8098, with no bucket and no database.
+- The web view (`src/web/`) imports the renderer's `markdown.js` and
+  `enhance.js` rather than copying them, and `scripts/build.js` slices the
+  document rules, the theme variables and the palettes out of
+  `src/renderer/styles.css` into `site/assets/web-doc.css`. Change how a
+  document renders or is coloured in one place and both follow. The markers in
+  that stylesheet are load-bearing — the build fails without them.
 - Prose — comments, release notes, site copy — is written the way the rest of
   the repository is written: plain, specific, no marketing. Say what something
   does and why it is that way.

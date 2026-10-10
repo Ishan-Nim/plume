@@ -1,13 +1,19 @@
 Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens straight into a clean reading view: no workspace to import, no project to set up, no editor chrome.
 
-**This is a pre-release.** 1.0 is the number Plume will carry when it is out; until then the builds are numbered from zero, so that nobody mistakes a work in progress for a finished thing.
+**This is a pre-release.** 1.0 is the number Plume will carry when it is out; until then the builds are numbered from zero.
 
-**Notes live in vaults.** A folder on disk is never silently one. You open a folder and it stays exactly what it was — editable, untouched, unable to sync. Making it a vault is a thing you choose, and it writes a `.plume/` folder into it: an id, its own settings, and an index of what is in it. That index is what backlinks, the graph and search across a whole notebook are built from. Delete `.plume/` and it is a folder again with every note where it was.
+**0.0.3 puts your notes in a browser tab.**
 
-**Making one asks what it is called before it asks where it goes.** Plume makes the folder with the name you typed, and a line underneath says exactly which folder is about to appear. A new vault opens on a `Welcome.md` rather than on nothing. Claiming a folder of notes you already have writes nothing into it but the `.plume/` that makes the claim.
+A linked vault now opens at [plume-md.com/notes.html](https://plume-md.com/notes.html): the vaults in your account on the left, the documents in the one you are looking at beneath them, and a note in the middle. It is rendered by the same pipeline the desktop app uses — the same wiki links, tables, callouts, highlights, task lists, maths and syntax colouring, from the same source files — so a note reads the same in both.
 
-**It opens where you left off** — the vault you were last in, on the note you were last reading. Which note that is lives inside the vault and never leaves the computer that wrote it, so a laptop and a desktop on one vault each come back to their own place in it.
+**Press Edit for the Markdown and Ctrl+S to save it back.** A save carries the revision the note was opened at, so if the same note changed somewhere else in the meantime the write is refused and says so, rather than writing over work that was not on screen. `Ctrl+K` searches, `Ctrl+E` toggles the editor, and the address bar carries the note you are on.
 
-**As many vaults as you like.** The bar at the foot of the sidebar names the one you are in and lists the others, the one you are in ticked, with your account under them and the chooser under that. They sync at the same time, and two vaults holding a note of the same name never meet. The limit is on bytes in the cloud — one pool shared across every linked vault — not on how many vaults organise them. Local-only vaults and loose folders cost nothing at all.
+**It shows cloud vaults, and only those.** A browser cannot reach the folders on your disk, so loose folders and local-only vaults are not there — they were never uploaded. Link a vault from the desktop app and it appears; unlink it and it stops.
 
-**A vault that never leaves this computer is a finished state.** It works offline, forever, with no account: notes, backlinks, search, the graph. Linking one to an account is a second, separate choice, made per vault.
+**Notes live in vaults.** A folder on disk is never silently one. Making it a vault writes a `.plume/` folder into it: an id, its own settings, and an index of what is in it. Delete `.plume/` and it is a folder again with every note where it was.
+
+**Making one asks what it is called before it asks where it goes,** and Plume makes the folder with the name you typed. A new vault opens on a `Welcome.md` rather than on nothing.
+
+**It opens where you left off** — the vault you were last in, on the note you were last reading, remembered inside the vault and never leaving the computer that wrote it.
+
+**As many vaults as you like.** The limit is bytes in the cloud — one pool shared across every linked vault — not how many vaults organise them. Local-only vaults and loose folders cost nothing at all.

@@ -236,7 +236,7 @@
     <a href="#obsidian">Obsidian notes</a>
     <a href="#vault">Vaults</a>
     <a href="#sync">Syncing a vault</a>
-    <a href="#web">The web vault</a>
+    <a href="#web">Plume on the web</a>
     <a href="#editing">Editing</a>
     <a href="#git">Git sync</a>
     <a href="#updates">Updates</a>
@@ -617,11 +617,30 @@ idea (conflict 2026-10-09 LAPTOP).md</code></pre>
         computers alone: they stay where they are, as local-only vaults.</li>
     </ul>
 
-    <h2 id="web">The web vault</h2>
+    <h2 id="web">Plume on the web</h2>
     <p>
-      <a href="app.html">plume-md.com/app.html</a> shows your linked vaults in a browser: read them,
-      download them, drop new documents in, and delete them. Useful on a machine where Plume is not
-      installed. A vault you have not linked is not there, because it was never uploaded.
+      <a href="notes.html">plume-md.com/notes.html</a> is your vaults in a browser tab: the vaults
+      on the left, the documents in the one you are looking at, and a note in the middle &mdash;
+      rendered by the same pipeline the desktop app uses, so it reads the same. Press <b>Edit</b>
+      for the Markdown, <code>Ctrl+S</code> to save it back. <code>Ctrl+K</code> searches,
+      <code>Ctrl+E</code> toggles the editor, and the address bar carries the note you are on, so a
+      link to one is a link anybody signed in can follow.
+    </p>
+    <p>
+      <b>It shows cloud vaults, and only those.</b> A browser cannot reach the folders on your
+      disk, so loose folders and local-only vaults are not there &mdash; they were never uploaded.
+      Link a vault from the desktop app and it appears here; unlink it and it stops. Nothing else
+      about the vault model changes: the limit is still bytes rather than vaults, and the documents
+      are still plain Markdown.
+    </p>
+    <p>
+      Saving from the browser carries the revision the note was opened at. If the same note changed
+      somewhere else in the meantime, the save is refused and says so rather than writing over
+      work that was not on screen.
+    </p>
+    <p>
+      <a href="app.html">plume-md.com/app.html</a> is the account beside it: storage, API tokens,
+      the graph, and the vaults in your account that you can put on this computer.
     </p>
     <figure>
       <img src="assets/shots/web-vault.png" width="1340" height="880" loading="lazy" alt="The Plume Vault web page listing documents, with storage used">

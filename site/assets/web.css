@@ -1,0 +1,308 @@
+/* Plume on the web — the chrome around the document.
+ *
+ * The document itself is styled by web-doc.css, which scripts/build.js copies
+ * out of the desktop app's stylesheet so the two cannot drift. Everything here
+ * is the window around it: the sidebar, the bar, and the empty state.
+ *
+ * The colour variables come from site.css, so the web view is the same colour
+ * as the rest of plume-md.com rather than a third palette to keep in step.
+ */
+
+:root {
+  --w-side: 280px;
+  --w-bar: 52px;
+}
+
+/* web-doc.css carries the app's own colours, scoped to .markdown-body, so a
+   note is coloured exactly as it is in the app. Nothing to repeat here. */
+
+/* The site's .btn sets a display, which beats the [hidden] attribute's. A
+   button that is hidden has to be hidden. */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+body.w-booting .w-app { opacity: 0; }
+body.w-busy { cursor: progress; }
+
+.w-app {
+  display: grid;
+  grid-template-columns: var(--w-side) minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  transition: opacity .15s ease;
+}
+body.w-sidebar-off .w-app { grid-template-columns: 0 minmax(0, 1fr); }
+body.w-sidebar-off .w-side { display: none; }
+
+/* ---------------------------------------------------------------- sidebar */
+
+.w-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg-2);
+}
+
+.w-side-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 10px 8px 14px;
+}
+.w-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  font-weight: 650;
+  color: var(--text);
+  text-decoration: none;
+}
+.w-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.w-icon svg { width: 16px; height: 16px; }
+.w-icon:hover { background: rgba(0, 0, 0, 0.06); color: var(--text); }
+
+.w-search-wrap { display: block; padding: 0 12px 10px; }
+.w-search {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+.w-search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.w-side-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 16px; }
+
+.w-side-label {
+  margin: 10px 0 6px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.w-side-label:empty { display: none; }
+
+.w-vaults { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.w-vault {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.w-vault:hover { background: rgba(0, 0, 0, 0.05); }
+.w-vault.is-current { background: rgba(110, 86, 207, 0.12); }
+.w-vault b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.w-vault span { display: block; font-size: 11px; color: var(--text-3); }
+
+.w-tree { display: flex; flex-direction: column; gap: 1px; }
+.w-folder > summary {
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  list-style: none;
+}
+.w-folder > summary::-webkit-details-marker { display: none; }
+.w-folder > summary::before { content: "▸ "; color: var(--text-3); }
+.w-folder[open] > summary::before { content: "▾ "; }
+.w-folder > summary:hover { background: rgba(0, 0, 0, 0.05); }
+.w-folder-body { padding-left: 10px; border-left: 1px solid var(--line); margin-left: 12px; }
+
+.w-file {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.w-file:hover { background: rgba(0, 0, 0, 0.05); }
+.w-file.is-current { background: rgba(110, 86, 207, 0.14); font-weight: 600; }
+.w-file.is-other { color: var(--text-3); }
+.w-empty { margin: 6px 8px; font-size: 12.5px; color: var(--text-3); }
+
+.w-side-foot {
+  flex: none;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--line);
+}
+.w-who-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.w-who-row b {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.w-linkish { font-size: 12px; color: var(--accent); text-decoration: none; }
+.w-linkish:hover { text-decoration: underline; }
+.w-meter {
+  height: 4px;
+  margin: 7px 0 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.w-meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+.w-quota { font-size: 11px; color: var(--text-3); }
+
+/* The same palette control the rest of the site has, where there is room for
+   it: at the foot of the sidebar, under the account. */
+.w-controls { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.w-controls .palette-picker { flex: 1; min-width: 0; font-size: 12px; }
+
+/* ------------------------------------------------------------------- main */
+
+.w-main { min-width: 0; overflow-y: auto; position: relative; }
+
+.w-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--w-bar);
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(8px);
+}
+.w-crumb { flex: 1; min-width: 0; display: flex; gap: 6px; font-size: 13px; overflow: hidden; }
+.w-crumb span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-crumb-vault, .w-crumb-dir { color: var(--text-3); }
+.w-crumb-vault::after, .w-crumb-dir::after { content: " /"; }
+.w-crumb-file { font-weight: 600; color: var(--text); }
+.w-stats { flex: none; font-size: 12px; color: var(--text-3); }
+
+.w-doc { display: block; }
+.w-editor {
+  display: block;
+  width: min(46rem, 100%);
+  min-height: calc(100vh - var(--w-bar) - 60px);
+  margin: 0 auto;
+  padding: 32px 10px 120px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  resize: none;
+}
+.w-editor:focus { outline: none; }
+.w-missing { color: var(--text-3); font-style: italic; }
+
+/* --------------------------------------------------------- the empty state */
+
+.w-empty-state {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 14vh 24px 40px;
+  text-align: center;
+}
+.w-empty-state h1 { margin: 18px 0 10px; font-size: 1.6rem; }
+.w-empty-state p { margin: 0 0 12px; color: var(--text-2); line-height: 1.6; }
+.w-empty-state .w-note { font-size: .92rem; color: var(--text-3); }
+
+/* ------------------------------------------------------------------ toast */
+
+.w-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translate(-50%, 14px);
+  z-index: 50;
+  max-width: min(32rem, calc(100vw - 32px));
+  padding: 9px 16px;
+  border-radius: 10px;
+  background: #1a1a23;
+  color: #fff;
+  font-size: 13.5px;
+  line-height: 1.45;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.w-toast.is-up { opacity: 1; transform: translate(-50%, 0); }
+.w-toast.is-error { background: #b3261e; }
+
+/* ----------------------------------------------------------------- narrow */
+
+@media (max-width: 860px) {
+  .w-app { grid-template-columns: minmax(0, 1fr); }
+  .w-side {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    width: min(var(--w-side), 84vw);
+    box-shadow: 0 0 40px rgba(0, 0, 0, .18);
+  }
+  body:not(.w-sidebar-off) .w-side { display: flex; }
+  body.w-sidebar-off .w-side { display: none; }
+  .markdown-body { padding: 28px 20px 120px; }
+}
+
+/* ------------------------------------------------------------------- dark */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .markdown-body {
+    --warn-bg: #3a2f12;
+    --warn-text: #f0c986;
+    --danger: #ff6b6b;
+  }
+  :root:not([data-theme="light"]) .w-icon:hover,
+  :root:not([data-theme="light"]) .w-vault:hover,
+  :root:not([data-theme="light"]) .w-file:hover,
+  :root:not([data-theme="light"]) .w-folder > summary:hover { background: rgba(255, 255, 255, 0.07); }
+  :root:not([data-theme="light"]) .w-vault.is-current { background: rgba(157, 134, 240, 0.18); }
+  :root:not([data-theme="light"]) .w-file.is-current { background: rgba(157, 134, 240, 0.2); }
+  :root:not([data-theme="light"]) .w-meter { background: rgba(255, 255, 255, 0.12); }
+  :root:not([data-theme="light"]) .w-toast { background: #2c2c35; }
+}
