@@ -2,7 +2,13 @@ Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens
 
 **This is a pre-release.** 1.0 is the number Plume will carry when it is out; until then the builds are numbered from zero.
 
-**0.0.3 puts your notes in a browser tab.**
+**0.0.4 fixes dark mode in the web view, and counts vaults rather than people.**
+
+Dark arrives two ways and they are not the same selector: chosen, which marks the page, and inherited from the system, which marks nothing at all. The web view only had a rule for the second, so pressing the moon on a light machine turned the page around the note dark and left the note white. Every palette and the base theme are now written for both, and for choosing light on a dark machine as well.
+
+The counter on the home page said "vaults created" and counted sign-ups. A vault is now counted when the first document lands under a name that was not there before, and the stored number can be corrected from the data.
+
+**0.0.3 put your notes in a browser tab.**
 
 A linked vault now opens at [plume-md.com/notes.html](https://plume-md.com/notes.html): the vaults in your account on the left, the documents in the one you are looking at beneath them, and a note in the middle. It is rendered by the same pipeline the desktop app uses — the same wiki links, tables, callouts, highlights, task lists, maths and syntax colouring, from the same source files — so a note reads the same in both.
 

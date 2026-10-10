@@ -319,6 +319,22 @@
     btn.disabled = false;
   });
 
+  // The vaults counter was bumped when an account was created, so the number
+  // on the home page was a count of sign-ups. The counting is fixed; this
+  // corrects a number that was already stored, by counting what is there.
+  $('recount').addEventListener('click', async function () {
+    var btn = $('recount');
+    btn.disabled = true;
+    try {
+      var data = await apiJson('/admin/recount-vaults', { method: 'POST' });
+      note(dashMsg, 'Vaults: ' + data.before + ' \u2192 ' + data.vaults + '.', 'ok');
+      await load();
+    } catch (err) {
+      note(dashMsg, err.message);
+    }
+    btn.disabled = false;
+  });
+
   // ---------- start ----------
 
   enter();

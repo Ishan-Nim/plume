@@ -1,34 +1,23 @@
-# Plume 0.0.3
+# Plume 0.0.4
 
 **Not released yet** &middot; [plume-md.com](https://plume-md.com) &middot; MIT licence
 
-> **0.0.3 puts your notes in a browser tab.**
+> **0.0.4 fixes dark mode in the web view, and counts vaults rather than people.**
 >
-> A linked vault now opens at
-> [plume-md.com/notes.html](https://plume-md.com/notes.html): the vaults in your
-> account on the left, the documents in the one you are looking at beneath them,
-> and a note in the middle. It is rendered by the same pipeline the desktop app
-> uses &mdash; the same wiki links, tables, callouts, highlights, task lists,
-> maths and syntax colouring, from the same source files &mdash; so a note reads
-> the same in both, and a change to how Markdown renders reaches both at once.
+> Dark arrives two ways and they are not the same thing: chosen, which marks the
+> page, and inherited from the system, which marks nothing at all. The web view
+> only had a rule for the second, so pressing the moon on a light machine turned
+> the page around the note dark and left the note itself white. Every palette and
+> the base theme are now written for both, and for the third case as well &mdash;
+> choosing light on a dark machine. Six combinations, each checked in a real
+> browser.
 >
-> **Press Edit for the Markdown and Ctrl+S to save it back.** A save carries the
-> revision the note was opened at, so if the same note changed somewhere else in
-> the meantime the write is refused and says so, rather than writing over work
-> that was not on screen. `Ctrl+K` searches, `Ctrl+E` toggles the editor, and the
-> address bar carries the note you are on, so a link to one is a link anybody
-> signed in can follow.
->
-> **It shows cloud vaults, and only those.** A browser cannot reach the folders
-> on your disk, so loose folders and local-only vaults are not there &mdash; they
-> were never uploaded. Link a vault from the desktop app and it appears; unlink
-> it and it stops. Nothing else about the model changes: the limit is still bytes
-> rather than vaults, and a vault that never leaves your computer still costs
-> nothing at all.
->
-> Everything from 0.0.2 is in here: opening where you left off, naming a vault
-> before placing it, a first note in every new one, and the vault list at the
-> foot of the sidebar.
+> **The counter on the home page said "vaults created" and counted sign-ups.** It
+> was bumped when an account was made, which is not when a vault is made. A vault
+> exists in an account as the first segment of its documents' paths, so one is
+> counted the moment the first document lands under a name that was not there
+> before &mdash; and the number already stored can be corrected from the data,
+> which is what **Recount vaults** on the admin page does.
 
 ---
 

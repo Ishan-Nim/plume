@@ -3,7 +3,7 @@
   'use strict';
 
   // The one place the released version lives. Bump it when a release ships.
-  var VERSION = '0.0.3';
+  var VERSION = '0.0.4';
   var REPO = 'https://github.com/Ishan-Nim/plume';
   // Through the counter, which redirects to the release asset.
   var BASE = '/api/download?file=';

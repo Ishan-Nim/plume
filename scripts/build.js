@@ -182,39 +182,42 @@ async function main() {
     '   change the document rules there and both the app and the web view follow. */',
     '',
   ].join('\n');
-  // The palettes, too. The app selects them with [data-theme][data-palette] on
-  // the root; the site adds a third case for dark arriving from the system
-  // rather than from a choice. Each app block becomes the web cases it covers,
-  // scoped to the document so the page around it keeps the site's own colours.
+  // Dark arrives two ways and they are not the same selector: chosen, which
+  // puts data-theme="dark" on the root, and inherited from the system, which
+  // puts nothing there at all. A rule written for only one of them leaves the
+  // document light while the page around it is dark — which is what happened.
+  //
+  // So every palette, and the base theme, is written three times in this
+  // order: light, chosen dark, then system dark inside a media query. Light
+  // goes first so the two darks override it, and the system-dark rule carries
+  // :not([data-theme="light"]) so that choosing light on a dark system wins.
+  const themeRules = (name, light, dark) => {
+    const on = name ? `[data-palette="${name}"]` : '';
+    const out = [];
+    if (light.trim()) out.push(`:root${on} .markdown-body {\n${light}\n}`);
+    if (dark.trim()) {
+      out.push(`:root[data-theme="dark"]${on} .markdown-body {\n${dark}\n}`);
+      out.push(`@media (prefers-color-scheme: dark) {\n`
+        + `:root:not([data-theme="light"])${on} .markdown-body {\n${dark}\n}\n}`);
+    }
+    return out.join('\n');
+  };
+
   const palettes = [];
+  const byPalette = new Map();
   for (const m of rendererCss.matchAll(/^\[data-theme="(light|dark)"\]\[data-palette="([a-z]+)"\] \{/gm)) {
     const [, mode, name] = m;
-    const vars = varsOf(m[0]);
-    if (!vars.trim()) continue;
-    const selectors = mode === 'dark'
-      ? [`:root[data-theme="dark"][data-palette="${name}"] .markdown-body`,
-        `:root:not([data-theme="light"])[data-palette="${name}"] .markdown-body`]
-      : [`:root[data-palette="${name}"]:not([data-theme="dark"]) .markdown-body`];
-    // The system-dark case only applies when the system is dark.
-    if (mode === 'dark') {
-      palettes.push(`${selectors[0]} {\n${vars}\n}`);
-      palettes.push(`@media (prefers-color-scheme: dark) {\n${selectors[1]} {\n${vars}\n}\n}`);
-    } else {
-      palettes.push(`${selectors[0]} {\n${vars}\n}`);
-    }
+    const row = byPalette.get(name) || { light: '', dark: '' };
+    row[mode] = varsOf(m[0]);
+    byPalette.set(name, row);
   }
+  for (const [name, row] of byPalette) palettes.push(themeRules(name, row.light, row.dark));
 
   const theme = [
-    '.markdown-body {',
-    varsOf(':root {'),
-    varsOf(':root,'),
-    '}',
+    // The measurements and fonts do not change with the theme.
+    `.markdown-body {\n${varsOf(':root {')}\n}`,
     '',
-    '@media (prefers-color-scheme: dark) {',
-    '  :root:not([data-theme="light"]) .markdown-body {',
-    varsOf('[data-theme="dark"] {'),
-    '  }',
-    '}',
+    themeRules(null, varsOf(':root,'), varsOf('[data-theme="dark"] {')),
     '',
     palettes.join('\n'),
   ].join('\n');
