@@ -2,7 +2,11 @@ Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens
 
 **This is a pre-release.** 1.0 is the number Plume will carry when it is out; until then the builds are numbered from zero.
 
-**0.0.4 fixes dark mode in the web view, and counts vaults rather than people.**
+**0.0.5 is a navigation you can read at a glance.** The row across the top of plume-md.com had grown to eight things. It is four now: Product, Learn, your account, and Download. The first two open; the third opens once you are signed in. Each item says what it is for underneath its name, one menu opens at a time, Escape closes it, and a tap anywhere else closes it.
+
+Two pages stopped scrolling sideways on a phone: the glow behind the headline reaches past both edges by design and nothing clipped it, and the documentation collapsed to a column whose width was still set by its widest code block.
+
+**0.0.4 fixed dark mode in the web view, and counts vaults rather than people.**
 
 Dark arrives two ways and they are not the same selector: chosen, which marks the page, and inherited from the system, which marks nothing at all. The web view only had a rule for the second, so pressing the moon on a light machine turned the page around the note dark and left the note white. Every palette and the base theme are now written for both, and for choosing light on a dark machine as well.
 

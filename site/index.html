@@ -115,7 +115,7 @@
   "applicationCategory": "Productivity",
   "applicationSubCategory": "Markdown viewer",
   "operatingSystem": "Windows 10, Windows 11, macOS 11+, Linux",
-  "softwareVersion": "0.0.4",
+  "softwareVersion": "0.0.5",
   "url": "https://plume-md.com/",
   "downloadUrl": "https://plume-md.com/download.html",
   "installUrl": "https://plume-md.com/download.html",
@@ -275,13 +275,39 @@
       Plume
     </a>
     <nav class="nav-links" aria-label="Main">
-      <a class="navlink nav-hide" href="#features">Features</a>
-      <a class="navlink nav-hide" href="#vaults">Vaults</a>
-      <a class="navlink nav-hide" href="notes.html">Web app</a>
-      <a class="navlink nav-hide" href="docs.html">Docs</a>
-      <a class="navlink nav-hide" href="https://github.com/Ishan-Nim/plume">GitHub</a>
-      <button class="navlink" id="nav-signout" type="button" hidden>Sign out</button>
-      <a class="navlink" id="nav-account" href="app.html">Sign in</a>
+      <div class="nav-menu">
+        <button class="navlink nav-top" type="button" aria-expanded="false" aria-haspopup="true">
+          Product
+          <svg class="nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-panel" role="menu" hidden>
+          <a role="menuitem" href="#features"><b>Features</b><span>What it does, in one page</span></a>
+          <a role="menuitem" href="#vaults"><b>Vaults</b><span>As many as you like, in your own space</span></a>
+          <a role="menuitem" href="notes.html"><b>Web app</b><span>Your notes in a browser tab</span></a>
+        </div>
+      </div>
+
+      <div class="nav-menu">
+        <button class="navlink nav-top" type="button" aria-expanded="false" aria-haspopup="true">
+          Learn
+          <svg class="nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-panel" role="menu" hidden>
+          <a role="menuitem" href="docs.html"><b>Documentation</b><span>Reading, editing, vaults and sync</span></a>
+          <a role="menuitem" href="contact.html"><b>Contact</b><span>Questions, and reporting a problem</span></a>
+          <a role="menuitem" href="https://github.com/Ishan-Nim/plume"><b>Source on GitHub</b><span>MIT licensed, and the issue tracker</span></a>
+        </div>
+      </div>
+
+      <div class="nav-menu" id="nav-account-menu">
+        <a class="navlink nav-top" id="nav-account" href="app.html">Sign in</a>
+        <div class="nav-panel" role="menu" hidden>
+          <a role="menuitem" href="notes.html"><b>Your notes</b><span>Read and edit them here</span></a>
+          <a role="menuitem" href="app.html"><b>My vault</b><span>Storage, tokens and the graph</span></a>
+          <button role="menuitem" type="button" id="nav-signout"><b>Sign out</b><span>On this browser</span></button>
+        </div>
+      </div>
+
       <a class="btn btn-primary btn-sm" href="download.html">Download</a>
     </nav>
   </div>
@@ -292,7 +318,7 @@
   <div class="hero">
     <div class="wrap">
       <a class="eyebrow" href="https://github.com/Ishan-Nim/plume/releases/latest">
-        <b>New</b> Plume <span data-version>0.0.4</span> is out
+        <b>New</b> Plume <span data-version>0.0.5</span> is out
       </a>
       <h1>Markdown, <em>beautifully</em> set.</h1>
       <p class="lede">
@@ -495,7 +521,7 @@
     <div class="wrap">
       <div class="section-head center">
         <h2>Read your Markdown today.</h2>
-        <p>Free, open source, and about as heavy as a feather. Version <span data-version>0.0.4</span>.</p>
+        <p>Free, open source, and about as heavy as a feather. Version <span data-version>0.0.5</span>.</p>
       </div>
       <a class="btn btn-primary btn-lg" href="download.html" data-auto-download>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>

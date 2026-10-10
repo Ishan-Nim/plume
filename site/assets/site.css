@@ -331,13 +331,72 @@ p { margin: 0; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 660; color: var(--text); letter-spacing: -0.02em; font-size: 1.07rem; }
 .brand:hover { text-decoration: none; }
 .brand img { width: 28px; height: 28px; border-radius: 8px; }
-.nav-links { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.nav-links a.navlink {
+/* The navigation is four things: three that open, and the one that acts.
+   Everything else that used to sit along this row lives inside one of them,
+   because a row of eight links is a list, not a menu. */
+.nav-links { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.nav-links a.navlink,
+.nav-links button.nav-top {
+  display: inline-flex; align-items: center; gap: 4px;
   color: var(--text-2); font-size: .94rem; font-weight: 500;
   padding: 7px 11px; border-radius: 9px;
+  border: 0; background: transparent; font-family: inherit; cursor: pointer;
 }
-.nav-links a.navlink:hover { color: var(--text); background: var(--bg-3); text-decoration: none; }
-@media (max-width: 760px) { .nav-hide { display: none; } }
+.nav-links a.navlink:hover,
+.nav-links button.nav-top:hover { color: var(--text); background: var(--bg-3); text-decoration: none; }
+.nav-links .nav-top[aria-expanded="true"] { color: var(--text); background: var(--bg-3); }
+
+.nav-caret { width: 13px; height: 13px; opacity: .6; transition: transform .16s ease; }
+.nav-top[aria-expanded="true"] .nav-caret { transform: rotate(180deg); }
+
+/* ---------- the menus ---------- */
+
+.nav-menu { position: relative; }
+.nav-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  min-width: 266px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow-lg);
+}
+.nav-panel[hidden] { display: none; }
+.nav-panel a,
+.nav-panel button {
+  display: block; width: 100%;
+  padding: 9px 11px;
+  border: 0; border-radius: 10px;
+  background: transparent;
+  font: inherit; text-align: left; cursor: pointer;
+  color: var(--text);
+}
+.nav-panel a:hover,
+.nav-panel button:hover,
+.nav-panel a:focus-visible,
+.nav-panel button:focus-visible { background: var(--bg-3); text-decoration: none; }
+.nav-panel b { display: block; font-size: .92rem; font-weight: 600; }
+.nav-panel span { display: block; margin-top: 1px; font-size: .8rem; color: var(--text-3); line-height: 1.4; }
+
+/* Signed out there is nothing in the account menu worth opening, so the top
+   item is simply the way in. */
+.nav-links a.navlink#nav-account { color: var(--accent-strong); font-weight: 560; }
+body:not(.is-signed-in) #nav-account-menu .nav-panel { display: none; }
+
+/* ---------- narrow ---------- */
+
+@media (max-width: 760px) {
+  .nav-hide { display: none; }
+  /* Two menus and the button fit; the third would wrap the row. */
+  .nav-links .nav-menu:nth-of-type(2) { display: none; }
+  .nav-panel { min-width: min(280px, calc(100vw - 28px)); }
+}
+@media (max-width: 460px) {
+  .nav-links .nav-menu:nth-of-type(1) { display: none; }
+}
 
 .theme-toggle {
   display: inline-grid; place-items: center;
@@ -380,7 +439,11 @@ p { margin: 0; }
 
 /* ---------- hero ---------- */
 
-.hero { padding-block: clamp(56px, 9vw, 104px) 0; text-align: center; position: relative; }
+/* The glow below reaches 20% past each edge on purpose. Nothing clipped it,
+   so on a narrow screen it gave the whole page a sideways scroll. `clip`
+   rather than `hidden`: it cuts the overflow without making this a scroll
+   container, which would break the sticky header above it. */
+.hero { padding-block: clamp(56px, 9vw, 104px) 0; text-align: center; position: relative; overflow-x: clip; }
 .hero::before {
   content: ""; position: absolute; inset: -10% -20% auto; height: 520px; z-index: -1;
   background: radial-gradient(ellipse 60% 100% at 50% 0%, var(--accent-soft), transparent 70%);
@@ -630,13 +693,7 @@ table.kb td:last-child { font-family: var(--mono); font-size: .86rem; color: var
 .counter span { font-size: .87rem; color: var(--text-2); }
 @media (max-width: 420px) { .counter { padding: 9px 14px; } .counter b { font-size: 1.08rem; } }
 
-.nav-links button.navlink {
-  border: 0; background: transparent; font: inherit;
-  color: var(--text-2); font-size: .94rem; font-weight: 500;
-  padding: 7px 11px; border-radius: 9px; cursor: pointer;
-}
-.nav-links button.navlink:hover { color: var(--text); background: var(--bg-3); }
-.nav-links a.navlink#nav-account { color: var(--accent-strong); font-weight: 560; }
+/* The account link keeps its colour; the rest of this row is styled above. */
 
 /* ---------- translations ---------- */
 

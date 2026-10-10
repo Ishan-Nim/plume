@@ -98,7 +98,10 @@
 <script src="assets/i18n.js" defer></script>
 <style>
   .docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; align-items: start; padding-block: clamp(36px, 6vw, 64px); }
-  @media (max-width: 900px) { .docs { grid-template-columns: 1fr; gap: 28px; } }
+  /* minmax(0, 1fr), not 1fr: a bare 1fr keeps min-width:auto, so one wide
+     code block or table in the prose widens the column and the page with
+     it. Those scroll inside themselves instead. */
+  @media (max-width: 900px) { .docs { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
 
   .toc { position: sticky; top: 84px; font-size: .9rem; }
   @media (max-width: 900px) {
@@ -217,10 +220,39 @@
       Plume
     </a>
     <nav class="nav-links" aria-label="Main">
-      <a class="navlink nav-hide" href="/#features">Features</a>
-      <a class="navlink nav-hide" href="https://github.com/Ishan-Nim/plume">GitHub</a>
-      <button class="navlink" id="nav-signout" type="button" hidden>Sign out</button>
-      <a class="navlink" id="nav-account" href="app.html">Sign in</a>
+      <div class="nav-menu">
+        <button class="navlink nav-top" type="button" aria-expanded="false" aria-haspopup="true">
+          Product
+          <svg class="nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-panel" role="menu" hidden>
+          <a role="menuitem" href="/#features"><b>Features</b><span>What it does, in one page</span></a>
+          <a role="menuitem" href="/#vaults"><b>Vaults</b><span>As many as you like, in your own space</span></a>
+          <a role="menuitem" href="notes.html"><b>Web app</b><span>Your notes in a browser tab</span></a>
+        </div>
+      </div>
+
+      <div class="nav-menu">
+        <button class="navlink nav-top" type="button" aria-expanded="false" aria-haspopup="true">
+          Learn
+          <svg class="nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-panel" role="menu" hidden>
+          <a role="menuitem" href="docs.html"><b>Documentation</b><span>Reading, editing, vaults and sync</span></a>
+          <a role="menuitem" href="contact.html"><b>Contact</b><span>Questions, and reporting a problem</span></a>
+          <a role="menuitem" href="https://github.com/Ishan-Nim/plume"><b>Source on GitHub</b><span>MIT licensed, and the issue tracker</span></a>
+        </div>
+      </div>
+
+      <div class="nav-menu" id="nav-account-menu">
+        <a class="navlink nav-top" id="nav-account" href="app.html">Sign in</a>
+        <div class="nav-panel" role="menu" hidden>
+          <a role="menuitem" href="notes.html"><b>Your notes</b><span>Read and edit them here</span></a>
+          <a role="menuitem" href="app.html"><b>My vault</b><span>Storage, tokens and the graph</span></a>
+          <button role="menuitem" type="button" id="nav-signout"><b>Sign out</b><span>On this browser</span></button>
+        </div>
+      </div>
+
       <a class="btn btn-primary btn-sm" href="download.html">Download</a>
     </nav>
   </div>

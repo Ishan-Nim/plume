@@ -3,7 +3,7 @@
   'use strict';
 
   // The one place the released version lives. Bump it when a release ships.
-  var VERSION = '0.0.4';
+  var VERSION = '0.0.5';
   var REPO = 'https://github.com/Ishan-Nim/plume';
   // Through the counter, which redirects to the release asset.
   var BASE = '/api/download?file=';
@@ -258,11 +258,79 @@
       .catch(function () { /* the page is fine without them */ });
   }
 
+  // ---------- the menus ----------
+  //
+  // Three of the four things in the navigation open; the fourth is the
+  // download button. Only one is open at a time, Escape closes it and gives
+  // the keyboard back to the thing that opened it, and a click anywhere else
+  // closes it too — including on a touch screen, where there is no hover to
+  // leave.
+
+  var menus = [].slice.call(document.querySelectorAll('.nav-menu'));
+
+  function closeMenus(except) {
+    menus.forEach(function (menu) {
+      if (menu === except) return;
+      var top = menu.querySelector('.nav-top');
+      var panel = menu.querySelector('.nav-panel');
+      if (panel) panel.hidden = true;
+      if (top && top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  menus.forEach(function (menu) {
+    var top = menu.querySelector('.nav-top');
+    var panel = menu.querySelector('.nav-panel');
+    if (!top || !panel) return;
+
+    // A link at the top of a menu still goes where it says on a click; the
+    // menu under it opens on hover and on keyboard focus instead. A button
+    // has nowhere to go, so it opens on the click.
+    if (top.tagName === 'BUTTON') {
+      top.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var open = panel.hidden === false;
+        closeMenus(menu);
+        panel.hidden = open;
+        top.setAttribute('aria-expanded', String(!open));
+      });
+    }
+
+    menu.addEventListener('mouseenter', function () {
+      closeMenus(menu);
+      panel.hidden = false;
+      if (top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'true');
+    });
+    menu.addEventListener('mouseleave', function () {
+      panel.hidden = true;
+      if (top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'false');
+    });
+    menu.addEventListener('focusin', function () {
+      closeMenus(menu);
+      panel.hidden = false;
+      if (top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'true');
+    });
+  });
+
+  if (menus.length) {
+    document.addEventListener('click', function () { closeMenus(null); });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Escape') return;
+      var open = document.querySelector('.nav-panel:not([hidden])');
+      if (!open) return;
+      var top = open.parentNode.querySelector('.nav-top');
+      closeMenus(null);
+      if (top && top.focus) top.focus();
+    });
+  }
+
   // ---------- am I signed in? ----------
   //
   // The marketing pages do not talk to the API, but they can see whether a
   // session exists, which is all that is needed to offer the way back in — and
-  // the way out.
+  // the way out. Signed out, the account menu is just the way in: the CSS
+  // keeps its panel shut, because "Sign out" is not an offer to make somebody
+  // who is not signed in.
 
   var account = document.getElementById('nav-account');
   var signout = document.getElementById('nav-signout');
@@ -271,13 +339,14 @@
     try { signedIn = Boolean(localStorage.getItem('plume-vault-token')); } catch (e) { /* private mode */ }
 
     if (signedIn) {
+      document.body.classList.add('is-signed-in');
       account.textContent = 'My vault';
       if (signout) {
-        signout.hidden = false;
         signout.addEventListener('click', function () {
           try { localStorage.removeItem('plume-vault-token'); } catch (e) { /* ignore */ }
+          document.body.classList.remove('is-signed-in');
           account.textContent = 'Sign in';
-          signout.hidden = true;
+          closeMenus(null);
         });
       }
     }

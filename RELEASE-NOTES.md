@@ -1,23 +1,25 @@
-# Plume 0.0.4
+# Plume 0.0.5
 
 **Not released yet** &middot; [plume-md.com](https://plume-md.com) &middot; MIT licence
 
-> **0.0.4 fixes dark mode in the web view, and counts vaults rather than people.**
+> **0.0.5 is a navigation you can read at a glance.**
 >
-> Dark arrives two ways and they are not the same thing: chosen, which marks the
-> page, and inherited from the system, which marks nothing at all. The web view
-> only had a rule for the second, so pressing the moon on a light machine turned
-> the page around the note dark and left the note itself white. Every palette and
-> the base theme are now written for both, and for the third case as well &mdash;
-> choosing light on a dark machine. Six combinations, each checked in a real
-> browser.
+> The row across the top of plume-md.com had grown to eight things, which is a
+> list rather than a menu. It is four now: **Product**, **Learn**, your
+> **account**, and **Download**. The first two open; the third opens once you
+> are signed in and is simply the way in before that, because *Sign out* is not
+> an offer to make somebody who is not signed in.
 >
-> **The counter on the home page said "vaults created" and counted sign-ups.** It
-> was bumped when an account was made, which is not when a vault is made. A vault
-> exists in an account as the first segment of its documents' paths, so one is
-> counted the moment the first document lands under a name that was not there
-> before &mdash; and the number already stored can be corrected from the data,
-> which is what **Recount vaults** on the admin page does.
+> Each item in a menu says what it is for underneath its name, so the menu
+> answers the question rather than only naming a page. One opens at a time,
+> Escape closes it and hands the keyboard back, and a tap anywhere else closes
+> it &mdash; which is what a touch screen needs, having no hover to leave.
+>
+> **Two pages stopped scrolling sideways on a phone.** The glow behind the
+> headline reaches past both edges by design and nothing was clipping it, so
+> the whole page could be dragged sideways. And the documentation collapsed
+> to a single column whose width was still set by its widest code block; the
+> code scrolls inside itself now, as it already did on wider screens.
 
 ---
 
