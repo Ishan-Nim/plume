@@ -102,6 +102,9 @@ left, and the ways to get another on the right.
 
 ![The chooser: your vaults, and the four ways in.](../site/assets/shots/vault-chooser.png)
 
+![Create a new vault: the name first, the place second, and a line saying
+which folder is about to appear.](../site/assets/shots/vault-maker.png)
+
 ### 1. Loose files and folders
 
 Open one or more `.md` files, or a folder, directly. Plume edits them in place.

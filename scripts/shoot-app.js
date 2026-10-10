@@ -111,7 +111,9 @@ async function main(win) {
   }
 
   // ---- the vault, signed out ----
-  await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+  // The vault bar lists the vaults now; the account panel is a tab of the
+  // sidebar, so it is asked for as one.
+  await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
   await until('!!document.getElementById("vault-email")');
   await sleep(500);
   await shoot(win, 'vault-signin');
@@ -147,7 +149,7 @@ async function main(win) {
       if (row) row.click();
     `);
     await sleep(1400);
-    await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+    await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
     await sleep(700);
     await run(`
       const sync = [...document.querySelectorAll('.vault-btn')]
@@ -165,7 +167,7 @@ async function main(win) {
     if (row) row.click();
   `);
   await sleep(1500);
-  await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+  await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
   await sleep(900);
   await shoot(win, 'vault-synced');
 
@@ -198,10 +200,7 @@ async function main(win) {
   wc.reload();
   await until('document.body.dataset.ready === "1"', 20000);
   await sleep(1400);
-  await run(`
-    var p = document.querySelector("[data-panel=vault]");
-    if (p && p.hidden) document.getElementById("vault-bar").click();
-  `);
+  await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
   await until('[...document.querySelectorAll(".vault-btn")].some(b => /^Sync /.test(b.textContent.trim()))', 12000);
   await sleep(900);
   await shoot(win, 'vault-offer');
@@ -222,10 +221,7 @@ async function main(win) {
   wc.reload();
   await until('document.body.dataset.ready === "1"', 20000);
   await sleep(1400);
-  await run(`
-    var p = document.querySelector("[data-panel=vault]");
-    if (p && p.hidden) document.getElementById("vault-bar").click();
-  `);
+  await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
   await until('!!document.querySelector(".vault-current-info")', 12000);
   await sleep(900);
   await shoot(win, 'vault-folder');
@@ -239,10 +235,7 @@ async function main(win) {
   wc.reload();
   await until('document.body.dataset.ready === "1"', 20000);
   await sleep(1400);
-  await run(`
-    var p = document.querySelector("[data-panel=vault]");
-    if (p && p.hidden) document.getElementById("vault-bar").click();
-  `);
+  await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
   await until('!!document.querySelector(".vault-existing .vault-row")', 12000);
   await sleep(900);
   await shoot(win, 'vault-notebooks');

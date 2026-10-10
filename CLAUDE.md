@@ -58,8 +58,13 @@ Do not weaken that.
 ## The rest
 
 - Tests: `npm test` (unit) and the end-to-end runs under `test/e2e/`
-  (`edit-flow.js`, `live-flow.js`, `vault-flow.js`) with `npx electron`. Run
-  the ones a change touches before shipping it.
+  (`edit-flow.js`, `live-flow.js`, `new-note-flow.js`, `organise-flow.js`,
+  `qa-flow.js`, `vault-flow.js`, `vault-sync-flow.js`, `sweep-flow.js`) with
+  `npx electron`. Run the ones a change touches before shipping it, and
+  `sweep-flow.js` — which presses every control in the window — before any
+  release. The vault runs and the sweep need a vault API that is never
+  production: `node scripts/dev-server-memory.js` in `E:\plume-vault` serves
+  one in memory on port 8098, with no bucket and no database.
 - Prose — comments, release notes, site copy — is written the way the rest of
   the repository is written: plain, specific, no marketing. Say what something
   does and why it is that way.

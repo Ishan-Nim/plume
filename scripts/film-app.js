@@ -205,7 +205,7 @@ async function main(win) {
     filming = false;
     await recorder;
 
-    await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+    await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
     await until('!!document.getElementById("vault-email")');
     await sleep(600);
 
@@ -235,7 +235,7 @@ async function main(win) {
         if (row) row.click();
       `);
       await sleep(550);
-      await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+      await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
       await sleep(320);
       await run(`
         const send = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Sync to vault');
@@ -254,7 +254,7 @@ async function main(win) {
       if (row) row.click();
     `);
     await sleep(1200);
-    await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+    await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
     await sleep(800);
 
     filming = true;

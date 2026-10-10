@@ -31,7 +31,9 @@ app.setPath('userData', tmp);
 const [w, h] = (process.env.PLUME_SIZE || '1180x760').split('x').map(Number);
 
 // Notes to film against, plus a web of links so the graph has something to draw.
-const notebook = fs.mkdtempSync(path.join(os.tmpdir(), 'plume-clipnotes-'));
+// The folder is called "Notes" rather than the temporary directory it sits in,
+// because its name is on screen — in the sidebar's header and in the title bar.
+const notebook = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'plume-clipnotes-')), 'Notes');
 fs.cpSync(path.join(ROOT, 'docs', 'film-notebook'), notebook, { recursive: true });
 const TOPICS = ['reading-view', 'wiki-links', 'callouts', 'front-matter', 'katex-math',
   'mermaid-diagrams', 'task-lists', 'the-outline', 'live-reload', 'the-editor',
@@ -165,6 +167,26 @@ app.whenReady().then(async () => {
     });
   `);
 
+  // Types the way somebody types, a character at a time, so the film shows a
+  // name being chosen rather than appearing.
+  const typeInto = async (selector, text, every = 70) => {
+    for (let i = 1; i <= text.length; i += 1) {
+      await run(`
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (el) {
+          el.value = ${JSON.stringify(text)}.slice(0, ${i});
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      `);
+      await sleep(every);
+    }
+  };
+
+  const press = (selector, key) => run(`
+    const el = document.querySelector(${JSON.stringify(selector)});
+    if (el) el.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }));
+  `);
+
   const reset = async () => {
     await run(`
       await window.plume.setSettings({ theme: 'light', palette: 'plume', sidebar: true, sidebarTab: 'files' });
@@ -232,6 +254,63 @@ app.whenReady().then(async () => {
       await sleep(2400);
       await run(`document.getElementById('btn-edit').click();`);
       await sleep(1600);
+    },
+
+    // ---- making a note from the sidebar ----
+    async newnote() {
+      await sleep(700);
+      await run(`document.getElementById('btn-tree-new').click();`);
+      await until('!!document.querySelector(".tree-draft-name")');
+      await sleep(600);
+      await typeInto('.tree-draft-name', 'Thursday meeting');
+      await sleep(900);
+      await press('.tree-draft-name', 'Enter');
+      // The editor element does not exist until editing starts, so this asks
+      // whether it is there and showing rather than reading through a null.
+      await until('!!document.getElementById("editor") && !document.getElementById("editor").hidden', 8000);
+      await sleep(1300);
+      await typeInto('#editor', '# Thursday meeting\n\nWhat we decided:', 55);
+      await sleep(1600);
+    },
+
+    // ---- renaming, and the links following ----
+    async organise() {
+      // A document open behind it, so the rename happens in a window somebody
+      // is working in rather than against an empty page.
+      await run(`
+        const row = [...document.querySelectorAll('.tree-row')]
+          .find(r => r.querySelector('.tree-name') && r.querySelector('.tree-name').textContent === 'A tour of Plume');
+        if (row) row.click();
+      `);
+      await sleep(1400);
+      // Right-click the row, where the row actually is.
+      await run(`
+        const row = [...document.querySelectorAll('.tree-row')]
+          .find(r => r.querySelector('.tree-name') && r.querySelector('.tree-name').textContent === 'Wiki links');
+        if (!row) throw new Error('no row to rename');
+        row.scrollIntoView({ block: 'center' });
+        await new Promise(r => setTimeout(r, 400));
+        const box = row.getBoundingClientRect();
+        row.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true, cancelable: true,
+          clientX: Math.round(box.left + box.width * 0.6),
+          clientY: Math.round(box.top + box.height / 2),
+        }));
+      `);
+      await until('!document.getElementById("menu-tree").hidden');
+      await sleep(1600);
+      await run(`
+        const item = [...document.querySelectorAll('#menu-tree .menu-item')].find(b => b.textContent.includes('Rename'));
+        if (item) item.click();
+      `);
+      await until('!!document.querySelector(".tree-renaming .tree-draft-name")');
+      await sleep(700);
+      await run(`document.querySelector('.tree-draft-name').value = '';`);
+      await typeInto('.tree-draft-name', 'Linking notes');
+      await sleep(800);
+      await press('.tree-draft-name', 'Enter');
+      // The toast says how many links in how many notes followed it.
+      await sleep(3200);
     },
 
     // ---- find in page ----
@@ -314,7 +393,7 @@ app.whenReady().then(async () => {
 
   if (wanted.some((k) => NEEDS_VAULT.has(k)) && process.env.PLUME_VAULT_API) {
     console.log('preparing a vault (off camera)…');
-    await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+    await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
     await until('!!document.getElementById("vault-email")');
     await sleep(600);
     await run(`
@@ -336,7 +415,7 @@ app.whenReady().then(async () => {
           if (row) row.click();
         `);
         await sleep(520);
-        await run(`var p = document.querySelector("[data-panel=vault]"); if (p && p.hidden) document.getElementById("vault-bar").click();`);
+        await run(`window.plume.setSettings({ sidebar: true, sidebarTab: 'vault' });`);
         await sleep(300);
         await run(`
           const send = [...document.querySelectorAll('.vault-btn')].find(b => b.textContent.trim() === 'Sync to vault');

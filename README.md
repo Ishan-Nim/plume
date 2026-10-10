@@ -267,6 +267,26 @@ PLUME_VAULT_API=http://127.0.0.1:8098/api npx electron test/e2e/vault-flow.js
 PLUME_VAULT_API=http://127.0.0.1:8098/api npx electron test/e2e/vault-sync-flow.js
 ```
 
+And a sweep of every control in the window — toolbar, overflow menu, sidebar,
+chooser, the create-a-vault screen, the switcher, the vault panel, the graph —
+each pressed from a known state, failing on anything that throws, logs an error
+or does nothing. The window's ways out (file dialogs, the shell, the printer)
+are replaced with recorders first, so nothing it presses leaves the window.
+
+```bash
+PLUME_VAULT_API=http://127.0.0.1:8098/api npx electron test/e2e/sweep-flow.js
+```
+
+The rest follow one story each and need no server:
+
+```bash
+npx electron test/e2e/edit-flow.js       # editing, saving, unsaved work
+npx electron test/e2e/live-flow.js       # live preview and the editor
+npx electron test/e2e/new-note-flow.js   # making notes and folders
+npx electron test/e2e/organise-flow.js   # renaming and moving, links following
+npx electron test/e2e/qa-flow.js         # layout, zoom, the reading settings
+```
+
 Visual smoke test (renders a document in the real app and saves a screenshot):
 
 ```bash
