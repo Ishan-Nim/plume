@@ -109,6 +109,63 @@ test('deleting .plume makes the folder loose again, with every note intact', () 
   assert.equal(fs.readFileSync(path.join(dir, 'idea.md'), 'utf8'), '# An idea');
 });
 
+// ---------- making one from a name and a place ----------
+
+// The other order: the name first, and the folder made to match it, so a new
+// vault is not stuck being called whatever a file dialog's New Folder button
+// was given.
+
+test('a new vault is made in a folder of its own name', () => {
+  const parent = tempDir('plume-parent-');
+
+  const vault = vaults.createNew(parent, 'Field Notes');
+
+  assert.equal(vault.name, 'Field Notes');
+  assert.equal(vault.root, path.join(parent, 'Field Notes'));
+  assert.equal(vaults.isVault(vault.root), true);
+  // The folder it was put in is otherwise untouched.
+  assert.deepEqual(fs.readdirSync(parent), ['Field Notes']);
+});
+
+test('a name a folder cannot have is refused, and nothing is made', () => {
+  const parent = tempDir('plume-parent-');
+
+  for (const bad of ['', '   ', '...', 'NUL', 'com1', '<>:"|?*']) {
+    assert.throws(() => vaults.createNew(parent, bad), /name a folder can have|Letters/i,
+      `“${bad}” should not be a vault name`);
+  }
+  assert.deepEqual(fs.readdirSync(parent), []);
+});
+
+test('a name with path separators in it does not escape the location', () => {
+  const parent = tempDir('plume-parent-');
+  // The separators are not cleaned into a deeper path: they are not allowed
+  // in a folder name at all, so what is left is one folder, here.
+  const vault = vaults.createNew(parent, 'Notes/../../escaped');
+
+  assert.equal(path.dirname(vault.root), path.resolve(parent));
+  assert.deepEqual(fs.readdirSync(parent), [path.basename(vault.root)]);
+});
+
+test('a folder that is already there is not taken over', () => {
+  const parent = tempDir('plume-parent-');
+  write(parent, 'Journal/old.md', 'mine');
+
+  assert.throws(() => vaults.createNew(parent, 'Journal'), /already in that folder/);
+  // Which is the whole point: the notes in it are untouched and it is still
+  // loose, so claiming it is still a choice somebody gets to make.
+  assert.equal(fs.readFileSync(path.join(parent, 'Journal', 'old.md'), 'utf8'), 'mine');
+  assert.equal(vaults.isVault(path.join(parent, 'Journal')), false);
+});
+
+test('a vault cannot be made inside another one, and leaves no empty folder', () => {
+  const outer = tempDir();
+  vaults.create(outer, { name: 'Outer' });
+
+  assert.throws(() => vaults.createNew(outer, 'Inner'), /already inside the vault/);
+  assert.equal(fs.existsSync(path.join(outer, 'Inner')), false);
+});
+
 // ---------- a vault is found from anywhere inside it ----------
 
 test('a note deep inside a vault knows which vault it is in', () => {

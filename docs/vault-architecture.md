@@ -88,7 +88,16 @@ and the quota it shares with every other linked vault.](../site/assets/shots/vau
 
 ## How you get into each one
 
-A new window opens on a chooser: the vaults this computer already has on the
+Plume opens on the vault it was last in, on the note it was last showing. That
+note is recorded per vault in `.plume/workspace.json`, which is device-local and
+never synced, so two computers on one vault each come back to their own place in
+it. If the record is gone, or names a note that is gone, the vault opens on
+whatever reads as its front — `Welcome.md`, `README.md`, `index.md`, `home.md`,
+or failing those the first note it finds.
+
+The chooser is what a window opens on when there is nothing to come back to: no
+vaults on this computer yet, or the last one moved or deleted. It is also what
+**Manage vaults…** goes back to. The vaults this computer already has are on the
 left, and the ways to get another on the right.
 
 ![The chooser: your vaults, and the four ways in.](../site/assets/shots/vault-chooser.png)
@@ -106,8 +115,13 @@ There is no `.plume/`, no `vault_id`, and no account involvement.
 
 ### 2. Create a new vault
 
-Choose a folder — empty or not — and Plume initialises it by writing `.plume/`.
-This works with **no account and no network**.
+Name it, say which folder to put it in, and Plume makes a folder of that name
+and initialises it by writing `.plume/`. The name is asked for first because the
+name is also the folder's: a file dialog can only ask *where*, which is why this
+is a screen of Plume's own rather than one. A new vault is given a `Welcome.md`
+to open on — only ever written into a vault with no Markdown in it, and never
+over a file that is already there. This works with **no account and no
+network**.
 
 - The vault is fully functional: notes, attachments, settings, search, graph.
 - It consumes **zero** quota, because nothing is in the cloud.
@@ -139,11 +153,12 @@ Two paths lead to a linked vault:
 
 Having more than one vault is the normal case — one per project, or one for
 work and one for everything else — so moving between them is not a thing to go
-back to the welcome screen for. The switcher is on the bar at the foot of the
-sidebar, in the overflow menu, and on **Ctrl+Shift+V**.
+back to the welcome screen for. The bar at the foot of the sidebar names the
+vault you are in and is the control for leaving it: press it and the others are
+there. The overflow menu and **Ctrl+Shift+V** open the same list.
 
 ![The switcher: every vault this computer knows about, the one you are in
-marked, and the two ways to make another.](../site/assets/shots/vault-switcher.png)
+ticked, with the account and the way back to the chooser.](../site/assets/shots/vault-switcher.png)
 
 It lists each vault by name and folder, marks the linked ones, and filters as
 you type once there are more than a handful. Vaults are remembered as you make
@@ -166,7 +181,7 @@ MyVault/
 │   │   ├── state.json      # this device's cursor and pause flag
 │   │   ├── pending/        # uploads waiting on quota
 │   │   └── trash/          # documents removed because the remote said so
-│   ├── workspace.json      # open tabs and pane layout (device-local)
+│   ├── workspace.json      # the note this computer left the vault on (device-local)
 │   └── cache/              # search index, thumbnails (device-local, rebuildable)
 ├── Notes/
 │   └── idea.md

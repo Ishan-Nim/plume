@@ -85,14 +85,17 @@ export class Vault {
    * @param {Function} toast     the app's notification helper
    * @param {Function} getDoc    returns the open document, or null
    * @param {Function} onGraph   asked to show the graph of these documents
+   * @param {Function} getRoot   the folder the window is looking at, or null
+   * @param {Function} onEnter   asked to land the window in a vault just opened
    */
-  constructor(root, api, toast, getDoc, onGraph, getRoot) {
+  constructor(root, api, toast, getDoc, onGraph, getRoot, onEnter) {
     this.root = root;
     this.api = api;
     this.toast = toast;
     this.getDoc = getDoc;
     this.onGraph = onGraph;
     this.getRoot = getRoot || (() => null);
+    this.onEnter = onEnter || (async () => {});
 
     this.mode = 'signin';
     this.account = null;      // who is signed in, and the quota
@@ -698,8 +701,9 @@ export class Vault {
           await this.load();
           return;
         }
-        this.toast(`Opened “${vault.name}”`);
         await this.load();
+        // Opening a vault means being in it, on the note it was left on.
+        await this.onEnter(res);
       });
 
       row.append(label, el('div', { class: 'vault-row-acts' }, open));

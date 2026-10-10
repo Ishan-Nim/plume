@@ -10,6 +10,7 @@ const {
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const fsp = require('node:fs/promises');
 const { pathToFileURL, fileURLToPath } = require('node:url');
 const { spawn, execFile } = require('node:child_process');
 const settings = require('./settings');
@@ -645,12 +646,89 @@ function broadcastSettings() {
   for (const win of liveWindows()) win.webContents.send('settings:changed', view);
 }
 
-handle('app:init', ctx => {
+/**
+ * Remembers which note a vault was last left on.
+ *
+ * In the vault's own workspace file, which is device-local by design: a laptop
+ * and a desktop on the same vault each come back to whatever *they* were
+ * reading. Stored relative to the vault root, because the same vault sits at a
+ * different path on each of them.
+ */
+function rememberLastDoc(root, docPath) {
+  // `findVaultRoot` answers for `.obsidian` as well, and a folder that is not
+  // a Plume vault must not acquire a `.plume/` because somebody read a file
+  // in it. Nothing is written outside a vault, not even bookkeeping.
+  if (!root || !docPath || !vaults.isVault(root)) return;
+  const rel = path.relative(root, docPath);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return;
+  const current = vaults.readWorkspace(root) || {};
+  vaults.writeWorkspace(root, { ...current, lastDoc: rel.split(path.sep).join('/') });
+}
+
+// What reads as the front of a vault when there is no record of a last note.
+const FRONT_NOTES = ['welcome.md', 'readme.md', 'index.md', 'home.md'];
+
+/**
+ * The note to open when a vault is entered — switched to, made, claimed, or
+ * come back to on launch.
+ *
+ * Where it was left, if that note is still there; otherwise whatever reads as
+ * the front of it, which is a note that calls itself one. Opening *something*
+ * beats opening nothing: a vault is a place of work, and arriving in one to be
+ * shown a chooser is arriving nowhere.
+ */
+async function noteToOpen(root) {
+  const workspace = vaults.readWorkspace(root);
+  const last = workspace && typeof workspace.lastDoc === 'string' ? workspace.lastDoc : null;
+  if (last) {
+    const abs = path.resolve(root, last);
+    if (files.isWithin(root, abs) && await files.isFile(abs)) return abs;
+  }
+
+  const notes = await files.walkMarkdown(root, { max: 400, maxDepth: 2 });
+  if (!notes.length) return null;
+  return notes.find(p => FRONT_NOTES.includes(path.basename(p).toLowerCase())) || notes[0];
+}
+
+/**
+ * The vault this window opens on, and the note to open in it.
+ *
+ * Coming back to the vault you were last in is what a vault is for, and a
+ * chooser in front of a list of one is a question with an obvious answer asked
+ * every launch. The chooser is still what you get when there is no answer — no
+ * vaults on this computer yet, or the last one has been moved or deleted — and
+ * a folder deliberately opened loose is left alone, because choosing not to
+ * make it a vault was also a choice.
+ */
+async function resumeTarget() {
+  const folder = settings.get().folder;
+  let root = null;
+  if (folder) {
+    if (!vaults.isVault(folder)) return null;
+    root = path.resolve(folder);
+  } else {
+    const first = vaults.known()[0];
+    if (!first) return null;
+    root = first.root;
+    // Nothing else in the window knows about this choice yet — the sidebar,
+    // the vault bar and sync all read the open folder — so make it the open
+    // folder rather than quietly opening a document from somewhere else.
+    settings.update({ folder: root });
+    vaults.remember(root);
+  }
+  return { folder: root, doc: await noteToOpen(root) };
+}
+
+handle('app:init', async ctx => {
   ctx.ready = true;
+  const initialPath = ctx.initialPath || ctx.filePath;
   return {
     // After a renderer crash the reloaded page asks again and gets back the
     // document it was showing.
-    initialPath: ctx.initialPath || ctx.filePath,
+    initialPath,
+    // A window opened on a file has its answer; one opened on nothing goes
+    // back to where it was.
+    resume: initialPath ? null : await resumeTarget(),
     settings: settings.publicView(),
     version: app.getVersion(),
     platform: process.platform,
@@ -669,6 +747,8 @@ handle('doc:load', async (ctx, p) => {
     if (isWin || isMac) app.addRecentDocument(doc.path);
     const dir = path.dirname(doc.path);
     const vaultRoot = await files.findVaultRoot(dir);
+    // So the next launch comes back here rather than to the chooser.
+    if (vaultRoot) rememberLastDoc(vaultRoot, doc.path);
     broadcastSettings();
     return {
       path: doc.path,
@@ -1379,14 +1459,100 @@ function broadcastVaults() {
 handle('vaults:state', ctx => vaultView(ctx));
 
 /**
- * Turns a folder into a vault — the one that is open, or one chosen here.
+ * Where a new vault's folder is offered to go before anybody browses.
  *
- * The same act whether the folder is empty or already holds a pile of notes:
- * nothing is moved, copied or rewritten, and the Markdown that was there is
- * simply now the vault's content, indexed where it lies.
+ * Documents, because that is where a folder of writing belongs and because it
+ * exists on every platform. `pick` is the Browse button: the same question,
+ * asked with a file dialog, so the typed name is still what names the folder.
+ */
+handle('vaults:location', vaultResult(async (ctx, options) => {
+  const want = options && typeof options === 'object' ? options : {};
+  if (!want.pick) {
+    let home = null;
+    try {
+      home = app.getPath('documents');
+    } catch {
+      home = app.getPath('home');
+    }
+    return { path: home };
+  }
+  const { canceled, filePaths } = await dialog.showOpenDialog(ctx.win, {
+    title: 'Choose where the vault folder goes',
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Use this folder',
+    defaultPath: want.from ? localPath(ctx, want.from) : undefined,
+  });
+  if (canceled || !filePaths.length) return { canceled: true };
+  return { path: filePaths[0] };
+}));
+
+// The note a brand-new vault opens on. A vault with nothing in it is a correct
+// but discouraging thing to be handed, and the first note is the one place
+// where the few things worth knowing can be said in passing. It is an ordinary
+// document: edit it, rename it, delete it.
+const FIRST_NOTE = `# Welcome
+
+This is your vault — a folder on this computer holding plain Markdown files.
+Plume keeps its own notes about the vault in a \`.plume\` folder in here;
+everything else is yours, and readable without Plume.
+
+Make a note of something. **Ctrl Shift N** starts a new one, and two square
+brackets link it to another, the way Obsidian does.
+
+When you have your own notes in here, delete this one.
+`;
+
+/**
+ * Writes a first note into a vault that has none.
+ *
+ * Only ever into an empty vault, and never over a file: claiming a folder that
+ * already holds Markdown must leave the folder exactly as it was, and a new
+ * vault made where a \`Welcome.md\` somehow already sits is a folder with
+ * notes in it, whatever else it looks like.
+ */
+async function seedFirstNote(root) {
+  let entries = [];
+  try {
+    entries = await fsp.readdir(root, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const hasNotes = entries.some(e => e.isFile() && /\.(md|markdown)$/i.test(e.name));
+  if (hasNotes) return null;
+
+  const target = path.join(root, 'Welcome.md');
+  try {
+    await fsp.writeFile(target, FIRST_NOTE, { encoding: 'utf8', flag: 'wx' });
+    return target;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Turns a folder into a vault — the one that is open, or one chosen here, or
+ * one made here from a name and a place.
+ *
+ * Claiming is the same act whether the folder is empty or already holds a pile
+ * of notes: nothing is moved, copied or rewritten, and the Markdown that was
+ * there is simply now the vault's content, indexed where it lies. Making is
+ * that plus the folder, and plus a first note so the vault opens on something.
  */
 handle('vaults:create', vaultResult(async (ctx, options) => {
   const want = options && typeof options === 'object' ? options : {};
+
+  // Named first, placed second: the panel asked for both, so the folder is
+  // made here and carries the name that was typed.
+  if (want.parent) {
+    const parent = localPath(ctx, want.parent);
+    const made = vaults.createNew(parent, str(want.name, 120));
+    files.forgetVaultRoot();
+    settings.update({ folder: made.root });
+    broadcastSettings();
+    broadcastVaults();
+    return { vault: made, opened: await seedFirstNote(made.root), view: vaultView(ctx) };
+  }
+
   // The folder the window is actually looking at, which is the one the panel
   // named on the button. Reading the sidebar setting instead meant that
   // opening a single document and pressing "Create vault in Notes" popped a
@@ -1414,7 +1580,12 @@ handle('vaults:create', vaultResult(async (ctx, options) => {
   settings.update({ folder: root });
   broadcastSettings();
   broadcastVaults();
-  return { vault: made, view: vaultView(ctx) };
+  // Claiming a folder writes nothing into it beyond the `.plume/` that is the
+  // claim — the notes that were there are the vault's content, and one of them
+  // is what it opens on. A vault *made* in an empty folder gets a first note,
+  // the same as one made by name.
+  const seeded = want.mode === 'adopt' ? null : await seedFirstNote(root);
+  return { vault: made, opened: seeded || await noteToOpen(root), view: vaultView(ctx) };
 }));
 
 handle('vaults:rename', vaultResult(async (ctx, root, name) => {
@@ -1433,9 +1604,12 @@ handle('vaults:open', vaultResult(async (ctx, root) => {
   }
   vaults.remember(abs);
   settings.update({ folder: abs });
+  files.forgetVaultRoot();
   broadcastSettings();
   broadcastVaults();
-  return { vault: found, view: vaultView(ctx) };
+  // Switching vaults means being in the other one, on the note it was left on
+  // — not being told that the switch happened.
+  return { vault: found, opened: await noteToOpen(abs), view: vaultView(ctx) };
 }));
 
 /** Takes a vault off this computer's list. The folder is not touched. */

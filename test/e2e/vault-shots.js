@@ -68,8 +68,10 @@ const EMAIL = `shots-${Date.now()}@plume-md.test`;
 const PASSWORD = 'shots-flow-password-1';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const OPEN_VAULT = 'var p = document.querySelector("[data-panel=vault]");'
-  + ' if (p && p.hidden) document.getElementById("vault-bar").click();';
+// The vault bar lists the vaults now; the account panel is a tab of the
+// sidebar, so it is asked for as one.
+const OPEN_VAULT = 'window.plume.setSettings({ sidebar: true, sidebarTab: "vault" });'
+  + ' await new Promise(r => setTimeout(r, 400));';
 
 // Linking is confirmed by the main process with a native dialog, which this
 // run cannot click. Answered yes so the shots reach the linked state.
@@ -163,7 +165,7 @@ app.whenReady().then(async () => {
     await sleep(600);
 
     await run2(`
-      document.getElementById('vault-switch').click();
+      document.getElementById('vault-bar').click();
     `);
     await sleep(900);
     await shot2('vault-switcher');

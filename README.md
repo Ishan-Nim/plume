@@ -51,7 +51,8 @@
 - **New notes from the sidebar.** The `+` in the **Files** header starts one in the folder the tree is showing; every folder has a `+` of its own for a note inside it, and `Ctrl+Shift+N` does the first of those from the keyboard. You name it in the tree where the note will be — `Enter` creates it, opens it and leaves you ready to type, `Esc` leaves nothing behind. The button beside it makes a folder. A name Windows cannot open is refused on every platform, and an existing note is never overwritten.
 - **Rename, move and delete from the tree.** Right-click any row for a menu — rename (`F2`), move to trash, open in a new window, copy path — and drag a note onto a folder to move it. **Renaming rewrites every link that pointed at the note:** `[[Plan]]`, `![[Plan]]`, `[[Plan#Heading|alias]]` and `[the plan](Plan.md)`, across the whole folder, with a count of what changed. Deleting goes to the system trash and asks first.
 - **Open a folder** of notes from the welcome screen or **⋯ → Open folder…**: the sidebar roots itself there and stays there, and Plume remembers it for next time. Opening a folder is all it is — nothing is written beside your notes, and the folder is not a vault until you make it one.
-- **Vaults, when you want one.** **Create vault** writes a `.plume/` folder into a folder of notes and indexes the Markdown already there, which is what backlinks across the whole folder, search and the graph are built on. It needs no account and no network, and it is a finished state on its own. Link a vault to an account and it syncs between your computers. See [Vaults](#vaults).
+- **Vaults, when you want one.** Name a vault and say where it goes and Plume makes the folder, or claim a folder of notes you already have. Either way it writes a `.plume/` folder and indexes the Markdown, which is what backlinks across the whole folder, search and the graph are built on. It needs no account and no network, and it is a finished state on its own. Link a vault to an account and it syncs between your computers. See [Vaults](#vaults).
+- **It opens where you left it.** Plume comes back into the vault it was last in, on the note it was last showing — recorded in the vault, never leaving the computer it was read on. The bar at the foot of the sidebar names that vault and lists the others; `Ctrl+Shift+V` opens the same list.
 - **Live reload** — save the file in any editor and Plume updates in place, keeping your scroll position.
 - **Updates that ask first.** Plume tells you when a new version is out and installs it when you say so. Every download is checked against the release's published checksum.
 - **Find in page**, back/forward between linked notes, image lightbox, copy buttons on code blocks.
@@ -78,15 +79,18 @@ that could carry a loose path to the cloud, so there is nothing to misconfigure.
 
 ### A local-only vault
 
-**Create vault** writes a `.plume/` directory into the folder. From then on the
-folder has a permanent id, settings of its own and an index of its files, which is
-what backlinks, search and the graph across the whole vault are built on.
+**Create a new vault** asks what it is called and where it goes, makes the folder
+with that name, and writes a `.plume/` directory into it. From then on the folder
+has a permanent id, settings of its own and an index of its files, which is what
+backlinks, search and the graph across the whole vault are built on. A new vault
+is given a `Welcome.md` to start from, and opens on it.
 
 This works with no account and no network, forever, and uses none of your storage.
 It is a finished state, not a step on the way to something else.
 
-Creating a vault in a folder that is already full of Markdown adopts those notes
-where they lie. Nothing is moved, copied or re-imported.
+**Open a folder as a vault** does the same to a folder that is already full of
+Markdown, adopting those notes where they lie. Nothing is moved, copied,
+re-imported or written beside them — only the `.plume/` that makes the claim.
 
 ### A linked vault
 
@@ -156,7 +160,7 @@ copies on your computers alone.
   sync/state.json      this device's sync cursor and pause flag (never synced)
   sync/pending/        uploads waiting on quota
   sync/trash/          documents removed because the remote said so, recoverable
-  workspace.json       open tabs and panes (never synced)
+  workspace.json       the note this computer left the vault on (never synced)
   cache/               search index and thumbnails, rebuildable
 ```
 

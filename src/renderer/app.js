@@ -25,6 +25,11 @@ const MERMAID_URL = new URL('vendor/mermaid.min.js', location.href).href;
 const FONT_MIN = 12;
 const FONT_MAX = 28;
 
+// Where the help button goes. The documentation is on the site rather than in
+// the app so that it is the same page for somebody who has not installed Plume
+// yet, and so that fixing a wrong sentence does not need a release.
+const DOCS_URL = 'https://plume-md.com/docs.html';
+
 // Above this many characters the document is laid out lazily (see .is-large).
 const LARGE_DOC_CHARS = 250000;
 
@@ -792,7 +797,6 @@ function updateTitlebar() {
 
 function showSidebarTab(tab) {
   if (tab === 'vault') vault().show();
-  else lastDocTab = tab;
   for (const btn of document.querySelectorAll('.sidebar-tab')) {
     btn.classList.toggle('active', btn.dataset.tab === tab);
     btn.setAttribute('aria-selected', String(btn.dataset.tab === tab));
@@ -873,7 +877,8 @@ async function renderWelcomeVaults() {
         toast(res.error, 'error');
         return renderWelcomeVaults();
       }
-      return renderWelcomeVaults();
+      await renderWelcomeVaults();
+      return enterVault(res);
     });
 
     // Taking a vault off this list is about the list, not the folder — so it
@@ -907,8 +912,157 @@ async function renderWelcomeVaults() {
   button.textContent = signedIn ? 'Choose a vault…' : 'Sign in';
 }
 
+// ---------------------------------------------------------------------------
+// Making a vault: a name, then a place
+//
+// A file dialog can only ask where, so a vault made through one was called
+// whatever the folder it was made in happened to be called — and making that
+// folder meant finding the New Folder button in somebody else's dialog. This
+// asks for the name first and makes the folder itself, which is the order the
+// question actually has.
+//
+// The main process is the authority on both halves: these checks only decide
+// what the preview line says, and whatever it refuses is shown as it said it.
+
+const FOLDER_BAD = /[<>:"/\\|?* -]/g;
+const FOLDER_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
+/** The folder a vault name would get, or '' if nothing usable is left. */
+function folderNameFor(raw) {
+  const given = String(raw == null ? '' : raw)
+    .replace(/[\r\n\t]/g, ' ')
+    .trim()
+    .slice(0, 120)
+    .replace(FOLDER_BAD, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/, '');
+  if (!given || FOLDER_RESERVED.test(given)) return '';
+  return given;
+}
+
+/**
+ * Lands the window inside a vault that has just been opened, made or claimed.
+ *
+ * The main process says which note that means — where the vault was left, or
+ * the note that reads as the front of it — and the tree is rooted at the vault
+ * either way, because an empty vault is still somewhere to be rather than a
+ * reason to go back to the chooser.
+ */
+async function enterVault(res) {
+  if (!res || !res.vault) return false;
+  updateSettings({ sidebar: true, sidebarTab: 'files' });
+  if (res.opened && await openDoc(res.opened, { push: false })) {
+    fileTree.show(res.vault.root, res.opened).catch(() => {});
+    return true;
+  }
+  await showWelcome();
+  fileTree.setRoot(res.vault.root, null).catch(() => {});
+  return false;
+}
+
+const vaultMaker = {
+  parent: null,
+
+  async open() {
+    body.classList.add('is-making');
+    const panel = $('#vault-maker');
+    if (panel) panel.hidden = false;
+    const name = $('#maker-name');
+    if (name) {
+      name.value = '';
+      name.focus({ preventScroll: true });
+    }
+    this.say(null);
+    this.paint();
+    if (!this.parent) {
+      try {
+        const res = await api.vaults.location({});
+        if (res && res.ok && res.path) this.parent = res.path;
+      } catch { /* then Browse is the only way, and it is right there */ }
+      this.paint();
+    }
+  },
+
+  close() {
+    body.classList.remove('is-making');
+    const panel = $('#vault-maker');
+    if (panel) panel.hidden = true;
+    this.say(null);
+  },
+
+  /** The one line saying what is about to appear on disk. */
+  paint() {
+    const line = $('#maker-path');
+    if (!line) return;
+    const leaf = folderNameFor($('#maker-name') ? $('#maker-name').value : '');
+    if (!this.parent) {
+      line.textContent = 'Choose where the vault folder goes.';
+      return;
+    }
+    const sep = this.parent.includes('\\') ? '\\' : '/';
+    const base = this.parent.endsWith(sep) ? this.parent.slice(0, -1) : this.parent;
+    line.replaceChildren(
+      document.createTextNode('Creates '),
+      el('b', { text: leaf ? `${base}${sep}${leaf}` : base + sep }),
+    );
+  },
+
+  say(message) {
+    const box = $('#maker-error');
+    if (!box) return;
+    box.textContent = message || '';
+    box.hidden = !message;
+  },
+
+  async browse() {
+    let res = null;
+    try {
+      res = await api.vaults.location({ pick: true, from: this.parent || undefined });
+    } catch {
+      return this.say('Could not open the folder chooser.');
+    }
+    if (!res.ok) return this.say(res.error);
+    if (res.canceled) return undefined;
+    this.parent = res.path;
+    this.say(null);
+    this.paint();
+    return undefined;
+  },
+
+  async create() {
+    const field = $('#maker-name');
+    const typed = field ? field.value.trim() : '';
+    if (!folderNameFor(typed)) {
+      return this.say(typed
+        ? 'That is not a name a folder can have. Letters, numbers and spaces work.'
+        : 'Give the vault a name.');
+    }
+    if (!this.parent) return this.say('Choose where the vault folder goes.');
+
+    const button = $('#btn-maker-create');
+    if (button) button.disabled = true;
+    try {
+      const res = await api.vaults.create({ parent: this.parent, name: typed });
+      if (!res.ok) return this.say(res.error);
+      this.close();
+      toast(`“${res.vault.name}” is now a vault`);
+      await renderWelcomeVaults();
+      // Into the vault, not into a panel about it: the notes are the point,
+      // and linking it to an account is a decision for later.
+      await enterVault(res);
+      return undefined;
+    } finally {
+      if (button) button.disabled = false;
+    }
+  },
+};
+
 async function showWelcome() {
   state.doc = null;
+  // Arriving back at the welcome screen is an answer to the question the
+  // maker was asking, however it was answered.
+  vaultMaker.close();
   body.classList.add('is-welcome');
   document.title = 'Plume';
   updateTitlebar();
@@ -1173,7 +1327,7 @@ function buildMoreMenu() {
   }
   items.push(
     sep(),
-    menuItem('Switch vault…', 'vault', () => openVaultSwitcher($('#vault-switch')),
+    menuItem('Switch vault…', 'vault', () => openVaultSwitcher($('#vault-bar')),
       { shortcut: 'Ctrl+Shift+V' }),
     menuItem('Plume Vault…', 'cloud', openVault),
     menuItem('Git sync…', 'refresh', openGit),
@@ -1292,14 +1446,14 @@ function currentDoc() {
 function vault() {
   if (!vaultPanel) {
     vaultPanel = new Vault($('#vault-panel'), api, toast, currentDoc, showGraph,
-      () => fileTree.root || (state.doc && state.doc.vaultRoot) || null);
+      () => fileTree.root || (state.doc && state.doc.vaultRoot) || null,
+      enterVault);
   }
   return vaultPanel;
 }
 
 // The menu item does not open a dialog: it shows the sidebar on the Vault tab,
 // where signing in lives permanently.
-let lastDocTab = 'files';
 let lastVaultState = null;
 let lastSyncState = null;
 
@@ -1323,10 +1477,6 @@ async function openGit() {
   togglePopover($('#btn-more'), ui.gitPop);
 }
 
-function toggleVault() {
-  const showing = state.settings && state.settings.sidebarTab === 'vault';
-  updateSettings({ sidebar: true, sidebarTab: showing ? lastDocTab : 'vault' });
-}
 
 // ---------------------------------------------------------------------------
 // Switching vaults
@@ -1389,13 +1539,15 @@ async function openVaultSwitcher(button) {
       // The one you are already in is shown so the list is the whole truth,
       // but switching to it would reload a window for nothing.
       if (vault.root === here) {
-        row.append(el('span', { class: 'switcher-current', text: 'open' }));
+        const mark = el('span', { class: 'switcher-current', title: 'Open in this window' });
+        mark.innerHTML = icon('check', 14);
+        row.append(mark);
       } else {
         row.addEventListener('click', async () => {
           closePopover();
           const res = await api.vaults.open(vault.root);
           if (!res.ok) return toast(res.error, 'error');
-          toast(`Switched to “${vault.name}”`);
+          await enterVault(res);
           return undefined;
         });
       }
@@ -1418,26 +1570,32 @@ async function openVaultSwitcher(button) {
   pop.append(list);
   draw('');
 
+  // The account belongs here because it is a property of a vault rather than
+  // of the app: a vault is linked to an account or it is not, and this is the
+  // list of vaults. Signing in is the first step of linking one.
   const foot = el('div', { class: 'switcher-foot' });
-  const make = el('button', { class: 'ghost-btn', type: 'button', text: 'Create a vault…' });
-  make.addEventListener('click', async () => {
-    closePopover();
-    const res = await api.vaults.create({ choose: true, mode: 'create' });
-    if (!res.ok) return toast(res.error, 'error');
-    if (res.canceled) return undefined;
-    toast(`“${res.vault.name}” is now a vault`);
-    return undefined;
+  const account = el('button', {
+    class: 'ghost-btn', type: 'button',
+    text: view.account && view.account.signedIn
+      ? `Signed in as ${view.account.email}` : 'Sign in to Plume Vault…',
   });
-  const open = el('button', { class: 'ghost-btn', type: 'button', text: 'Open a folder as a vault…' });
-  open.addEventListener('click', async () => {
+  account.addEventListener('click', () => {
     closePopover();
-    const res = await api.vaults.create({ choose: true, mode: 'adopt' });
-    if (!res.ok) return toast(res.error, 'error');
-    if (res.canceled) return undefined;
-    toast(`“${res.vault.name}” is now a vault`);
-    return undefined;
+    openVault();
   });
-  foot.append(make, open);
+  foot.append(account);
+
+  // One way out rather than two: making a vault and claiming a folder are
+  // both on the screen this goes back to, where they are asked properly.
+  const manage = el('button', { class: 'ghost-btn', type: 'button', text: 'Manage vaults…' });
+  manage.addEventListener('click', () => {
+    closePopover();
+    // Leaving the document behind, so it is asked about the same way opening
+    // another one would ask.
+    if (!mayLeaveDocument()) return;
+    showWelcome().catch(console.error);
+  });
+  foot.append(manage);
   pop.append(foot);
 
   togglePopover(button, pop);
@@ -1463,9 +1621,8 @@ function paintVaultBar(view, account) {
   const status = $('#vault-bar-status');
   if (!title || !status) return;
 
-  $('#vault-bar').setAttribute('aria-expanded',
-    String(Boolean(state.settings && state.settings.sidebarTab === 'vault')));
-
+  // `aria-expanded` on the bar belongs to the switcher it opens, and the
+  // popover code owns it. Nothing to set here.
   const vault = view && view.vault;
 
   if (!vault) {
@@ -1759,19 +1916,42 @@ function wireUi() {
 
   // Making a vault and claiming a folder that already has notes in it are the
   // same act underneath — a `.plume/` written where the files already are —
-  // but they are different questions to be asked, so the chooser they open
-  // asks them differently.
-  const makeVault = async mode => {
-    const res = await api.vaults.create({ choose: true, mode });
+  // but they are different questions, and only one of them has a folder to
+  // point at already. Making one asks for a name here; claiming one goes
+  // straight to the folder chooser, because the folder is the whole answer.
+  $('#btn-welcome-vault').addEventListener('click', () => {
+    vaultMaker.open().catch(console.error);
+  });
+  $('#btn-maker-back').addEventListener('click', () => vaultMaker.close());
+  $('#btn-maker-browse').addEventListener('click', () => {
+    vaultMaker.browse().catch(console.error);
+  });
+  $('#btn-maker-create').addEventListener('click', () => {
+    vaultMaker.create().catch(console.error);
+  });
+  $('#maker-name').addEventListener('input', () => {
+    vaultMaker.say(null);
+    vaultMaker.paint();
+  });
+  $('#maker-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      vaultMaker.create().catch(console.error);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      vaultMaker.close();
+    }
+  });
+
+  $('#btn-welcome-adopt').addEventListener('click', async () => {
+    const res = await api.vaults.create({ choose: true, mode: 'adopt' });
     if (!res.ok) return toast(res.error, 'error');
     if (res.canceled) return undefined;
     toast(`“${res.vault.name}” is now a vault`);
     await renderWelcomeVaults();
-    updateSettings({ sidebar: true, sidebarTab: 'vault' });
-    return vault().show({ force: true });
-  };
-  $('#btn-welcome-vault').addEventListener('click', () => makeVault('create'));
-  $('#btn-welcome-adopt').addEventListener('click', () => makeVault('adopt'));
+    await enterVault(res);
+    return undefined;
+  });
 
   $('#btn-welcome-account').addEventListener('click', () => {
     updateSettings({ sidebar: true, sidebarTab: 'vault' });
@@ -1786,10 +1966,14 @@ function wireUi() {
   $('#btn-edit').addEventListener('click', toggleEdit);
   $('#btn-save').addEventListener('click', saveDoc);
 
-  $('#vault-bar').addEventListener('click', toggleVault);
-  $('#vault-switch').addEventListener('click', ev => {
+  $('#vault-bar').addEventListener('click', ev => {
     ev.stopPropagation();
-    openVaultSwitcher($('#vault-switch'));
+    openVaultSwitcher($('#vault-bar'));
+  });
+  $('#btn-vault-help').addEventListener('click', () => api.openExternal(DOCS_URL));
+  $('#btn-vault-settings').addEventListener('click', e => {
+    e.stopPropagation();
+    togglePopover(e.currentTarget, ui.readingPop);
   });
   api.onVaultsChanged(view => {
     lastSyncState = view;
@@ -2014,7 +2198,7 @@ function wireKeys() {
     }
     if (ctrl && e.shiftKey && lower === 'v') {
       e.preventDefault();
-      return openVaultSwitcher($('#vault-switch'));
+      return openVaultSwitcher($('#vault-bar'));
     }
     if (ctrl && e.shiftKey && lower === 'g') {
       e.preventDefault();
@@ -2165,6 +2349,11 @@ async function boot() {
   applySettings(info.settings);
   if (info.initialPath) {
     const ok = await openDoc(info.initialPath, { push: false });
+    if (!ok) await showWelcome();
+  } else if (info.resume && info.resume.doc) {
+    // Back into the vault this computer was last in, on the note it was left
+    // on. The chooser is for when there is nothing to come back to.
+    const ok = await openDoc(info.resume.doc, { push: false });
     if (!ok) await showWelcome();
   } else {
     await showWelcome();

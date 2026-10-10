@@ -53,20 +53,24 @@
       <section class="sidebar-panel" data-panel="vault" hidden>
         <div id="vault-panel" class="vault-panel"></div>
       </section>
-      <!-- The bar names the vault you are in and opens its panel; the button
-           beside it switches to another. Two acts, so two targets. -->
+      <!-- The name of the vault you are in, and what it is doing. Pressing it
+           lists the others: the vault you are in is the thing you change when
+           you want a different one, so it is the control for changing it.
+           Help and settings sit at the far end, out of the way of that. -->
       <div class="vault-bar-row">
-        <button id="vault-bar" class="vault-bar" type="button" aria-expanded="false">
-          <span class="vault-bar-icon" data-icon="cloud" data-size="15"></span>
+        <button id="vault-bar" class="vault-bar" type="button" aria-haspopup="true"
+                aria-expanded="false" title="Switch vault (Ctrl+Shift+V)">
+          <span class="vault-bar-chevron" data-icon="up" data-size="14"></span>
           <span class="vault-bar-text">
             <b id="vault-bar-title">Plume Vault</b>
             <span id="vault-bar-status">Sign in to sync</span>
           </span>
-          <span class="vault-bar-chevron" data-icon="chevron" data-size="14"></span>
         </button>
-        <button id="vault-switch" class="vault-switch icon-btn" type="button"
-                title="Switch vault (Ctrl+Shift+V)" aria-label="Switch vault" aria-expanded="false"
-                data-icon="vault" data-size="15"></button>
+        <button id="btn-vault-help" class="vault-bar-act icon-btn" type="button"
+                title="Help" aria-label="Help" data-icon="help" data-size="15"></button>
+        <button id="btn-vault-settings" class="vault-bar-act icon-btn" type="button"
+                title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false"
+                data-icon="settings" data-size="15"></button>
       </div>
       <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize"></div>
     </aside>
@@ -130,7 +134,7 @@
             them, quieter, the way in that commits to nothing at all — opening
             a file or a folder and leaving it loose.
           -->
-          <div class="chooser">
+          <div class="chooser" id="chooser">
             <div class="chooser-side">
               <h2>Your vaults</h2>
               <ul id="welcome-vault-list" class="welcome-vault-list"></ul>
@@ -141,7 +145,7 @@
               <div class="chooser-row">
                 <div>
                   <b>Create a new vault</b>
-                  <span>Make a vault in a folder you choose. It stays on this computer until you link it.</span>
+                  <span>Name it and say where it goes. It stays on this computer until you link it.</span>
                 </div>
                 <button id="btn-welcome-vault" class="primary-btn" type="button">Create</button>
               </div>
@@ -174,6 +178,52 @@
               </div>
             </div>
           </div>
+
+          <!--
+            Making a vault asks two things, and they have an order: the name
+            first, because the name is also the folder, and the place second,
+            because a folder has to be put somewhere. Asking for the folder in
+            a file dialog instead — which is what this replaces — got the order
+            backwards and left the vault called whatever the folder was.
+
+            It takes over the welcome screen rather than floating above it: one
+            screen asking one thing, with the way back at the top of it.
+          -->
+          <div id="vault-maker" class="maker" hidden>
+            <button id="btn-maker-back" class="maker-back" type="button">
+              <span data-icon="back" data-size="14"></span>Back
+            </button>
+            <h2 class="maker-title">Create a new vault</h2>
+
+            <div class="maker-card">
+              <div class="maker-row">
+                <div>
+                  <b>Vault name</b>
+                  <span>What the vault is called, and the name of the folder it is made in.</span>
+                </div>
+                <input id="maker-name" class="maker-input" type="text" placeholder="My notes"
+                       maxlength="120" autocomplete="off" spellcheck="false" aria-label="Vault name">
+              </div>
+
+              <div class="maker-row">
+                <div>
+                  <b>Location</b>
+                  <span>Where to put the new folder. Nothing already there is touched.</span>
+                </div>
+                <div class="chooser-pair">
+                  <button id="btn-maker-browse" class="secondary-btn" type="button">Browse</button>
+                </div>
+              </div>
+            </div>
+
+            <p id="maker-path" class="maker-path"></p>
+            <p id="maker-error" class="maker-error" role="alert" hidden></p>
+
+            <div class="maker-acts">
+              <button id="btn-maker-create" class="primary-btn" type="button">Create</button>
+            </div>
+          </div>
+
           <div id="default-banner" class="default-banner" hidden>
             <span>Open <b>.md</b> files with a double-click — make Plume your default viewer.</span>
             <button id="btn-default" class="ghost-btn" type="button">Set as default…</button>

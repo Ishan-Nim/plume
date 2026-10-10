@@ -66,8 +66,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // The vault sits in a bar at the foot of the sidebar, and that bar toggles —
 // so clicking it blindly a second time would close what we just opened.
-const OPEN_VAULT = 'var p = document.querySelector("[data-panel=vault]");'
-  + ' if (p && p.hidden) document.getElementById("vault-bar").click();';
+// The vault bar lists the vaults now; the account panel is a tab of the
+// sidebar, so it is asked for as one.
+const OPEN_VAULT = 'window.plume.setSettings({ sidebar: true, sidebarTab: "vault" });'
+  + ' await new Promise(r => setTimeout(r, 400));';
 
 const logs = [];
 const results = [];

@@ -291,6 +291,63 @@ function cleanName(raw) {
   return given.slice(0, 120);
 }
 
+// A new vault is named before it has a folder, and the name becomes the
+// folder — so the name has to survive being one. Windows rules out rather a
+// lot: the characters a path is built from, trailing dots and spaces, and the
+// device names that have been reserved since DOS.
+const BAD_IN_FOLDER = /[<>:"/\\|?* -]/g;
+const RESERVED_FOLDER = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
+/** The folder name a vault name would get, or '' if nothing usable is left. */
+function folderName(raw) {
+  const given = cleanName(raw)
+    .replace(BAD_IN_FOLDER, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/, '');
+  if (!given || RESERVED_FOLDER.test(given)) return '';
+  return given;
+}
+
+/**
+ * Makes a folder for a new vault inside `parent`, and claims it.
+ *
+ * `create` takes a folder that already exists, which means the folder has to
+ * be made in a file dialog first and the vault is then stuck with whatever it
+ * was called there. Asking for the name first and making the folder here is
+ * the other order, and the one people expect: the name you type is the name
+ * of the vault *and* of the folder it lives in.
+ *
+ * An existing folder is never taken over by this path. Claiming a folder that
+ * already holds notes is a different question with a different answer — that
+ * is `create` on a folder the user picked — so a collision is refused rather
+ * than resolved with a "(2)" nobody asked for.
+ */
+function createNew(parent, name) {
+  const base = path.resolve(parent);
+  if (!isDirSync(base)) throw new Error('That location is not a folder on this computer.');
+
+  const leaf = folderName(name);
+  if (!leaf) throw new Error('That is not a name a folder can have. Letters, numbers and spaces work.');
+
+  const abs = path.join(base, leaf);
+  if (fs.existsSync(abs)) {
+    throw new Error(`“${leaf}” is already in that folder. `
+      + 'Pick another name, or open that folder as a vault instead.');
+  }
+
+  fs.mkdirSync(abs);
+  try {
+    return create(abs, { name: cleanName(name) });
+  } catch (err) {
+    // A folder made one line ago and refused the next is litter, and it is
+    // empty, so it goes back. rmdir and not rm: if anything is in there, this
+    // is not the folder we just made and it stays.
+    try { fs.rmdirSync(abs); } catch { /* then it was not ours to remove */ }
+    throw err;
+  }
+}
+
 /** Renames the vault without touching the folder it lives in. */
 function rename(root, name) {
   const vault = read(root);
@@ -558,6 +615,8 @@ module.exports = {
   read,
   forPath,
   create,
+  createNew,
+  folderName,
   rename,
   link,
   unlink,

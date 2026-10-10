@@ -86,6 +86,7 @@ contextBridge.exposeInMainWorld('plume', {
   vaults: {
     state: () => invoke('vaults:state'),
     create: options => invoke('vaults:create', options),
+    location: options => invoke('vaults:location', options),
     rename: (root, name) => invoke('vaults:rename', root, name),
     open: root => invoke('vaults:open', root),
     forget: root => invoke('vaults:forget', root),

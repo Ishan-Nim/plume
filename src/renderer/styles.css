@@ -924,6 +924,88 @@ body:not(.is-welcome) .welcome { display: none; }
   .chooser-row { flex-direction: column; align-items: stretch; gap: 10px; }
 }
 
+/* Making a vault takes the whole welcome screen while it is open: the chooser,
+   the recent files and the default-app nudge are all answers to a question
+   that has just been answered. */
+body.is-making .chooser,
+body.is-making .recent,
+body.is-making .default-banner { display: none; }
+
+.maker { width: min(520px, 100%); margin: 30px auto 0; text-align: left; }
+.maker-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 13px;
+  line-height: 0;
+}
+.maker-back span { line-height: 0; }
+.maker-back:hover { background: var(--chrome); color: var(--text); }
+.maker-title { margin: 10px 0 14px; font-size: 17px; font-weight: 650; color: var(--heading); }
+
+.maker-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.maker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 14px 14px 18px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.maker-row:last-child { border-bottom: 0; }
+.maker-row > div:first-child { min-width: 0; }
+.maker-row b { display: block; font-size: 13.5px; font-weight: 600; color: var(--text); }
+.maker-row span {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.maker-input {
+  flex: none;
+  width: 180px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.maker-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* The one line that says what is about to happen on disk. */
+.maker-path {
+  margin: 10px 2px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+.maker-path b { font-weight: 600; color: var(--text); }
+.maker-error { margin: 8px 2px 0; font-size: 12.5px; line-height: 1.5; color: var(--danger); }
+
+.maker-acts { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+@media (max-width: 560px) {
+  .maker-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .maker-input { width: auto; }
+}
+
 .recent { margin-top: 28px; text-align: left; }
 .recent h2 {
   margin: 0 0 8px 4px;
@@ -1675,51 +1757,13 @@ summary.callout-title::-webkit-details-marker { display: none; }
   .markdown-body a.external::after { display: none; }
 }
 
-.vault-bar {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  /* Takes what is left of the row rather than all of it, so the switcher
-     button beside it is not pushed off the edge of the sidebar. */
-  flex: 1;
-  min-width: 0;
-  padding: 9px 12px;
-  border: 0;
-  background: var(--chrome);
-  color: var(--text-2);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  flex: none;
-}
-.vault-bar:hover { background: var(--chrome-2); color: var(--text); }
-.vault-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.vault-bar[aria-expanded="true"] { background: var(--chrome-2); color: var(--text); }
-.vault-bar[aria-expanded="true"] .vault-bar-icon { color: var(--accent); }
-
-.vault-bar-icon { flex: none; display: flex; color: var(--text-3); }
-.vault-bar-text { flex: 1; min-width: 0; }
-.vault-bar-text b {
-  display: block; font-size: 12.5px; font-weight: 600; color: var(--heading);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.vault-bar-text span {
-  display: block; font-size: 11px; color: var(--text-3); margin-top: 1px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.vault-bar-chevron { flex: none; display: flex; color: var(--text-3); transition: transform .15s ease; }
-.vault-bar[aria-expanded="true"] .vault-bar-chevron { transform: rotate(180deg); }
-
-/* The vault panel sits above the bar rather than replacing the whole sidebar. */
-.sidebar-panel[data-panel="vault"] { border-top: 1px solid var(--border); }
-
 /* ---------------------------------------------------------------------------
    Plume Vault — sidebar panel
    --------------------------------------------------------------------------- */
 
-/* The bar and the switcher button share one strip at the foot of the sidebar:
-   the bar names the vault you are in and opens its panel, the button beside it
-   switches to another. Two acts, so two targets. */
+/* One strip at the foot of the sidebar: the vault you are in at the near end,
+   where pressing it lists the others, and help and settings at the far end,
+   which is where a thing you reach for twice a month belongs. */
 .vault-bar-row {
   display: flex;
   align-items: stretch;
@@ -1727,38 +1771,36 @@ summary.callout-title::-webkit-details-marker { display: none; }
   border-top: 1px solid var(--border);
   background: var(--chrome);
 }
-.vault-switch {
+.vault-bar-act {
   flex: none;
-  width: 34px;
+  width: 30px;
   border-radius: 0;
   color: var(--text-3);
 }
-.vault-switch:hover { background: var(--chrome-2); color: var(--text); }
-.vault-switch[aria-expanded="true"] { background: var(--chrome-2); color: var(--accent); }
+.vault-bar-act:hover { background: var(--chrome-2); color: var(--text); }
+.vault-bar-act[aria-expanded="true"] { background: var(--chrome-2); color: var(--accent); }
 
 .vault-bar {
   display: flex;
   align-items: center;
-  gap: 9px;
-  /* Takes what is left of the row rather than all of it, so the switcher
-     button beside it is not pushed off the edge of the sidebar. */
+  gap: 8px;
+  /* Takes what is left of the row, so the name has the width and the two
+     buttons beside it keep to the edge. */
   flex: 1;
   min-width: 0;
-  padding: 9px 12px;
+  padding: 9px 4px 9px 10px;
   border: 0;
   background: var(--chrome);
   color: var(--text-2);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  flex: none;
 }
 .vault-bar:hover { background: var(--chrome-2); color: var(--text); }
 .vault-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .vault-bar[aria-expanded="true"] { background: var(--chrome-2); color: var(--text); }
-.vault-bar[aria-expanded="true"] .vault-bar-icon { color: var(--accent); }
+.vault-bar[aria-expanded="true"] .vault-bar-chevron { color: var(--accent); }
 
-.vault-bar-icon { flex: none; display: flex; color: var(--text-3); }
 .vault-bar-text { flex: 1; min-width: 0; }
 .vault-bar-text b {
   display: block; font-size: 12.5px; font-weight: 600; color: var(--heading);
@@ -2274,7 +2316,7 @@ body.is-editing #btn-edit { color: var(--accent); background: var(--accent-soft)
   color: var(--text-3);
 }
 .switcher-mark { flex: none; line-height: 0; color: var(--accent); }
-.switcher-current { flex: none; font-size: 11px; color: var(--text-3); }
+.switcher-current { flex: none; line-height: 0; color: var(--text-2); }
 .switcher-empty { margin: 10px; font-size: 12.5px; color: var(--text-3); }
 
 .switcher-foot {
