@@ -104,6 +104,22 @@ app.whenReady().then(async () => {
     // 1. What a fresh install opens on: the chooser.
     await shot('vault-chooser');
 
+    // 1b. And the screen behind its Create button, which asks for a name
+    //     before it asks for a place.
+    await run(`
+      document.getElementById('btn-welcome-vault').click();
+      await new Promise(r => setTimeout(r, 500));
+      const n = document.getElementById('maker-name');
+      n.value = 'Field Notes';
+      n.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 250));
+    `);
+    await shot('vault-maker');
+    await run(`
+      document.getElementById('btn-maker-back').click();
+      await new Promise(r => setTimeout(r, 300));
+    `);
+
     // 2. A folder, opened and left loose.
     await run(`
       window.plume.setSettings({ folder: ${JSON.stringify(FIELD)} });
@@ -124,6 +140,9 @@ app.whenReady().then(async () => {
     await run2(OPEN_VAULT);
     await sleep(900);
     await shot2('vault-loose');
+
+    // 2b. The sign-in form, in the sidebar rather than over the document.
+    await shot2('vault-signin');
 
     // 3. Signed in, so the account section is real.
     await run2(`
