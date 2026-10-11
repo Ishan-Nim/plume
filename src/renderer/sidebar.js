@@ -7,7 +7,7 @@ import { icon } from './icons.js';
 export class FileTree {
   constructor({ container, title, upButton, newButton, newFolderButton,
     listDir, createNote, createFolder, renameEntry, moveEntry,
-    onOpen, onOpenNew, onCreate, onMenu, onError }) {
+    onOpen, onOpenNew, onCreate, onMenu, onDelete, onError }) {
     this.container = container;
     this.title = title;
     this.upButton = upButton;
@@ -22,6 +22,7 @@ export class FileTree {
     this.onOpen = onOpen;
     this.onOpenNew = onOpenNew;
     this.onCreate = onCreate;
+    this.onDelete = onDelete || (() => {});
     this.onError = onError || (() => {});
     this.root = null;
     this.parent = null;
@@ -473,6 +474,11 @@ export class FileTree {
     else if (e.key === 'ArrowLeft' && row.classList.contains('is-dir')) this.expand(row, false);
     else if (e.key === 'Enter') row.click();
     else if (e.key === 'F2') this.beginRename(row.dataset.path);
+    // Delete takes a row to the trash; with Shift, off the disk instead.
+    // Backspace too: on a Mac keyboard that is the key marked Delete.
+    else if (e.key === 'Delete' || e.key === 'Backspace') {
+      this.onDelete(row.dataset.path, row.classList.contains('is-dir'), e.shiftKey);
+    }
     else return;
     e.preventDefault();
   }

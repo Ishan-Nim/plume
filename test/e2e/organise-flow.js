@@ -1,15 +1,15 @@
 'use strict';
 
 // End-to-end check of organising notes from the sidebar in the real app:
-// renaming, moving by drag, deleting to the trash — and the thing that makes
-// renaming worth having, which is that every [[link]] pointing at the note
-// follows it.
+// renaming, moving by drag, deleting to the trash and deleting for good —
+// and the thing that makes renaming worth having, which is that every
+// [[link]] pointing at the note follows it.
 //
 //   npx electron test/e2e/organise-flow.js
 //
 // Env: PLUME_SHOTS (directory for screenshots), PLUME_SIZE, PLUME_THEME.
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -32,6 +32,7 @@ fs.writeFileSync(DOC, [
 ].join('\n'));
 fs.writeFileSync(path.join(notebook, 'Plan.md'), '# Plan\n\nBack to [[Welcome]].\n');
 fs.writeFileSync(path.join(notebook, 'Planning.md'), '# Planning\n');
+fs.writeFileSync(path.join(notebook, 'Scratch.md'), '# Scratch\n');
 fs.mkdirSync(path.join(notebook, 'Projects'));
 fs.writeFileSync(path.join(notebook, 'Projects', 'Plume.md'), '# Plume\n\nSee [[Plan#Later|the plan]].\n');
 
@@ -48,6 +49,18 @@ fs.writeFileSync(path.join(tmp, 'settings.json'), JSON.stringify({
 process.argv.push(DOC);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Deleting for good is confirmed by the main process with a native dialog,
+// which a headless run cannot click. The answer is given here and the
+// questions are recorded, so a release that quietly stopped asking fails
+// rather than passes.
+const asked = [];
+let answer = 0;
+dialog.showMessageBox = async (_win, options) => {
+  asked.push(options.title || '');
+  return { response: answer, checkboxChecked: false };
+};
+
 const results = [];
 const logs = [];
 let failures = 0;
@@ -196,6 +209,23 @@ async function main(win) {
   record('links to a deleted note are left alone, not rewritten',
     read(path.join(notebook, 'Start here.md')).includes('[[Planning]]'));
   await shot('04-trashed');
+
+  // ---- deleting for good, which only the main process can agree to ----
+  answer = 1;
+  await menu('Scratch', 'Delete permanently');
+  await sleep(1200);
+  record('saying no to the permanent delete keeps the note',
+    fs.existsSync(path.join(notebook, 'Scratch.md')));
+  record('and the question came from the main process, not the renderer',
+    asked.some(t => /Delete permanently/i.test(t)), asked.join(' | ') || '(nothing asked)');
+
+  answer = 0;
+  await menu('Scratch', 'Delete permanently');
+  await sleep(1500);
+  record('saying yes takes it off the disk', !fs.existsSync(path.join(notebook, 'Scratch.md')));
+  record('the tree stops showing it too',
+    !(await peek('[...document.querySelectorAll(".tree-name")].some(n => n.textContent === "Scratch")')));
+  await shot('05-deleted');
 }
 
 app.on('browser-window-created', (_e, win) => {

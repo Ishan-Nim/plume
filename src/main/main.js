@@ -1003,6 +1003,41 @@ handle('note:trash', async (ctx, p) => {
   return { path: abs, folder: dir, name: path.basename(abs) };
 });
 
+/**
+ * Deletes a note or a folder off the disk, with nothing left to get it back
+ * from. The question is asked here rather than only in the renderer: the
+ * trash is a mistake you can walk back and this is not, so the one control
+ * over it has to survive a renderer that has gone wrong. Links that pointed
+ * at it are left as they were, same as `note:trash`.
+ */
+handle('note:delete', async (ctx, p) => {
+  const abs = localPath(ctx, p);
+  const dir = await files.isDir(abs);
+  if (!dir && !(await files.isFile(abs))) return { error: 'That is no longer there.' };
+  const { response } = await dialog.showMessageBox(ctx.win, {
+    type: 'warning',
+    buttons: ['Delete permanently', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Delete permanently',
+    message: `Permanently delete “${path.basename(abs)}”?`,
+    detail: (dir
+      ? 'The folder and everything inside it is removed from the disk. '
+      : 'It is removed from the disk. ')
+      + 'It does not go to the trash, and it cannot be undone.',
+  });
+  if (response !== 0) return { canceled: true };
+  try {
+    await fs.promises.rm(abs, { recursive: dir, force: false });
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  files.clearCaches();
+  settings.removeRecent(abs);
+  broadcastSettings();
+  return { path: abs, folder: dir, name: path.basename(abs) };
+});
+
 // Classify a link the user clicked. The renderer passes the absolute URL the
 // browser resolved against the document's folder.
 handle('link:resolve', async (ctx, href) => {

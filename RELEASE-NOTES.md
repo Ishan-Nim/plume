@@ -1,25 +1,24 @@
-# Plume 0.0.5
+# Plume 0.0.6
 
 **Not released yet** &middot; [plume-md.com](https://plume-md.com) &middot; MIT licence
 
-> **0.0.5 is a navigation you can read at a glance.**
+> **0.0.6 adds a delete that actually deletes.**
 >
-> The row across the top of plume-md.com had grown to eight things, which is a
-> list rather than a menu. It is four now: **Product**, **Learn**, your
-> **account**, and **Download**. The first two open; the third opens once you
-> are signed in and is simply the way in before that, because *Sign out* is not
-> an offer to make somebody who is not signed in.
+> The Files tree could move a note to the system trash, and that is the right
+> default &mdash; it is a mistake you can walk back. It is not what you want
+> for a note you never meant to keep, or for a folder you are clearing out of
+> a vault that syncs. **Delete permanently** sits under **Move to trash** on
+> the right-click menu now, and takes the note or the folder off the disk.
 >
-> Each item in a menu says what it is for underneath its name, so the menu
-> answers the question rather than only naming a page. One opens at a time,
-> Escape closes it and hands the keyboard back, and a tap anywhere else closes
-> it &mdash; which is what a touch screen needs, having no hover to leave.
+> The question it asks comes from Plume itself rather than from the page, the
+> same way linking a vault does. A confirmation drawn by the window is no
+> confirmation at all if the window is the thing that has gone wrong, and this
+> is the only thing in the file tree that nothing can undo.
 >
-> **Two pages stopped scrolling sideways on a phone.** The glow behind the
-> headline reaches past both edges by design and nothing was clipping it, so
-> the whole page could be dragged sideways. And the documentation collapsed
-> to a single column whose width was still set by its widest code block; the
-> code scrolls inside itself now, as it already did on wider screens.
+> Both are on the keyboard: `Del` on a row in the tree sends it to the trash,
+> `Shift+Del` deletes it for good. Trashing keeps its own wording and its own
+> question, and links that pointed at a deleted note are still left broken on
+> purpose, because that is how you notice.
 
 ---
 
@@ -177,22 +176,22 @@ vault, and no way to forge a session.
 
 | System | File |
 |---|---|
-| Windows 10 / 11, 64-bit | `Plume-Setup-1.5.1.exe` |
-| macOS, Apple silicon | `Plume-1.5.1-mac-arm64.dmg` (or `.zip`) |
-| macOS, Intel | `Plume-1.5.1-mac-x64.dmg` (or `.zip`) |
-| Linux, x64 | `Plume-1.5.1-linux-x86_64.AppImage` or `Plume-1.5.1-linux-amd64.deb` |
+| Windows 10 / 11, 64-bit | `Plume-Setup-0.0.6.exe` |
+| macOS, Apple silicon | `Plume-0.0.6-mac-arm64.dmg` (or `.zip`) |
+| macOS, Intel | `Plume-0.0.6-mac-x64.dmg` (or `.zip`) |
+| Linux, x64 | `Plume-0.0.6-linux-x86_64.AppImage` or `Plume-0.0.6-linux-amd64.deb` |
 
 Or get them from [plume-md.com/download](https://plume-md.com/download.html),
 which offers the right build for your system.
 
 Checksums for every file are in `SHA256SUMS.txt` on the
-[release](https://github.com/Ishan-Nim/plume/releases/tag/v1.5.1).
+[release](https://github.com/Ishan-Nim/plume/releases/tag/v0.0.6).
 
 ## Installing
 
 ### Windows
 
-Run `Plume-Setup-1.5.1.exe`. Plume installs for all users in
+Run `Plume-Setup-0.0.6.exe`. Plume installs for all users in
 `C:\Program Files\Plume`, so Windows asks for administrator approval once. The
 installer is not code-signed yet: if SmartScreen shows "Windows protected your
 PC", choose **More info → Run anyway**.
@@ -214,8 +213,8 @@ so macOS blocks the first launch. Use either of these:
 ### Linux
 
 - **AppImage:** make it executable with
-  `chmod +x Plume-1.5.1-linux-x86_64.AppImage`, then run it.
-- **Debian / Ubuntu:** `sudo apt install ./Plume-1.5.1-linux-amd64.deb`. On
+  `chmod +x Plume-0.0.6-linux-x86_64.AppImage`, then run it.
+- **Debian / Ubuntu:** `sudo apt install ./Plume-0.0.6-linux-amd64.deb`. On
   Ubuntu 24.04 and later, use the `.deb`: it installs the AppArmor profile that
   Electron apps need to start there.
 

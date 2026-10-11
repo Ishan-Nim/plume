@@ -1149,7 +1149,9 @@ function isMac() {
 
 // 'Ctrl+O' → '⌘O' on macOS, where the key handler also accepts Cmd.
 function shortcutLabel(text) {
-  return isMac() ? text.replace(/Ctrl\+/g, '⌘').replace(/Alt\+/g, '⌥') : text;
+  if (!isMac()) return text;
+  return text.replace(/Ctrl\+/g, '⌘').replace(/Alt\+/g, '⌥')
+    .replace(/Shift\+/g, '⇧').replace(/\bDel\b/g, '⌫');
 }
 
 // index.html is written for Windows; adjust its hints elsewhere.
@@ -1216,7 +1218,8 @@ function showTreeMenu({ path: target, dir, root, x, y }) {
   if (!root) {
     items.push(
       menuItem('Rename…', 'pencil', () => fileTree.beginRename(target), { shortcut: 'F2' }),
-      menuItem('Move to trash', 'close', () => trashEntry(target, dir)),
+      menuItem('Move to trash', 'trash', () => trashEntry(target, dir), { shortcut: 'Del' }),
+      menuItem('Delete permanently', 'trashX', () => deleteEntry(target, dir), { shortcut: 'Shift+Del' }),
       sep(),
     );
   }
@@ -1285,6 +1288,24 @@ async function trashEntry(target, isDir) {
   }
   await fileTree.refresh();
   toast(`${res.name} is in the trash`);
+}
+
+// The same thing without the safety net. Plume does not ask here — the main
+// process does, because the renderer asking itself is no protection at all if
+// the renderer is what went wrong, and this is the one action in the tree that
+// nothing can undo.
+async function deleteEntry(target, isDir) {
+  const res = await api.deleteNote(target);
+  if (!res || res.canceled) return;
+  if (res.error) {
+    toast(res.error, 'error');
+    return;
+  }
+  if (state.doc && (samePath(state.doc.path, target) || relativeSegments(target, state.doc.path))) {
+    showBanner('This document was deleted.');
+  }
+  await fileTree.refresh();
+  toast(`${res.name} was deleted`);
 }
 
 function buildMoreMenu() {
@@ -1880,6 +1901,7 @@ const fileTree = new FileTree({
     if (!state.doc || !samePath(p, state.doc.path)) openDoc(p);
   },
   onOpenNew: p => api.openPaths([p]),
+  onDelete: (p, dir, permanent) => (permanent ? deleteEntry(p, dir) : trashEntry(p, dir)),
   onCreate: async p => {
     if (await openDoc(p)) toggleEdit();
   },

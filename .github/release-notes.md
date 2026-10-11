@@ -2,6 +2,10 @@ Plume is a feather-light Markdown viewer. Double-click a `.md` file and it opens
 
 **This is a pre-release.** 1.0 is the number Plume will carry when it is out; until then the builds are numbered from zero.
 
+**0.0.6 adds a delete that actually deletes.** The Files tree could move a note to the system trash, and that is the right default — it is a mistake you can walk back. It is not what you want for a note you never meant to keep, or for a folder you are clearing out of a vault that syncs. **Delete permanently** sits under **Move to trash** on the right-click menu now, and takes the note or the folder off the disk.
+
+The question it asks comes from Plume itself rather than from the page, the same way linking a vault does: a confirmation drawn by the window is no confirmation at all if the window is the thing that has gone wrong, and this is the only thing in the file tree that nothing can undo. Both are on the keyboard — `Del` sends a row to the trash, `Shift+Del` deletes it for good. Links that pointed at a deleted note are still left broken on purpose, because that is how you notice.
+
 **0.0.5 is a navigation you can read at a glance.** The row across the top of plume-md.com had grown to eight things. It is four now: Product, Learn, your account, and Download. The first two open; the third opens once you are signed in. Each item says what it is for underneath its name, one menu opens at a time, Escape closes it, and a tap anywhere else closes it.
 
 Two pages stopped scrolling sideways on a phone: the glow behind the headline reaches past both edges by design and nothing clipped it, and the documentation collapsed to a column whose width was still set by its widest code block.
