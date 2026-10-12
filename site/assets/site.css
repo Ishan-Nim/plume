@@ -365,6 +365,14 @@ p { margin: 0; }
   box-shadow: var(--shadow-lg);
 }
 .nav-panel[hidden] { display: none; }
+/* The panel hangs 8px below the thing that opens it. That gap belongs to
+   neither, so without something covering it the pointer leaves the menu on its
+   way down and the panel goes away before it is reached. */
+.nav-panel::before {
+  content: '';
+  position: absolute;
+  top: -10px; left: 0; right: 0; height: 10px;
+}
 .nav-panel a,
 .nav-panel button {
   display: block; width: 100%;

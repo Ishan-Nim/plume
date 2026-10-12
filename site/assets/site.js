@@ -296,20 +296,28 @@
       });
     }
 
-    menu.addEventListener('mouseenter', function () {
+    // A pointer on its way to the panel travels diagonally and can clip the
+    // edge of the menu for a frame. Closing on that frame takes the panel away
+    // under the mouse, so the close waits a moment and coming back cancels it.
+    var closing = null;
+
+    function show() {
+      if (closing) { clearTimeout(closing); closing = null; }
       closeMenus(menu);
       panel.hidden = false;
       if (top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'true');
-    });
+    }
+
+    menu.addEventListener('mouseenter', show);
     menu.addEventListener('mouseleave', function () {
-      panel.hidden = true;
-      if (top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'false');
+      if (closing) clearTimeout(closing);
+      closing = setTimeout(function () {
+        closing = null;
+        panel.hidden = true;
+        if (top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'false');
+      }, 180);
     });
-    menu.addEventListener('focusin', function () {
-      closeMenus(menu);
-      panel.hidden = false;
-      if (top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'true');
-    });
+    menu.addEventListener('focusin', show);
   });
 
   if (menus.length) {
