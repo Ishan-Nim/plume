@@ -340,6 +340,7 @@ p { margin: 0; }
   display: inline-flex; align-items: center; gap: 4px;
   color: var(--text-2); font-size: .94rem; font-weight: 500;
   padding: 7px 11px; border-radius: 9px;
+  white-space: nowrap;
   border: 0; background: transparent; font-family: inherit; cursor: pointer;
 }
 .nav-links a.navlink:hover,
@@ -396,14 +397,41 @@ body:not(.is-signed-in) #nav-account-menu .nav-panel { display: none; }
 
 /* ---------- narrow ---------- */
 
+/* Only the narrow header shows it; site.js builds it from the two it replaces. */
+.nav-menu-compact { display: none; }
+
 @media (max-width: 760px) {
   .nav-hide { display: none; }
-  /* Two menus and the button fit; the third would wrap the row. */
+  /* Product and Learn would wrap the row, so they become one menu here. */
+  .nav-links .nav-menu:nth-of-type(1),
   .nav-links .nav-menu:nth-of-type(2) { display: none; }
+  .nav-links .nav-menu-compact { display: block; }
+  /* Four things on a phone row: tighter padding keeps them on one line. */
+  .nav { gap: 6px; }
+  .nav-links a.navlink,
+  .nav-links button.nav-top { padding: 7px 8px; }
   .nav-panel { min-width: min(280px, calc(100vw - 28px)); }
+  /* Right-aligned under a narrow header, a panel this wide would hang off the
+     left edge of the screen, so this one spans the width under the header and
+     scrolls if the list is taller than the phone. */
+  .nav-menu-compact .nav-panel {
+    position: fixed;
+    top: 72px; right: 14px; left: auto;
+    width: min(360px, calc(100vw - 28px));
+    min-width: 0;
+    max-height: calc(100vh - 86px);
+    overflow-y: auto;
+  }
 }
-@media (max-width: 460px) {
-  .nav-links .nav-menu:nth-of-type(1) { display: none; }
+
+/* On a 320px screen the row still has to hold the logo, the menu, the account
+   and the download button, and it only does with everything pulled in. */
+@media (max-width: 380px) {
+  .brand { font-size: 1rem; gap: 8px; }
+  .nav { gap: 4px; }
+  .nav-links a.navlink,
+  .nav-links button.nav-top { padding: 7px 6px; }
+  .nav .btn-sm { padding-left: 10px; padding-right: 10px; }
 }
 
 .theme-toggle {

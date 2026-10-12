@@ -266,17 +266,62 @@
   // closes it too — including on a touch screen, where there is no hover to
   // leave.
 
+  // On a phone there is no room for Product and Learn beside the account and
+  // the download button, so below 760px the narrow stylesheet hides them and
+  // shows this instead: one menu holding what both of them hold. It is built
+  // here rather than written into the header of every page, so the short nav
+  // and the wide one cannot drift apart. i18n runs after this and translates
+  // the copies along with everything else.
+  (function () {
+    var links = document.querySelector('.nav-links');
+    if (!links) return;
+
+    var wide = [].slice.call(links.querySelectorAll('.nav-menu')).filter(function (m) {
+      var t = m.querySelector('.nav-top');
+      return m.id !== 'nav-account-menu' && t && t.tagName === 'BUTTON';
+    });
+    if (wide.length < 2) return;
+
+    var top = document.createElement('button');
+    top.className = 'navlink nav-top';
+    top.type = 'button';
+    top.setAttribute('aria-expanded', 'false');
+    top.setAttribute('aria-haspopup', 'true');
+    top.appendChild(document.createTextNode('Menu'));
+    var caret = wide[0].querySelector('.nav-caret');
+    if (caret) top.appendChild(caret.cloneNode(true));
+
+    var panel = document.createElement('div');
+    panel.className = 'nav-panel';
+    panel.setAttribute('role', 'menu');
+    panel.hidden = true;
+    wide.forEach(function (m) {
+      [].slice.call(m.querySelectorAll('.nav-panel > *')).forEach(function (item) {
+        panel.appendChild(item.cloneNode(true));
+      });
+    });
+
+    var menu = document.createElement('div');
+    menu.className = 'nav-menu nav-menu-compact';
+    menu.appendChild(top);
+    menu.appendChild(panel);
+    links.insertBefore(menu, document.getElementById('nav-account-menu') || links.lastElementChild);
+  })();
+
   var menus = [].slice.call(document.querySelectorAll('.nav-menu'));
 
   // A touch screen has no hover, but it does send an emulated mouseenter just
   // before the click of a tap. Opening on that and then toggling on the click
   // closed the menu again within the same tap, so the first tap appeared to do
   // nothing and it took two. Remember what the last pointer was, and let hover
-  // open a menu only for a pointer that can really hover.
+  // open a menu only for a pointer that can really hover. A laptop with a
+  // touchscreen sends both kinds, so this listens to the arrival of a pointer
+  // as well as its press: a real mouse announces itself with a pointerover
+  // before the mouseenter, and gets its hover back straight away.
   var lastPointer = 'mouse';
-  document.addEventListener('pointerdown', function (ev) {
-    lastPointer = ev.pointerType || 'mouse';
-  }, true);
+  function sawPointer(ev) { lastPointer = ev.pointerType || 'mouse'; }
+  document.addEventListener('pointerover', sawPointer, true);
+  document.addEventListener('pointerdown', sawPointer, true);
 
   function closeMenus(except) {
     menus.forEach(function (menu) {
