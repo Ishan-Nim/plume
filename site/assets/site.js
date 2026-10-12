@@ -268,6 +268,16 @@
 
   var menus = [].slice.call(document.querySelectorAll('.nav-menu'));
 
+  // A touch screen has no hover, but it does send an emulated mouseenter just
+  // before the click of a tap. Opening on that and then toggling on the click
+  // closed the menu again within the same tap, so the first tap appeared to do
+  // nothing and it took two. Remember what the last pointer was, and let hover
+  // open a menu only for a pointer that can really hover.
+  var lastPointer = 'mouse';
+  document.addEventListener('pointerdown', function (ev) {
+    lastPointer = ev.pointerType || 'mouse';
+  }, true);
+
   function closeMenus(except) {
     menus.forEach(function (menu) {
       if (menu === except) return;
@@ -308,7 +318,11 @@
       if (top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'true');
     }
 
-    menu.addEventListener('mouseenter', show);
+    menu.addEventListener('mouseenter', function () {
+      if (lastPointer === 'touch') return;
+      show();
+    });
+
     menu.addEventListener('mouseleave', function () {
       if (closing) clearTimeout(closing);
       closing = setTimeout(function () {
@@ -317,7 +331,15 @@
         if (top.tagName === 'BUTTON') top.setAttribute('aria-expanded', 'false');
       }, 180);
     });
-    menu.addEventListener('focusin', show);
+    // Pressing the button focuses it as well, and opening on that focus left
+    // the click below with an open menu to toggle shut — a tap did nothing and
+    // a mouse needed two clicks. Only a focus the browser would draw a ring
+    // around, which is to say a keyboard one, opens the menu.
+    menu.addEventListener('focusin', function (ev) {
+      var el = ev.target;
+      try { if (!el.matches(':focus-visible')) return; } catch (e) { /* older browser */ }
+      show();
+    });
   });
 
   if (menus.length) {
